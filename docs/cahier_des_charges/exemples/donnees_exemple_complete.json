@@ -1,0 +1,592 @@
+{
+  "v": 2,
+  "types": [
+    "Support",
+    "R&D",
+    "Technologique",
+    "Test d’idée"
+  ],
+  "statuts": [
+    {
+      "id": "brouillon",
+      "nom": "Brouillon",
+      "ton": "warn"
+    },
+    {
+      "id": "encours",
+      "nom": "En cours",
+      "ton": "info"
+    },
+    {
+      "id": "terminee",
+      "nom": "Terminée",
+      "ton": "ok"
+    }
+  ],
+  "manips": [
+    {
+      "id": "k97omty",
+      "nom": "Désacidification éthanol",
+      "tags": [
+        "graisse animale",
+        "FFA",
+        "éthanol"
+      ],
+      "statut": "encours",
+      "modele": false,
+      "maj": "2026-10-30T21:10:00Z",
+      "rev": 4,
+      "lancee": {
+        "le": "2026-10-30T19:45:00Z",
+        "par": "Pierre"
+      },
+      "journal": [
+        {
+          "t": "2026-10-30T20:30:00Z",
+          "par": "Pierre",
+          "txt": "Étape 3 · Désacidification : durée 20 → 15 min"
+        },
+        {
+          "t": "2026-10-30T21:05:00Z",
+          "par": "Pierre",
+          "txt": "Échantillon S3a : volume 40 → 50 mL"
+        }
+      ],
+      "base": "{\"contexte\":{\"donneur\":\"Interne · R&D\",\"ref\":\"DA-2026-0158\",\"date\":\"2026-10-30\",\"operateur\":\"Pierre\",\"volumeDepart\":1000,\"matiere\":\"Graisse animale\",\"lot\":\"\",\"type\":\"R&D\",\"objectif\":\"Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %\",\"precisions\":\"Essai de référence avant le passage à l’échelle pilote.\"},\"tags\":[\"graisse animale\",\"FFA\",\"éthanol\"],\"etapes\":[{\"id\":\"tt19p5g\",\"operation\":\"chauffage\",\"temperature\":60,\"duree\":30,\"agitation\":300,\"filtre\":null,\"vide\":null,\"autres\":[],\"equipement\":[\"Plaque chauffante agitatrice\"],\"reactifs\":[],\"remarque\":\"\"},{\"id\":\"jql2yg6\",\"operation\":\"filtration\",\"temperature\":null,\"duree\":10,\"agitation\":null,\"filtre\":5,\"vide\":{\"mbar\":null},\"autres\":[],\"equipement\":[\"Entonnoir Büchner\",\"Fiole à vide\",\"Membrane 5 µm\"],\"reactifs\":[],\"remarque\":\"\"},{\"id\":\"s6s7ozw\",\"operation\":\"désacidification\",\"temperature\":25,\"duree\":15,\"agitation\":300,\"filtre\":null,\"vide\":null,\"autres\":[],\"equipement\":[\"Ampoule à décanter 500 mL\"],\"reactifs\":[{\"nom\":\"Éthanol 96 %\",\"quantite\":\"1 : 1 (v/v)\",\"role\":\"Solvant\"},{\"nom\":\"Eau distillée\",\"quantite\":\"5 % (v/v)\",\"role\":\"Additif\"}],\"remarque\":\"\"},{\"id\":\"k15xllu\",\"operation\":\"décantation\",\"temperature\":40,\"duree\":120,\"agitation\":null,\"filtre\":null,\"vide\":null,\"autres\":[],\"equipement\":[\"Ampoule à décanter 500 mL\"],\"reactifs\":[],\"remarque\":\"\"},{\"id\":\"zpjj9jx\",\"operation\":\"séchage\",\"temperature\":105,\"duree\":60,\"agitation\":null,\"filtre\":null,\"vide\":null,\"autres\":[],\"equipement\":[\"Étuve\"],\"reactifs\":[],\"remarque\":\"\"}],\"prelevements\":[{\"id\":\"64b4717\",\"etapeId\":null,\"moment\":\"avant\",\"temps\":null,\"volume\":50,\"scirius\":\"000412\",\"aramis\":\"000873\",\"labo\":\"Labo interne\",\"analyses\":[\"FFA / indice d’acide\",\"Teneur en eau\",\"Impuretés insolubles\"]},{\"id\":\"xbrmu1h\",\"etapeId\":\"jql2yg6\",\"moment\":\"effluent\",\"temps\":null,\"volume\":50,\"scirius\":\"000413\",\"aramis\":\"\",\"labo\":\"Labo interne\",\"analyses\":[\"FFA / indice d’acide\",\"Impuretés insolubles\"]},{\"id\":\"2igox7u\",\"etapeId\":\"s6s7ozw\",\"moment\":\"pendant\",\"temps\":10,\"volume\":50,\"scirius\":\"000414\",\"aramis\":\"\",\"labo\":\"Labo interne\",\"analyses\":[\"FFA / indice d’acide\",\"Teneur en eau\",\"Impuretés insolubles\"]},{\"id\":\"n7fne5s\",\"etapeId\":\"s6s7ozw\",\"moment\":\"effluent\",\"temps\":null,\"volume\":25,\"scirius\":\"\",\"aramis\":\"\",\"labo\":\"Labo externe\",\"analyses\":[\"Métaux (ICP)\",\"Phosphore\"]},{\"id\":\"5g02p19\",\"etapeId\":\"zpjj9jx\",\"moment\":\"pendant\",\"temps\":30,\"volume\":50,\"scirius\":\"\",\"aramis\":\"\",\"labo\":\"Labo interne\",\"analyses\":[\"FFA / indice d’acide\",\"Teneur en eau\"]},{\"id\":\"ojmh3c2\",\"etapeId\":\"zpjj9jx\",\"moment\":\"effluent\",\"temps\":null,\"volume\":100,\"scirius\":\"\",\"aramis\":\"\",\"labo\":\"Labo externe\",\"analyses\":[\"FFA / indice d’acide\",\"Teneur en eau\",\"Métaux (ICP)\",\"Phosphore\"]}]}",
+      "texteManuel": null,
+      "contexte": {
+        "donneur": "Interne · R&D",
+        "ref": "DA-2026-0158",
+        "date": "2026-10-30",
+        "operateur": "Pierre",
+        "volumeDepart": 1000,
+        "matiere": "Graisse animale",
+        "lot": "",
+        "type": "R&D",
+        "objectif": "Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %",
+        "precisions": "Essai de référence avant le passage à l’échelle pilote."
+      },
+      "communes": {
+        "temperature": null,
+        "agitation": null,
+        "vide": null
+      },
+      "etapes": [
+        {
+          "id": "tt19p5g",
+          "operation": "chauffage",
+          "temperature": 60,
+          "duree": 30,
+          "agitation": 300,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Plaque chauffante agitatrice"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "jql2yg6",
+          "operation": "filtration",
+          "temperature": null,
+          "duree": 10,
+          "agitation": null,
+          "filtre": 5,
+          "vide": {
+            "mbar": null
+          },
+          "autres": [],
+          "equipement": [
+            "Entonnoir Büchner",
+            "Fiole à vide",
+            "Membrane 5 µm"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "s6s7ozw",
+          "operation": "désacidification",
+          "temperature": 25,
+          "duree": 15,
+          "agitation": 300,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Ampoule à décanter 500 mL"
+          ],
+          "reactifs": [
+            {
+              "nom": "Éthanol 96 %",
+              "quantite": "1 : 1 (v/v)",
+              "role": "Solvant"
+            },
+            {
+              "nom": "Eau distillée",
+              "quantite": "5 % (v/v)",
+              "role": "Additif"
+            }
+          ],
+          "remarque": ""
+        },
+        {
+          "id": "k15xllu",
+          "operation": "décantation",
+          "temperature": 40,
+          "duree": 120,
+          "agitation": null,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Ampoule à décanter 500 mL"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "zpjj9jx",
+          "operation": "séchage",
+          "temperature": 105,
+          "duree": 60,
+          "agitation": null,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Étuve"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        }
+      ],
+      "prelevements": [
+        {
+          "id": "64b4717",
+          "etapeId": null,
+          "moment": "avant",
+          "temps": null,
+          "volume": 50,
+          "scirius": "000412",
+          "aramis": "000873",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau",
+            "Impuretés insolubles"
+          ]
+        },
+        {
+          "id": "xbrmu1h",
+          "etapeId": "jql2yg6",
+          "moment": "effluent",
+          "temps": null,
+          "volume": 50,
+          "scirius": "000413",
+          "aramis": "",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Impuretés insolubles"
+          ]
+        },
+        {
+          "id": "2igox7u",
+          "etapeId": "s6s7ozw",
+          "moment": "pendant",
+          "temps": 10,
+          "volume": 50,
+          "scirius": "000414",
+          "aramis": "",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau",
+            "Impuretés insolubles"
+          ]
+        },
+        {
+          "id": "n7fne5s",
+          "etapeId": "s6s7ozw",
+          "moment": "effluent",
+          "temps": null,
+          "volume": 25,
+          "scirius": "",
+          "aramis": "",
+          "labo": "Labo externe",
+          "analyses": [
+            "Métaux (ICP)",
+            "Phosphore"
+          ]
+        },
+        {
+          "id": "5g02p19",
+          "etapeId": "zpjj9jx",
+          "moment": "pendant",
+          "temps": 30,
+          "volume": 50,
+          "scirius": "",
+          "aramis": "",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau"
+          ]
+        },
+        {
+          "id": "ojmh3c2",
+          "etapeId": "zpjj9jx",
+          "moment": "effluent",
+          "temps": null,
+          "volume": 100,
+          "scirius": "",
+          "aramis": "",
+          "labo": "Labo externe",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau",
+            "Métaux (ICP)",
+            "Phosphore"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tm5yhem",
+      "nom": "Désacidification acétone",
+      "tags": [
+        "graisse animale",
+        "FFA",
+        "acétone"
+      ],
+      "statut": "terminee",
+      "modele": false,
+      "maj": "2026-10-28T15:00:00Z",
+      "rev": 3,
+      "lancee": null,
+      "journal": [],
+      "base": null,
+      "texteManuel": null,
+      "contexte": {
+        "donneur": "Interne · R&D",
+        "ref": "DA-2026-0149",
+        "date": "2026-10-28",
+        "operateur": "",
+        "volumeDepart": 800,
+        "matiere": "Graisse animale",
+        "lot": "",
+        "type": "Test d’idée",
+        "idee": "Remplacer l’éthanol par l’acétone comme solvant de désacidification",
+        "objectif": "Comparer le taux de FFA obtenu avec l’acétone à celui de l’éthanol"
+      },
+      "communes": {
+        "temperature": null,
+        "agitation": null,
+        "vide": null
+      },
+      "etapes": [
+        {
+          "id": "if2qs4p",
+          "operation": "chauffage",
+          "temperature": 60,
+          "duree": 30,
+          "agitation": 300,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Plaque chauffante agitatrice"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "bayjbml",
+          "operation": "filtration",
+          "temperature": null,
+          "duree": 10,
+          "agitation": null,
+          "filtre": 5,
+          "vide": {
+            "mbar": null
+          },
+          "autres": [],
+          "equipement": [
+            "Entonnoir Büchner",
+            "Fiole à vide",
+            "Membrane 5 µm"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "ktagrsz",
+          "operation": "désacidification",
+          "temperature": 25,
+          "duree": 15,
+          "agitation": 300,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Ampoule à décanter 500 mL"
+          ],
+          "reactifs": [
+            {
+              "nom": "Acétone",
+              "quantite": "1 : 1 (v/v)",
+              "role": "Solvant"
+            }
+          ],
+          "remarque": ""
+        },
+        {
+          "id": "29t56w8",
+          "operation": "décantation",
+          "temperature": 40,
+          "duree": 120,
+          "agitation": null,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Ampoule à décanter 500 mL"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "1m1f7x3",
+          "operation": "séchage",
+          "temperature": 105,
+          "duree": 60,
+          "agitation": null,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Étuve"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        }
+      ],
+      "prelevements": [
+        {
+          "id": "zq0enee",
+          "etapeId": null,
+          "moment": "avant",
+          "temps": null,
+          "volume": 50,
+          "scirius": "000398",
+          "aramis": "000861",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide"
+          ]
+        },
+        {
+          "id": "1x09xhi",
+          "etapeId": "1m1f7x3",
+          "moment": "effluent",
+          "temps": null,
+          "volume": 50,
+          "scirius": "000399",
+          "aramis": "000862",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7wvldju",
+      "nom": "Filtration seule 5 µm",
+      "tags": [
+        "graisse animale",
+        "filtration"
+      ],
+      "statut": "terminee",
+      "modele": true,
+      "maj": "2026-10-21T10:00:00Z",
+      "rev": 2,
+      "lancee": null,
+      "journal": [],
+      "base": null,
+      "texteManuel": null,
+      "contexte": {
+        "donneur": "Interne · Production",
+        "ref": "DA-2026-0121",
+        "date": "2026-10-21",
+        "operateur": "",
+        "volumeDepart": 500,
+        "matiere": "Graisse animale",
+        "lot": "",
+        "type": "Support",
+        "objectif": "Filtrer un lot de graisse pour la production"
+      },
+      "communes": {
+        "temperature": null,
+        "agitation": null,
+        "vide": null
+      },
+      "etapes": [
+        {
+          "id": "3lbv9in",
+          "operation": "filtration",
+          "temperature": null,
+          "duree": 10,
+          "agitation": null,
+          "filtre": 5,
+          "vide": {
+            "mbar": null
+          },
+          "autres": [],
+          "equipement": [
+            "Entonnoir Büchner",
+            "Fiole à vide",
+            "Membrane 5 µm"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        },
+        {
+          "id": "7zesy00",
+          "operation": "séchage",
+          "temperature": 105,
+          "duree": 60,
+          "agitation": null,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Étuve"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        }
+      ],
+      "prelevements": []
+    },
+    {
+      "id": "bsleanf",
+      "nom": "Essai séchage étuve 80 °C",
+      "tags": [
+        "graisse animale",
+        "séchage"
+      ],
+      "statut": "archivee",
+      "modele": false,
+      "maj": "2026-10-02T09:00:00Z",
+      "rev": 1,
+      "lancee": null,
+      "journal": [],
+      "base": null,
+      "texteManuel": null,
+      "contexte": {
+        "donneur": "Interne · R&D",
+        "ref": "",
+        "date": "2026-10-02",
+        "operateur": "",
+        "volumeDepart": 300,
+        "matiere": "Graisse animale",
+        "lot": "",
+        "type": "Technologique",
+        "objectif": "Vérifier le séchage à 80 °C en étuve"
+      },
+      "communes": {
+        "temperature": null,
+        "agitation": null,
+        "vide": null
+      },
+      "etapes": [
+        {
+          "id": "40ognm1",
+          "operation": "séchage",
+          "temperature": 80,
+          "duree": 60,
+          "agitation": null,
+          "filtre": null,
+          "vide": null,
+          "autres": [],
+          "equipement": [
+            "Étuve"
+          ],
+          "reactifs": [],
+          "remarque": ""
+        }
+      ],
+      "prelevements": []
+    }
+  ],
+  "inventaire": [
+    {
+      "id": "2euudie",
+      "nom": "Éthanol 96 %",
+      "scirius": "001245",
+      "emplacement": "Armoire inflammables 1 · étagère 2",
+      "fournisseur": "",
+      "lot": ""
+    },
+    {
+      "id": "dk79qu3",
+      "nom": "Eau distillée",
+      "scirius": "",
+      "emplacement": "Distillateur · labo 2",
+      "fournisseur": "production interne",
+      "lot": ""
+    },
+    {
+      "id": "4mwv3vt",
+      "nom": "Acétone",
+      "scirius": "001302",
+      "emplacement": "Armoire inflammables 2 · étagère 1",
+      "fournisseur": "",
+      "lot": ""
+    },
+    {
+      "id": "dtm9bs8",
+      "nom": "Éthanol absolu",
+      "scirius": "001251",
+      "emplacement": "Armoire inflammables 1 · étagère 2",
+      "fournisseur": "",
+      "lot": ""
+    }
+  ],
+  "labos": [
+    {
+      "nom": "Labo interne",
+      "volume": 50,
+      "analyses": [
+        "FFA / indice d’acide",
+        "Teneur en eau",
+        "Impuretés insolubles"
+      ]
+    },
+    {
+      "nom": "Labo externe",
+      "volume": 100,
+      "analyses": [
+        "Métaux (ICP)",
+        "Phosphore"
+      ]
+    }
+  ],
+  "analyses": [
+    "FFA / indice d’acide",
+    "Teneur en eau",
+    "Impuretés insolubles",
+    "Métaux (ICP)",
+    "Phosphore"
+  ],
+  "donneurs": [
+    "Interne · R&D",
+    "Interne · Production",
+    "Client externe"
+  ]
+}

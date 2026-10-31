@@ -1,0 +1,419 @@
+{
+  "titre": "Désacidification éthanol",
+  "contexte": {
+    "donneur": "Interne · R&D",
+    "ref": "DA-2026-0158",
+    "date": "2026-10-30",
+    "operateur": "Pierre",
+    "volumeDepart": 1000,
+    "matiere": "Graisse animale",
+    "lot": "",
+    "type": "R&D",
+    "objectif": "Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %",
+    "precisions": "Essai de référence avant le passage à l’échelle pilote.",
+    "tags": [
+      "graisse animale",
+      "FFA",
+      "éthanol"
+    ]
+  },
+  "version": 4,
+  "enregistree_le": "2026-10-30T21:10:00Z",
+  "lancee": {
+    "le": "2026-10-30T19:45:00Z",
+    "par": "Pierre"
+  },
+  "journal": [
+    {
+      "t": "2026-10-30T20:30:00Z",
+      "par": "Pierre",
+      "txt": "Étape 3 · Désacidification : durée 20 → 15 min"
+    },
+    {
+      "t": "2026-10-30T21:05:00Z",
+      "par": "Pierre",
+      "txt": "Échantillon S3a : volume 40 → 50 mL"
+    }
+  ],
+  "etapes": [
+    {
+      "n": 1,
+      "operation": "chauffage",
+      "parametres": {
+        "temperature_c": 60,
+        "duree_min": 30,
+        "agitation_trmin": 300
+      },
+      "equipement": [
+        "Plaque chauffante agitatrice"
+      ],
+      "reactifs": [],
+      "reactifs_detail": [],
+      "remarque": ""
+    },
+    {
+      "n": 2,
+      "operation": "filtration",
+      "parametres": {
+        "duree_min": 10,
+        "filtre_um": 5,
+        "vide": true,
+        "vide_mbar": null
+      },
+      "equipement": [
+        "Entonnoir Büchner",
+        "Fiole à vide",
+        "Membrane 5 µm"
+      ],
+      "reactifs": [],
+      "reactifs_detail": [],
+      "remarque": ""
+    },
+    {
+      "n": 3,
+      "operation": "désacidification",
+      "parametres": {
+        "temperature_c": 25,
+        "duree_min": 15,
+        "agitation_trmin": 300
+      },
+      "equipement": [
+        "Ampoule à décanter 500 mL"
+      ],
+      "reactifs": [
+        "éthanol 96 %",
+        "eau distillée"
+      ],
+      "reactifs_detail": [
+        {
+          "nom": "Éthanol 96 %",
+          "quantite": "1 : 1 (v/v)",
+          "role": "Solvant"
+        },
+        {
+          "nom": "Eau distillée",
+          "quantite": "5 % (v/v)",
+          "role": "Additif"
+        }
+      ],
+      "remarque": ""
+    },
+    {
+      "n": 4,
+      "operation": "décantation",
+      "parametres": {
+        "temperature_c": 40,
+        "duree_min": 120
+      },
+      "equipement": [
+        "Ampoule à décanter 500 mL"
+      ],
+      "reactifs": [],
+      "reactifs_detail": [],
+      "remarque": ""
+    },
+    {
+      "n": 5,
+      "operation": "séchage",
+      "parametres": {
+        "temperature_c": 105,
+        "duree_min": 60
+      },
+      "equipement": [
+        "Étuve"
+      ],
+      "reactifs": [],
+      "reactifs_detail": [],
+      "remarque": ""
+    }
+  ],
+  "sous_sections": [
+    {
+      "titre": "2.1 Échantillon",
+      "texte": "Demande : Interne · R&D, type R&D (réf. DA-2026-0158). Objectif : Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %. Contexte : Essai de référence avant le passage à l’échelle pilote. Matière étudiée : Graisse animale (lot [n° à saisir]). Volume de départ : 1 000 mL, dont 325 mL prélevés sous forme de 6 échantillons. Le flux comporte 5 étapes (étapes 1 à 5), décrites en 2.3."
+    },
+    {
+      "titre": "2.2 Matériel et réactifs",
+      "texte": "Matériel : Plaque chauffante agitatrice (étape 1), Entonnoir Büchner (étape 2), Fiole à vide (étape 2), Membrane 5 µm (étape 2), Ampoule à décanter 500 mL (étapes 3, 4), Étuve (étape 5). Réactifs : éthanol 96 % (étape 3, fournisseur [nom à saisir], lot [n° à saisir]) ; eau distillée (étape 3, fournisseur production interne, lot [n° à saisir])."
+    },
+    {
+      "titre": "2.3 Méthodes",
+      "texte": "Étape 1 : le produit a été chauffé à 60 °C pendant 30 min sous agitation (300 tr/min). Étape 2 : il a ensuite été filtré sur membrane de 5 µm pendant 10 min sous vide. Étape 3 : il a ensuite été désacidifié en présence d’éthanol 96 % (1 : 1 (v/v)) et d’eau distillée (5 % (v/v)) à 25 °C pendant 15 min sous agitation (300 tr/min). Étape 4 : il a ensuite été décanté à 40 °C pendant 2 h. Étape 5 : il a ensuite été séché à 105 °C pendant 1 h."
+    },
+    {
+      "titre": "2.4 Prélèvements",
+      "texte": "Un échantillon de 50 mL (S0) a été prélevé avant traitement (entrée du flux), puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau, Impuretés insolubles) [n° Scirius 000412, n° Aramis 000873]. Un échantillon de 50 mL (S2) a été prélevé à l’effluent de l’étape 2 (filtration), puis analysé au Labo interne (FFA / indice d’acide, Impuretés insolubles) [n° Scirius 000413]. Un échantillon de 50 mL (S3a) a été prélevé pendant l’étape 3 (désacidification), à 10 min, puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau, Impuretés insolubles) [n° Scirius 000414]. Un échantillon de 25 mL (S3b) a été prélevé à l’effluent de l’étape 3 (désacidification), puis analysé au Labo externe (Métaux (ICP), Phosphore). Un échantillon de 50 mL (S5a) a été prélevé pendant l’étape 5 (séchage), à 30 min, puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau). Un échantillon de 100 mL (S5b) a été prélevé à l’effluent de l’étape 5 (séchage), puis analysé au Labo externe (FFA / indice d’acide, Teneur en eau, Métaux (ICP), Phosphore)."
+    }
+  ],
+  "materiel": [
+    "Plaque chauffante agitatrice",
+    "Entonnoir Büchner",
+    "Fiole à vide",
+    "Membrane 5 µm",
+    "Ampoule à décanter 500 mL",
+    "Étuve"
+  ],
+  "reactifs": [
+    "éthanol 96 %",
+    "eau distillée"
+  ],
+  "prelevements": [
+    {
+      "id": "S0",
+      "apres_etape": 0,
+      "moment": "avant",
+      "temps_min": null,
+      "volume_ml": 50,
+      "scirius": "000412",
+      "aramis": "000873",
+      "labo": "Labo interne",
+      "analyses": [
+        "FFA / indice d’acide",
+        "Teneur en eau",
+        "Impuretés insolubles"
+      ]
+    },
+    {
+      "id": "S2",
+      "apres_etape": 2,
+      "moment": "effluent",
+      "temps_min": null,
+      "volume_ml": 50,
+      "scirius": "000413",
+      "aramis": null,
+      "labo": "Labo interne",
+      "analyses": [
+        "FFA / indice d’acide",
+        "Impuretés insolubles"
+      ]
+    },
+    {
+      "id": "S3a",
+      "apres_etape": 3,
+      "moment": "pendant",
+      "temps_min": 10,
+      "volume_ml": 50,
+      "scirius": "000414",
+      "aramis": null,
+      "labo": "Labo interne",
+      "analyses": [
+        "FFA / indice d’acide",
+        "Teneur en eau",
+        "Impuretés insolubles"
+      ]
+    },
+    {
+      "id": "S3b",
+      "apres_etape": 3,
+      "moment": "effluent",
+      "temps_min": null,
+      "volume_ml": 25,
+      "scirius": null,
+      "aramis": null,
+      "labo": "Labo externe",
+      "analyses": [
+        "Métaux (ICP)",
+        "Phosphore"
+      ]
+    },
+    {
+      "id": "S5a",
+      "apres_etape": 5,
+      "moment": "pendant",
+      "temps_min": 30,
+      "volume_ml": 50,
+      "scirius": null,
+      "aramis": null,
+      "labo": "Labo interne",
+      "analyses": [
+        "FFA / indice d’acide",
+        "Teneur en eau"
+      ]
+    },
+    {
+      "id": "S5b",
+      "apres_etape": 5,
+      "moment": "effluent",
+      "temps_min": null,
+      "volume_ml": 100,
+      "scirius": null,
+      "aramis": null,
+      "labo": "Labo externe",
+      "analyses": [
+        "FFA / indice d’acide",
+        "Teneur en eau",
+        "Métaux (ICP)",
+        "Phosphore"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "titre": "Départ",
+      "conditions": "",
+      "materiel": [],
+      "reactifs": [],
+      "echantillons": [
+        {
+          "id": "S0",
+          "volume": 50,
+          "moment": "avant traitement",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau",
+            "Impuretés insolubles"
+          ],
+          "scirius": "000412",
+          "aramis": "000873"
+        }
+      ]
+    },
+    {
+      "titre": "1 · Chauffage",
+      "conditions": "60 °C · 30 min · 300 tr/min",
+      "materiel": [
+        "Plaque chauffante agitatrice"
+      ],
+      "reactifs": [],
+      "echantillons": []
+    },
+    {
+      "titre": "2 · Filtration",
+      "conditions": "10 min · sous vide · 5 µm",
+      "materiel": [
+        "Entonnoir Büchner",
+        "Fiole à vide",
+        "Membrane 5 µm"
+      ],
+      "reactifs": [],
+      "echantillons": [
+        {
+          "id": "S2",
+          "volume": 50,
+          "moment": "effluent",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Impuretés insolubles"
+          ],
+          "scirius": "000413",
+          "aramis": ""
+        }
+      ]
+    },
+    {
+      "titre": "3 · Désacidification",
+      "conditions": "25 °C · 15 min · 300 tr/min",
+      "materiel": [
+        "Ampoule à décanter 500 mL"
+      ],
+      "reactifs": [
+        {
+          "nom": "Éthanol 96 %",
+          "quantite": "1 : 1 (v/v)",
+          "scirius": "001245",
+          "emplacement": "Armoire inflammables 1 · étagère 2",
+          "fournisseur": "",
+          "lot": ""
+        },
+        {
+          "nom": "Eau distillée",
+          "quantite": "5 % (v/v)",
+          "scirius": "",
+          "emplacement": "Distillateur · labo 2",
+          "fournisseur": "production interne",
+          "lot": ""
+        }
+      ],
+      "echantillons": [
+        {
+          "id": "S3a",
+          "volume": 50,
+          "moment": "pendant · à 10 min",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau",
+            "Impuretés insolubles"
+          ],
+          "scirius": "000414",
+          "aramis": ""
+        },
+        {
+          "id": "S3b",
+          "volume": 25,
+          "moment": "effluent",
+          "labo": "Labo externe",
+          "analyses": [
+            "Métaux (ICP)",
+            "Phosphore"
+          ],
+          "scirius": "",
+          "aramis": ""
+        }
+      ]
+    },
+    {
+      "titre": "4 · Décantation",
+      "conditions": "40 °C · 2 h",
+      "materiel": [
+        "Ampoule à décanter 500 mL"
+      ],
+      "reactifs": [],
+      "echantillons": []
+    },
+    {
+      "titre": "5 · Séchage",
+      "conditions": "105 °C · 1 h",
+      "materiel": [
+        "Étuve"
+      ],
+      "reactifs": [],
+      "echantillons": [
+        {
+          "id": "S5a",
+          "volume": 50,
+          "moment": "pendant · à 30 min",
+          "labo": "Labo interne",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau"
+          ],
+          "scirius": "",
+          "aramis": ""
+        },
+        {
+          "id": "S5b",
+          "volume": 100,
+          "moment": "effluent",
+          "labo": "Labo externe",
+          "analyses": [
+            "FFA / indice d’acide",
+            "Teneur en eau",
+            "Métaux (ICP)",
+            "Phosphore"
+          ],
+          "scirius": "",
+          "aramis": ""
+        }
+      ]
+    }
+  ],
+  "inventaire_reactifs": [
+    {
+      "nom": "éthanol 96 %",
+      "scirius": "001245",
+      "emplacement": "Armoire inflammables 1 · étagère 2",
+      "fournisseur": null,
+      "lot": null
+    },
+    {
+      "nom": "eau distillée",
+      "scirius": null,
+      "emplacement": "Distillateur · labo 2",
+      "fournisseur": "production interne",
+      "lot": null
+    }
+  ]
+}
