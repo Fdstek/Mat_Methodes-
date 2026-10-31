@@ -276,6 +276,10 @@ class Stockage:
             log.warning("enregistrement impossible %s : %s", m.id, ex)
             return ResultatEnregistrement(False, erreur="Non enregistré : dossier inaccessible")
 
+    def ecrire_tel_quel(self, m: Manip) -> None:
+        """Écrit la manip sans toucher à sa version ni à sa date (restauration des exemples)."""
+        ecrire_atomique(self.chemin_manip(m.id), _dumps(m.to_json()))
+
     def supprimer_manip(self, ident: str) -> None:
         f = self.chemin_manip(ident)
         if f.exists():
