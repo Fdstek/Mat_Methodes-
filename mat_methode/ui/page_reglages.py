@@ -1,10 +1,12 @@
 """Page « Réglages » (§6.5, maquette W05) : valables pour toutes les manips, partagés par tous."""
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QGridLayout, QVBoxLayout, QWidget
 
 from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain import reglages_ops as O
+from mat_methode.domain.models import Personne, initiales_de
 from mat_methode.domain.regles import basculer_analyse, tous_les_tags
 from mat_methode.domain.texte import libelle_volume, norm
 from mat_methode.ui import theme
@@ -35,7 +37,7 @@ class PageReglages(QWidget):
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(12)
-        self._ouverts: dict[str, bool] = {}
+        self.section: str | None = None  # carte ouverte (None = toutes les cartes)
 
     @property
     def r(self):
@@ -47,48 +49,195 @@ class PageReglages(QWidget):
         self.ctrl.toucher_reglages()
 
     def _section(self, titre: str, note: str = "") -> Expander:
-        x = Expander(titre, note, ouvert=self._ouverts.get(titre, titre == "Laboratoires"))
-        x.tete.clicked.connect(lambda *_: self._ouverts.__setitem__(titre, x.ouvert))
+        x = Expander(titre, note, ouvert=True)
+        x.tete.clicked.disconnect(x.basculer)  # une seule section à la fois : pas de repli
+        x.tete.setCursor(Qt.CursorShape.ArrowCursor)
         self.lay.addWidget(x)
         return x
 
+    def sections(self) -> list[tuple[str, str, str, str, object]]:
+        """(clé, titre, description, compteur, fonction) de chaque carte de la page Réglages."""
+        r = self.r
+        return [
+            ("personnes", "Personnes", "Donneurs d’ordre : nom, initiales (références), IGG", f"{len(r.personnes)}", self._personnes),
+            ("laboratoires", "Laboratoires", "Volume par défaut et analyses de chaque labo", f"{len(r.laboratoires)}", self._laboratoires),
+            ("operations", "Opérations", "Sous-étapes du flux (chauffage, filtration…) et texte", f"{len(r.operations)}", self._operations),
+            ("reactifs", "Réactifs", "Noms des réactifs proposés dans les étapes", f"{len(r.reactifs)}", self._reactifs),
+            ("volumes", "Volumes d’échantillon", "30 mL … 1 L", f"{len(r.volumes_ml)}", self._volumes),
+            ("analyses", "Analyses", "Analyses disponibles pour les laboratoires", f"{len(r.analyses)}", self._analyses),
+            ("types", "Types de demande", "Support, R&D, Test d’idée…", f"{len(r.types_demande)}", self._types),
+            ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
+            ("etats", "États des manips", "Brouillon, En cours, Terminée… et leurs couleurs", f"{len(r.etats)}", self._etats),
+            ("tags", "Tags", "Renommer ou retirer un tag partout", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
+            ("scirius", "Fichier Scirius", "Lien avec le suivi des enregistrements Scirius (SharePoint)",
+             "choisi" if r.scirius_fichier else "auto", self._scirius),
+        ]
+
+    def ouvrir(self, cle: str | None):
+        self.section = cle
+        self.rafraichir()
+
     def rafraichir(self, *_):
         vider(self.lay)
-        self.lay.addWidget(etiquette("Réglages de base de l’application : ils servent pour toutes les manips et sont partagés "
-                                     "avec les autres utilisateurs du dossier.", secondaire=True, wrap=True))
+        sec = getattr(self, "section", None)
         lecture_seule = self.ctrl.st.lecture_seule
-        self._laboratoires()
-        self._operations()
-        self._volumes()
-        self._liste_simple("Réactifs", [x.nom for x in self.r.reactifs], self._suppr_reactif, self._ajout_reactif, "Nouveau réactif",
-                           "Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape "
-                           "et sont gardés pour la prochaine fois.",
-                           renommer=self._ren(O.renommer_reactif, lambda: [x.nom for x in self.r.reactifs]))
-        self._liste_simple("Analyses disponibles", self.r.analyses, self._suppr_analyse,
-                           lambda v: O.ajouter_analyse(self.r, v), "Nouvelle analyse",
-                           renommer=self._ren(O.renommer_analyse, lambda: self.r.analyses))
-        self._liste_simple("Donneurs d’ordre", self.r.donneurs_ordre, lambda v: self.r.donneurs_ordre.remove(v),
-                           lambda v: O.ajouter_simple(self.r.donneurs_ordre, v), "Nouveau donneur d’ordre",
-                           "Chaque donneur d’ordre devient un tag coloré dans « Mes manips ». ✎ renomme aussi dans toutes les manips.",
-                           renommer=self._ren(O.renommer_donneur, lambda: self.r.donneurs_ordre))
-        self._liste_simple("Types de demande", self.r.types_demande, lambda v: self.r.types_demande.remove(v),
-                           lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
-                           "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».",
-                           renommer=self._ren(O.renommer_type, lambda: self.r.types_demande))
-        self._liste_simple("Grandes étapes", self.r.grandes_etapes, lambda v: self.r.grandes_etapes.remove(v),
-                           lambda v: O.ajouter_simple(self.r.grandes_etapes, v), "Nouvelle grande étape",
-                           "Noms proposés pour regrouper des étapes du flux (ex. Degumming : chauffage, ajout d’acide, centrifugation…).",
-                           renommer=self._ren(O.renommer_grande_etape, lambda: self.r.grandes_etapes))
-        self._etats()
-        self._tags()
-        a = etiquette(f"{NOM_APPLICATION} · version {VERSION} · données : {self.ctrl.st.donnees}", secondaire=True, wrap=True)
-        a.setAccessibleName("À propos")
-        self.lay.addWidget(a)
+        if sec is None:
+            self.lay.addWidget(etiquette("Réglages de base de l’application, partagés avec les autres utilisateurs du dossier. "
+                                         "Clique une carte pour l’ouvrir.", secondaire=True, wrap=True))
+            grille = QGridLayout()
+            grille.setSpacing(12)
+            for k, (cle, titre, desc, compte, _) in enumerate(self.sections()):
+                grille.addWidget(self._carte(cle, titre, desc, compte), k // 3, k % 3)
+            for c in range(3):
+                grille.setColumnStretch(c, 1)
+            w = QWidget()
+            w.setLayout(grille)
+            self.lay.addWidget(w)
+            a = etiquette(f"{NOM_APPLICATION} · version {VERSION} · vous : {self.ctrl.nom_utilisateur()} (IGG {self.ctrl.st.utilisateur}) · "
+                          f"données : {self.ctrl.st.donnees}", secondaire=True, wrap=True)
+            a.setAccessibleName("À propos")
+            self.lay.addWidget(a)
+            self.lay.addStretch(1)
+            return
+        self.lay.addWidget(ligne(bouton("←  Tous les réglages", lambda: self.ouvrir(None)), "stretch"))
+        dict((c, f) for c, _, _, _, f in self.sections())[sec]()
         self.lay.addStretch(1)
         for i in range(self.lay.count()):
             w = self.lay.itemAt(i).widget()
             if isinstance(w, Expander):
                 w.corps.setEnabled(not lecture_seule)
+
+    def _carte(self, cle, titre, desc, compte) -> QWidget:
+        f = QFrame()
+        f.setObjectName("carteFlux")
+        f.setCursor(Qt.CursorShape.PointingHandCursor)
+        f.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        f.setAccessibleName(f"Réglages : {titre}")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.addWidget(ligne(etiquette(titre, "titreCarte"), "stretch", pastille(compte)))
+        v.addWidget(etiquette(desc, secondaire=True, wrap=True))
+        f.mousePressEvent = lambda _e: self.ouvrir(cle)
+        f.keyPressEvent = lambda ev: self.ouvrir(cle) if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space) else None
+        f.setMinimumHeight(96)
+        return f
+
+    def _reactifs(self):
+        self._liste_simple("Réactifs", [x.nom for x in self.r.reactifs], self._suppr_reactif, self._ajout_reactif, "Nouveau réactif",
+                           "Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape "
+                           "(ou depuis Scirius) et sont gardés pour la prochaine fois. On peut aussi ajouter un réactif depuis une étape.",
+                           renommer=self._ren(O.renommer_reactif, lambda: [x.nom for x in self.r.reactifs]))
+
+    def _analyses(self):
+        self._liste_simple("Analyses disponibles", self.r.analyses, self._suppr_analyse,
+                           lambda v: O.ajouter_analyse(self.r, v), "Nouvelle analyse",
+                           renommer=self._ren(O.renommer_analyse, lambda: self.r.analyses))
+
+    def _types(self):
+        self._liste_simple("Types de demande", self.r.types_demande, lambda v: self.r.types_demande.remove(v),
+                           lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
+                           "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».",
+                           renommer=self._ren(O.renommer_type, lambda: self.r.types_demande))
+
+    def _grandes(self):
+        self._liste_simple("Grandes étapes", self.r.grandes_etapes, lambda v: self.r.grandes_etapes.remove(v),
+                           lambda v: O.ajouter_simple(self.r.grandes_etapes, v), "Nouvelle grande étape",
+                           "Noms proposés pour regrouper des étapes du flux (ex. Degumming : chauffage, ajout d’acide, centrifugation…).",
+                           renommer=self._ren(O.renommer_grande_etape, lambda: self.r.grandes_etapes))
+
+    # ------------------------------------------------------------ personnes (donneurs d'ordre)
+    def _personnes(self):
+        x = self._section("Personnes (donneurs d’ordre)", f"{len(self.r.personnes)}")
+        x.ajouter(etiquette("Les donneurs d’ordre proposés dans « Ma demande ». Les initiales forment la référence des manips "
+                            "(ex. PB-2026-10-31-01). L’IGG (identifiant Windows) permet de reconnaître la personne connectée : "
+                            f"sur ce poste, l’IGG est {self.ctrl.st.utilisateur}.", secondaire=True, wrap=True))
+        for p in self.r.personnes:
+            nom = ChampTexte(p.nom)
+            nom.editingFinished.connect(lambda nom=nom, p=p: self._renommer_personne(p, nom.text()))
+            ini = ChampTexte(p.initiales, initiales_de(p.nom), mono=True)
+            ini.setMaximumWidth(90)
+            ini.modifie.connect(lambda v, p=p: (setattr(p, "initiales", v.strip().upper()), self.ctrl.toucher_reglages()))
+            igg = ChampTexte(p.igg, "ex. J0123456", mono=True)
+            igg.setMaximumWidth(160)
+            igg.modifie.connect(lambda v, p=p: (setattr(p, "igg", v.strip().upper()), self.ctrl.toucher_reglages()))
+            nb = sum(1 for m in self.ctrl.manips if m.contexte.donneur == p.nom)
+            moi = pastille("c’est vous", "ok") if p.igg and p.igg.upper() == self.ctrl.st.utilisateur else None
+            x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg),
+                            etiquette(f"{nb} manip{'s' if nb > 1 else ''}", secondaire=True), *( [moi] if moi else []), "stretch",
+                            icone("✕", f"Supprimer {p.nom}", lambda p=p: self._suppr_personne(p), danger=True)))
+        nouveau = ChampTexte("", "ex. Pierre BURGUN")
+        nigg = ChampTexte("", "IGG (facultatif)", mono=True)
+        nigg.setMaximumWidth(160)
+
+        def ajout():
+            nom = nouveau.text().strip()
+            if not nom or self.r.personne(nom):
+                return
+            self.r.personnes.append(Personne(nom=nom, initiales=initiales_de(nom), igg=nigg.text().strip().upper()))
+            self._changer()
+            self.rafraichir()
+
+        nouveau.returnPressed.connect(ajout)
+        nigg.returnPressed.connect(ajout)
+        moi = bouton("Me remplir (IGG de ce poste)", lambda: nigg.setText(self.ctrl.st.utilisateur), lien=True)
+        x.ajouter(ligne(champ("Nouvelle personne", nouveau), champ("IGG", nigg), bouton("Ajouter", ajout), moi, "stretch"))
+
+    def _renommer_personne(self, p, nouveau):
+        nouveau = nouveau.strip()
+        if not nouveau or nouveau == p.nom:
+            return
+        ch = O.renommer_donneur(self.r, self.ctrl.manips, p.nom, nouveau)
+        if p.nom != nouveau:
+            self.ctrl.toast.emit("Impossible : cette personne existe déjà")
+            self.rafraichir()
+            return
+        self._changer(ch)
+        self.ctrl.toast.emit(f"Renommée ({len(ch)} manip{'s' if len(ch) > 1 else ''} mise{'s' if len(ch) > 1 else ''} à jour)")
+
+    def _suppr_personne(self, p):
+        if confirmer(self, "Retirer cette personne ?", f"« {p.nom} » ne sera plus proposée comme donneur d’ordre. "
+                     "Les manips existantes gardent ce nom.", "Retirer"):
+            self.r.personnes = [x for x in self.r.personnes if x is not p]
+            self._changer()
+            self.rafraichir()
+
+    # ------------------------------------------------------------ fichier Scirius
+    def _scirius(self):
+        from mat_methode import scirius as S
+        x = self._section("Fichier Scirius")
+        x.ajouter(etiquette(f"Le fichier « {S.FICHIER} » (SharePoint du magasin) sert à remplir la charge de départ et les réactifs. "
+                            "Il est cherché automatiquement : dans tes dossiers OneDrive / SharePoint synchronisés, puis ouvert par Excel "
+                            "depuis SharePoint, puis la dernière copie partagée. Tu peux aussi choisir un fichier ici.",
+                            secondaire=True, wrap=True))
+        chemin = ChampTexte(self.r.scirius_fichier, "automatique")
+        chemin.setReadOnly(True)
+
+        def parcourir():
+            from PySide6.QtWidgets import QFileDialog
+            f, _ = QFileDialog.getOpenFileName(self, "Choisir le fichier Scirius", "", "Classeur Excel (*.xlsx *.xlsm)")
+            if f:
+                self.r.scirius_fichier = f
+                self._changer()
+                self.rafraichir()
+
+        def auto():
+            self.r.scirius_fichier = ""
+            self._changer()
+            self.rafraichir()
+
+        resultat = etiquette("", secondaire=True, wrap=True)
+
+        def tester():
+            from PySide6.QtWidgets import QApplication
+            resultat.setText("Lecture en cours…")
+            QApplication.processEvents()
+            lu = self.ctrl.lire_scirius(True, lambda t: (resultat.setText(t), QApplication.processEvents()))
+            resultat.setText(f"{len(lu.lignes)} lignes lues · {lu.origine}" if lu.lignes else
+                             "Fichier introuvable ou illisible : " + (" | ".join(lu.ecartes[:3]) or "aucune source"))
+
+        x.ajouter(ligne(champ("Fichier choisi", chemin), bouton("Parcourir…", parcourir), bouton("Automatique", auto),
+                        bouton("Tester la lecture", tester, accent=True), "stretch"))
+        x.ajouter(resultat)
 
     # ------------------------------------------------------------ opérations (sous-étapes)
     def _operations(self):

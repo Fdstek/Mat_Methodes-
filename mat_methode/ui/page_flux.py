@@ -124,7 +124,7 @@ def position(p, e) -> float:
 # ------------------------------------------------------------------ page
 class PageFlux(QWidget):
     voir_rapport = Signal()
-    voir_reglages = Signal()
+    voir_reglages = Signal(object)  # clé de la carte des Réglages à ouvrir
     dupliquer = Signal(str)
 
     def __init__(self, ctrl: Controleur):
@@ -168,7 +168,7 @@ class PageFlux(QWidget):
         if self.ctrl.lecture_seule:
             v = self.ctrl.verrou_autre
             self.lay.addWidget(InfoBar(f"Ouverte en lecture seule (depuis {fmt_dt(v.depuis)[-5:]}).",
-                                       titre=f"Modifiée en ce moment par {v.utilisateur}",
+                                       titre=f"Modifiée en ce moment par {self.ctrl.nom_de(v.utilisateur)}",
                                        niveau="info", actions=[bouton("Dupliquer pour travailler dessus", lambda: self.dupliquer.emit(m.id))]))
         self._lancement = QWidget()
         QVBoxLayout(self._lancement).setContentsMargins(0, 0, 0, 0)
@@ -274,11 +274,12 @@ class PageFlux(QWidget):
         nom.modifie.connect(lambda v: (setattr(m, "nom", v.strip() or "Manip"), self._toucher()))
         g.addWidget(champ("Nom de la manip", nom), 0, 0, 1, 3)
         donneur = Liste(r.donneurs_ordre, c.donneur)
-        donneur.choisi.connect(lambda v: (setattr(c, "donneur", v), self._toucher()))
+        donneur.choisi.connect(self._choisir_donneur)
         g.addWidget(champ("Donneur d’ordre", donneur), 1, 0)
-        ref = ChampTexte(c.ref, "n° ?", mono=True)
+        ref = ChampTexte(c.ref, "choisir le donneur d’ordre", mono=True)
         ref.modifie.connect(lambda v: (setattr(c, "ref", v), self._toucher()))
-        g.addWidget(champ("Référence de la demande", ref), 1, 1)
+        regen = icone("↻", "Générer la référence (initiales-date-n°)", self._regenerer_ref)
+        g.addWidget(champ("Référence (initiales-date-n°)", ligne(ref, regen)), 1, 1)
         vol = NumberBox(c.volume_depart_ml, "mL")
         vol.valeur.connect(lambda v: (setattr(c, "volume_depart_ml", v), self._toucher()))
         g.addWidget(champ("Volume de départ", vol), 1, 2)
@@ -727,7 +728,15 @@ class PageFlux(QWidget):
             mat.modifie.connect(lambda v: (setattr(m.contexte, "matiere", v), self._toucher()))
             lot = ChampTexte(m.contexte.lot, "lot ?", mono=True)
             lot.modifie.connect(lambda v: (setattr(m.contexte, "lot", v), self._toucher()))
-            cl.addWidget(ligne(champ("Matière", mat), champ("Lot", lot)))
+            sc = ChampTexte(m.contexte.scirius, "à saisir", mono=True)
+            sc.modifie.connect(lambda v: (setattr(m.contexte, "scirius", v.strip()), self._toucher()))
+            fo = ChampTexte(m.contexte.fournisseur)
+            fo.modifie.connect(lambda v: (setattr(m.contexte, "fournisseur", v), self._toucher()))
+            cl.addWidget(ligne(champ("Matière (charge)", mat), champ("Lot", lot)))
+            cl.addWidget(ligne(champ("N° Scirius de la charge", sc), champ("Fournisseur", fo)))
+            cl.addWidget(ligne(bouton("Chercher la charge dans Scirius…", self._scirius_charge, accent=True,
+                                      tip="Remplit le nom, le lot, le n° Scirius et le fournisseur depuis le fichier Scirius de SharePoint"),
+                               etiquette("Pas dans le fichier ? Saisis les champs à la main.", secondaire=True), "stretch"))
             lay.addWidget(f)
         else:
             i = m.etapes.index(e)
@@ -831,7 +840,9 @@ class PageFlux(QWidget):
             nouveau = bouton("+ Nouveau réactif…", lambda re_=re_: self._nouveau_reactif(re_), lien=True,
                              tip="Ajouter un réactif à la liste des Réglages et le choisir ici")
             v.addWidget(champ("Réactif", nom))
-            v.addWidget(nouveau)
+            v.addWidget(ligne(nouveau, bouton("Chercher dans Scirius…", lambda re_=re_: self._scirius_reactif(re_), lien=True,
+                                              tip="Remplit le n° Scirius, l’emplacement, le fournisseur et le lot depuis le fichier Scirius"),
+                              "stretch"))
             q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
             v.addWidget(champ("Quantité ou ratio", q))
@@ -856,8 +867,65 @@ class PageFlux(QWidget):
         wg.setLayout(g)
         x.ajouter(wg)
         x.ajouter(flux_widgets([bouton("+ Ajouter un réactif à cette étape", lambda: (e.reactifs.append(ReactifEtape()), self._toucher(True)), ajout=True),
-                                bouton("Un réactif manque ? Ajoute-le dans les Réglages.", self.voir_reglages.emit, lien=True)]))
+                                bouton("Gérer la liste des réactifs (Réglages)", lambda: self.voir_reglages.emit("reactifs"), lien=True)]))
         return x
+
+    def _choisir_donneur(self, v):
+        m = self.m
+        m.contexte.donneur = v
+        if R.reference_auto(m, self.ctrl.reglages, self.ctrl.manips):
+            self.ctrl.toast.emit(f"Référence : {m.contexte.ref}")
+            self._toucher(True)
+        else:
+            self._toucher()
+
+    def _regenerer_ref(self):
+        m = self.m
+        if self.ctrl.reglages.personne(m.contexte.donneur) is None:
+            self.ctrl.toast.emit("Choisis d’abord le donneur d’ordre")
+            return
+        if m.contexte.ref.strip() and not R.REF_AUTO.match(m.contexte.ref.strip()):
+            from mat_methode.ui.dialogues import confirmer
+            if not confirmer(self, "Remplacer la référence ?", f"« {m.contexte.ref} » sera remplacée par une référence automatique.",
+                             "Remplacer", danger=False):
+                return
+        R.reference_auto(m, self.ctrl.reglages, self.ctrl.manips, forcer=True)
+        self._toucher(True)
+
+    def _scirius_charge(self):
+        from mat_methode.ui.dialogues import chercher_scirius
+        c = self.m.contexte
+        ln = chercher_scirius(self, self.ctrl.lire_scirius, c.matiere if c.matiere != "Graisse animale" else "", "charge de départ")
+        if ln is None:
+            return
+        c.matiere = ln.get("product") or c.matiere
+        c.lot = ln.get("batch") or c.lot
+        c.scirius = ln.get("stock_item") or c.scirius
+        c.fournisseur = ln.get("supplier") or c.fournisseur
+        self._toucher(True)
+        self.ctrl.toast.emit("Charge remplie depuis Scirius")
+
+    def _scirius_reactif(self, re_):
+        from mat_methode.domain import reglages_ops as O
+        from mat_methode.ui.dialogues import chercher_scirius
+        ln = chercher_scirius(self, self.ctrl.lire_scirius, re_.nom, re_.nom or "réactif")
+        if ln is None:
+            return
+        r = self.ctrl.reglages
+        nom = re_.nom or ln.get("product", "").strip()
+        if not nom:
+            return
+        if r.reactif(nom) is None:
+            O.ajouter_reactif(r, nom)
+        inv = r.reactif(nom)
+        inv.scirius = ln.get("stock_item") or inv.scirius
+        inv.emplacement = ln.get("storage") or inv.emplacement
+        inv.fournisseur = ln.get("supplier") or inv.fournisseur
+        inv.lot = ln.get("batch") or inv.lot
+        re_.nom = inv.nom
+        self.ctrl.toucher_reglages()
+        self._toucher(True)
+        self.ctrl.toast.emit(f"« {inv.nom} » rempli depuis Scirius")
 
     def _nouveau_reactif(self, re_):
         """Ajoute un nom de réactif à la liste des Réglages depuis l'étape, et le choisit."""
@@ -943,7 +1011,7 @@ class PageFlux(QWidget):
         x.ajouter(wg)
         x.ajouter(flux_widgets([bouton("+ Ajouter un échantillon", lambda: self._ajouter_ech(e), ajout=True),
                                 etiquette("Reprend le laboratoire, le volume et les analyses par défaut.", secondaire=True),
-                                bouton("Réglages des laboratoires", self.voir_reglages.emit, lien=True)]))
+                                bouton("Réglages des laboratoires", lambda: self.voir_reglages.emit("laboratoires"), lien=True)]))
         return x
 
     def _ajouter_ech(self, e):

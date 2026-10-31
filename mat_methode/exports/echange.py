@@ -34,6 +34,10 @@ def contexte_vers(m: Manip) -> dict:
          "matiere": c.matiere, "lot": c.lot, "type": c.type, "objectif": c.objectif, "precisions": c.precisions}
     if c.idee:
         d["idee"] = c.idee
+    if c.scirius:
+        d["scirius"] = c.scirius
+    if c.fournisseur:
+        d["fournisseur"] = c.fournisseur
     d["tags"] = list(m.tags)
     return d
 

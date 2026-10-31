@@ -54,6 +54,20 @@ Réglages ; elle sert aussi au volume par défaut des laboratoires. Un volume ex
 **Nouveau réactif depuis le flux** : dans l'étape, « + Nouveau réactif… » ajoute le nom à la liste des Réglages et le
 choisit pour l'étape (le nom reste ainsi pris dans une liste commune, sans doublon).
 
+**Personnes et référence** : les donneurs d'ordre sont des personnes (Réglages › Personnes : Prénom NOM, initiales,
+IGG). Choisir le donneur d'ordre crée la référence `PB-2026-10-31-01` (initiales, date, numéro du jour), modifiable ;
+↻ la régénère. La personne connectée est reconnue par son IGG, lu dans le chemin du profil Windows / OneDrive
+(`C:\Users\<IGG>\…`), comme dans le projet Fractionnement : il suffit de renseigner l'IGG de chacun dans Réglages.
+
+**Scirius** : « Chercher la charge dans Scirius… » (Départ) et « Chercher dans Scirius… » (réactifs) lisent le fichier
+`Suivi enregistrements scirius.xlsx` du site SharePoint MS-SMR-RECH-CRES-MAGASIN : d'abord dans les dossiers OneDrive /
+SharePoint synchronisés, sinon en l'ouvrant avec Excel (compte Office de la personne), sinon la dernière copie partagée
+(`donnees\cache`). Un fichier peut aussi être choisi dans Réglages › Fichier Scirius. Ce qui n'est pas dans le fichier
+se saisit à la main.
+
+**Réglages** : dans le menu principal ; la page affiche une carte par sujet (Personnes, Laboratoires, Opérations,
+Réactifs, Volumes, Analyses, Types, Grandes étapes, États, Tags, Fichier Scirius).
+
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.
 

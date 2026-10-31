@@ -304,6 +304,32 @@ def basculer_analyse(liste_analyses: list[str], a: str) -> list[str]:
     return [x for x in liste_analyses if x != a] if a in liste_analyses else liste_analyses + [a]
 
 
+# ------------------------------------------------------------------ référence automatique
+REF_AUTO = re.compile(r"^[A-Z]{1,6}-\d{4}-\d{2}-\d{2}-\d{2,}$")
+
+
+def generer_reference(manips: list[Manip], initiales: str, jour: str) -> str:
+    """« PB-2026-10-31-01 » : initiales du donneur d'ordre, date (AAAA-MM-JJ), numéro du jour pour ces initiales."""
+    prefixe = f"{(initiales or 'XX').upper()}-{jour}-"
+    nums = [int(m.contexte.ref[len(prefixe):]) for m in manips
+            if m.contexte.ref.startswith(prefixe) and m.contexte.ref[len(prefixe):].isdigit()]
+    return f"{prefixe}{(max(nums) + 1 if nums else 1):02d}"
+
+
+def reference_auto(m: Manip, reglages: Reglages, manips: list[Manip], jour: str | None = None, forcer: bool = False) -> bool:
+    """Donne une référence automatique si elle est vide (ou déjà automatique, ou si `forcer`). Retourne True si changée."""
+    p = reglages.personne(m.contexte.donneur)
+    if p is None or not p.sigle():
+        return False
+    if not (forcer or not m.contexte.ref.strip() or REF_AUTO.match(m.contexte.ref.strip())):
+        return False
+    jour = jour or (m.contexte.date or maintenant_iso()[:10])
+    if REF_AUTO.match(m.contexte.ref.strip()) and m.contexte.ref.startswith(f"{p.sigle()}-{jour}-") and not forcer:
+        return False  # déjà la bonne
+    m.contexte.ref = generer_reference([x for x in manips if x.id != m.id], p.sigle(), jour)
+    return True
+
+
 # ------------------------------------------------------------------ duplication (§6.1)
 def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     """Copie sans lancement ni journal (version 1), sans référence, lot ni numéros Scirius/Aramis."""

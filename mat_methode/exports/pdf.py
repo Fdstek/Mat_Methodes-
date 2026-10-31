@@ -291,7 +291,9 @@ def blocs_phases(data: dict, corps) -> list:
     for i, ph in enumerate(data.get("phases", [])):
         if i == 0:
             ctx = data.get("contexte", {})
-            sous = escape(f"{ctx.get('matiere') or ''}") + f" (lot {_ou(ctx.get('lot'))})" + (
+            sous = escape(f"{ctx.get('matiere') or ''}") + f" (lot {_ou(ctx.get('lot'))}" + (
+                f", n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
+                f", fournisseur {escape(ctx['fournisseur'])}" if ctx.get("fournisseur") else "") + ")" + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
             sous = escape(ph.get("conditions") or "conditions à compléter") + (

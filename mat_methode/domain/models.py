@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mat_methode import SCHEMA_DONNEES
 from mat_methode.domain.catalogue import OPERATIONS
@@ -42,6 +42,27 @@ class Operation(_Modele):
     participe: str = ""
 
 
+def initiales_de(nom: str) -> str:
+    """« Pierre BURGUN » -> « PB » ; « Jean-Marc DUPONT » -> « JMD »."""
+    out = ""
+    for mot in (nom or "").replace("·", " ").split():
+        for part in mot.split("-"):
+            lettres = [c for c in part if c.isalpha()]
+            if lettres:
+                out += lettres[0].upper()
+    return out
+
+
+class Personne(_Modele):
+    """Donneur d'ordre (ou opérateur) : nom affiché, initiales (référence des manips), IGG Windows."""
+    nom: str
+    initiales: str = ""
+    igg: str = ""
+
+    def sigle(self) -> str:
+        return (self.initiales or initiales_de(self.nom)).strip().upper()
+
+
 class Etat(_Modele):
     id: str
     nom: str
@@ -62,7 +83,7 @@ ETATS_DEFAUT = [Etat(id="brouillon", nom="Brouillon", ton="warn"),
                 Etat(id="terminee", nom="Terminée", ton="ok")]
 TYPES_DEFAUT = ["Support", "R&D", "Technologique", "Test d’idée"]
 ANALYSES_DEFAUT = ["FFA / indice d’acide", "Teneur en eau", "Impuretés insolubles", "Métaux (ICP)", "Phosphore"]
-DONNEURS_DEFAUT = ["Interne · R&D", "Interne · Production", "Client externe"]
+DONNEURS_DEFAUT = ["Pierre BURGUN"]
 VOLUMES_DEFAUT = [30, 60, 120, 250, 500, 1000]  # mL ; 1000 = 1 L
 GRANDES_ETAPES_DEFAUT = ["Degumming", "Neutralisation", "Blanchiment", "Désodorisation", "Winterisation"]
 
@@ -76,7 +97,8 @@ class Reglages(_Modele):
         Laboratoire(nom="Labo interne", volume_ml=50, analyses=ANALYSES_DEFAUT[:3]),
         Laboratoire(nom="Labo externe", volume_ml=100, analyses=ANALYSES_DEFAUT[3:])])
     analyses: list[str] = Field(default_factory=lambda: list(ANALYSES_DEFAUT))
-    donneurs_ordre: list[str] = Field(default_factory=lambda: list(DONNEURS_DEFAUT))
+    personnes: list[Personne] = Field(default_factory=lambda: [Personne(nom=n, initiales=initiales_de(n)) for n in DONNEURS_DEFAUT])
+    scirius_fichier: str = ""  # chemin d'un fichier Scirius choisi à la main (sinon recherche automatique)
     types_demande: list[str] = Field(default_factory=lambda: list(TYPES_DEFAUT))
     etats: list[Etat] = Field(default_factory=lambda: [e.model_copy() for e in ETATS_DEFAUT])
     reactifs: list[ReactifInventaire] = Field(default_factory=list)
@@ -85,6 +107,26 @@ class Reglages(_Modele):
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ancien_format(cls, d):
+        """Schéma 2 : « donneurs_ordre » était une liste de noms."""
+        if isinstance(d, dict) and "personnes" not in d and isinstance(d.get("donneurs_ordre"), list):
+            d = dict(d)
+            d["personnes"] = [{"nom": n, "initiales": initiales_de(n)} for n in d.pop("donneurs_ordre") if n]
+        return d
+
+    @property
+    def donneurs_ordre(self) -> list[str]:
+        return [p.nom for p in self.personnes]
+
+    def personne(self, nom: str | None) -> Optional[Personne]:
+        return next((p for p in self.personnes if p.nom == nom), None)
+
+    def personne_igg(self, igg: str) -> Optional[Personne]:
+        igg = (igg or "").strip().upper()
+        return next((p for p in self.personnes if igg and p.igg.strip().upper() == igg), None)
 
     def etat_initial(self) -> str:
         return self.etats[0].id if self.etats else "brouillon"
@@ -181,6 +223,8 @@ class Contexte(_Modele):
     volume_depart_ml: Optional[float] = 1000
     matiere: str = "Graisse animale"
     lot: str = ""
+    scirius: str = ""  # n° Scirius de la charge de départ
+    fournisseur: str = ""  # fournisseur de la charge de départ
 
 
 class Communes(_Modele):

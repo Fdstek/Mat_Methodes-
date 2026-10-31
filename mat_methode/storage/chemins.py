@@ -48,10 +48,27 @@ def vider_temp(temp: Path) -> None:
 
 
 def utilisateur() -> str:
+    """IGG de la personne connectée sur ce poste (comme le projet Fractionnement) :
+    dossier du profil dans le chemin OneDrive (C:\\Users\\<IGG>\\OneDrive - …), profil Windows,
+    variable USERNAME, puis getpass. En majuscules."""
+    candidats = []
+    for var in ("OneDriveCommercial", "OneDrive", "USERPROFILE"):
+        valeur = os.environ.get(var, "")
+        if valeur:
+            parts = Path(valeur).parts
+            bas = [x.lower() for x in parts]
+            if "users" in bas and bas.index("users") + 1 < len(parts):
+                candidats.append(parts[bas.index("users") + 1])
+    candidats.append(os.environ.get("USERNAME", ""))
     try:
-        return getpass.getuser() or "inconnu"
+        candidats.append(getpass.getuser())
     except Exception:
-        return os.environ.get("USERNAME") or "inconnu"
+        pass
+    for v in candidats:
+        v = str(v or "").strip().upper()
+        if v:
+            return v
+    return "INCONNU"
 
 
 def poste() -> str:

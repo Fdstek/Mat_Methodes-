@@ -81,10 +81,9 @@ class Fenetre(QMainWindow):
         v.addSpacing(8)
         self.nav = {}
         pi = police_icones()
-        for k, t in (("manips", "Mes manips"), ("flux", "Flux"), ("rapport", "Rapport")):
+        for k, t in (("manips", "Mes manips"), ("flux", "Flux"), ("rapport", "Rapport"), ("reglages", "Réglages")):
             v.addWidget(self._nav(k, t, pi))
         v.addStretch(1)
-        v.addWidget(self._nav("reglages", "Réglages", pi))
         h.addWidget(self.volet)
 
         # ---- contenu
@@ -144,7 +143,7 @@ class Fenetre(QMainWindow):
         self.p_manips.importer.connect(self.importer)
         self.p_manips.exporter.connect(lambda i: self.autres_formats(i))
         self.p_flux.voir_rapport.connect(lambda: self.aller("rapport"))
-        self.p_flux.voir_reglages.connect(lambda: self.aller("reglages"))
+        self.p_flux.voir_reglages.connect(lambda section: self.aller("reglages", section))
         self.p_flux.dupliquer.connect(self._dupliquer_ouvrir)
         self.p_rapport.exporter_pdf.connect(lambda: self.exporter_fichier("pdf"))
         self.p_rapport.exporter_word.connect(lambda: self.exporter_fichier("docx"))
@@ -172,9 +171,11 @@ class Fenetre(QMainWindow):
         return b
 
     # ------------------------------------------------------------ navigation
-    def aller(self, page: str):
+    def aller(self, page: str, section: str | None = None):
         if page in ("flux", "rapport") and self.ctrl.courante is None:
             return
+        if page == "reglages":
+            self.p_reglages.section = section  # le menu ramène aux cartes ; un lien ouvre directement la bonne carte
         self.ctrl.journaliser()
         self.page = page
         self.pile.setCurrentIndex(["manips", "flux", "rapport", "reglages"].index(page))
@@ -367,10 +368,10 @@ class Fenetre(QMainWindow):
         D.exporter(self, f"Exporter · {m.nom}", lambda fmt: self._contenu(m, fmt), lambda fmt: self.exporter_fichier(fmt, m.id))
 
     def _conflit(self, mienne, disque):
-        choix = D.conflit(self, disque.modifie_par or "un autre utilisateur")
+        choix = D.conflit(self, self.ctrl.nom_de(disque.modifie_par) if disque.modifie_par else "un autre utilisateur")
         if choix == "recharger":
             self.ctrl.recharger_disque(disque)
-            self.toast.montrer(f"Version de {disque.modifie_par or 'l’autre utilisateur'} rechargée")
+            self.toast.montrer(f"Version de {self.ctrl.nom_de(disque.modifie_par) if disque.modifie_par else 'l’autre utilisateur'} rechargée")
         else:
             c = self.ctrl.enregistrer_comme_copie(mienne, disque)
             self.toast.montrer(f"Ta version est enregistrée : {c.nom}")

@@ -22,6 +22,7 @@ from mat_methode.domain.models import (
     ReactifInventaire,
     Reglages,
     Vide,
+    initiales_de,
 )
 
 TONS = {"": "neutre", "info": "info", "ok": "ok", "warn": "warn", "danger": "danger"}
@@ -37,7 +38,7 @@ def contexte_depuis(c: dict) -> Contexte:
         idee=c.get("idee") or "", precisions=c.get("precisions") or "", ref=c.get("ref") or "",
         date=c.get("date") or "", operateur=c.get("operateur") or "",
         volume_depart_ml=c.get("volumeDepart", c.get("volume_depart_ml")),
-        matiere=c.get("matiere") or "", lot=c.get("lot") or "")
+        matiere=c.get("matiere") or "", lot=c.get("lot") or "", scirius=c.get("scirius") or "", fournisseur=c.get("fournisseur") or "")
 
 
 def etape_depuis(e: dict) -> Etape:
@@ -83,7 +84,7 @@ def depuis_prototype(d: dict) -> tuple[Reglages, list[Manip]]:
     r = Reglages(
         laboratoires=[Laboratoire(nom=l["nom"], volume_ml=l.get("volume"), analyses=list(l.get("analyses") or []))
                       if isinstance(l, dict) else Laboratoire(nom=l) for l in d.get("labos") or []],
-        analyses=list(d.get("analyses") or []), donneurs_ordre=list(d.get("donneurs") or []),
+        analyses=list(d.get("analyses") or []), personnes=[{"nom": n, "initiales": initiales_de(n)} for n in d.get("donneurs") or []],
         types_demande=list(d.get("types") or []),
         etats=[Etat(id=s["id"], nom=s["nom"], ton=TONS.get(s.get("ton") or "", "neutre")) for s in d.get("statuts") or []]
         or Reglages().etats,

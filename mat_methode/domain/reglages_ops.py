@@ -131,8 +131,11 @@ def _renommer_liste(liste: list[str], ancien: str, nouveau: str) -> bool:
 
 
 def renommer_donneur(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
-    if not _renommer_liste(r.donneurs_ordre, ancien, nouveau):
+    p = r.personne(ancien)
+    nouveau = nouveau.strip()
+    if p is None or not nouveau or nouveau == ancien or any(norm(x.nom) == norm(nouveau) and x is not p for x in r.personnes):
         return []
+    p.nom = nouveau
     ch = [m for m in manips if m.contexte.donneur == ancien]
     for m in ch:
         m.contexte.donneur = nouveau.strip()

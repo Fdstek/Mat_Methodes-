@@ -197,7 +197,7 @@ class PageManips(QWidget):
             tags.append(pastille(f"Lancée · modifiée après lancement ({n})" if n else "Lancée", "warn" if n else "ok"))
         v = self.ctrl.st.verrou_autre(m.id)
         if v:
-            tags.append(pastille(f"Modifiée en ce moment par {v.utilisateur}", "info"))
+            tags.append(pastille(f"Modifiée en ce moment par {self.ctrl.nom_de(v.utilisateur)}", "info"))
         gauche.addWidget(flux_widgets(tags))
         if m.contexte.objectif:
             o = etiquette("", secondaire=True)

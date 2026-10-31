@@ -24,7 +24,7 @@ a = Analysis(
     [str(RACINE / "mat_methode" / "__main__.py")],
     pathex=[str(RACINE)],
     datas=datas,
-    hiddenimports=["mat_methode.data"],
+    hiddenimports=["mat_methode.data", "openpyxl"] + (["win32com.client", "pythoncom", "pywintypes"] if sys.platform == "win32" else []),
     excludes=["tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.Qt3DCore", "PySide6.QtQuick",
               "PySide6.QtQml", "PySide6.QtMultimedia", "PySide6.QtCharts", "PySide6.QtDataVisualization", "PySide6.QtPdf",
               "PySide6.QtBluetooth", "PySide6.QtNetworkAuth", "PySide6.QtSql", "PySide6.QtTest", "pytest", "pytestqt"],

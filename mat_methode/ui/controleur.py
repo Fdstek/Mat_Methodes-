@@ -175,7 +175,24 @@ class Controleur(QObject):
                 self.modifie.emit(False)
 
     def operateur(self, m: Manip) -> str:
-        return (m.contexte.operateur or "").strip() or self.st.utilisateur
+        return (m.contexte.operateur or "").strip() or self.nom_utilisateur()
+
+    def lire_scirius(self, forcer: bool = False, etape=lambda t: None):
+        """Lignes du fichier Scirius (voir mat_methode.scirius), gardées en mémoire pendant la session."""
+        from mat_methode.scirius import SourceScirius
+        if not forcer and getattr(self, "_scirius", None) is not None and self._scirius.lignes:
+            return self._scirius
+        src = SourceScirius(self.st.donnees / "cache", self.reglages.scirius_fichier, self.st.utilisateur)
+        self._scirius = src.lire(forcer=forcer, etape=etape)
+        return self._scirius
+
+    def nom_utilisateur(self) -> str:
+        """Nom de la personne connectée (liste des personnes des Réglages, retrouvée par son IGG), sinon l'IGG."""
+        return self.nom_de(self.st.utilisateur)
+
+    def nom_de(self, igg: str) -> str:
+        p = self.reglages.personne_igg(igg)
+        return p.nom if p else igg
 
     def enregistrer_tout(self) -> None:
         self._t_save.stop()
@@ -259,7 +276,10 @@ class Controleur(QObject):
         else:
             m = Manip(nom=nom, etat=self.reglages.etat_initial())
             m.contexte.date = maintenant_iso()[:10]
-        m.contexte.operateur = self.st.utilisateur
+        m.contexte.operateur = self.nom_utilisateur()
+        if base_id:
+            m.contexte.date = maintenant_iso()[:10]
+            R.reference_auto(m, self.reglages, self.manips)
         self.manips.append(m)
         self.sales.add(m.id)
         self.enregistrer_tout()
@@ -267,6 +287,8 @@ class Controleur(QObject):
 
     def dupliquer(self, ident: str) -> Manip:
         c = R.dupliquer(self.manip(ident), self.reglages)
+        c.contexte.date = maintenant_iso()[:10]
+        R.reference_auto(c, self.reglages, self.manips)
         self.manips.append(c)
         self.sales.add(c.id)
         self.enregistrer_tout()
@@ -295,11 +317,12 @@ class Controleur(QObject):
         r, ms = exemples()
         if not confirmer:
             self.reglages = r
+            self.reglages.personnes = Reglages().personnes  # des personnes, pas les services des exemples
         else:
             for k in ("laboratoires", "reactifs"):
                 noms = {x.nom for x in getattr(self.reglages, k)}
                 getattr(self.reglages, k).extend(x for x in getattr(r, k) if x.nom not in noms)
-            for k in ("analyses", "donneurs_ordre", "types_demande"):
+            for k in ("analyses", "types_demande"):
                 getattr(self.reglages, k).extend(x for x in getattr(r, k) if x not in getattr(self.reglages, k))
         ids = {m.id for m in self.manips}
         for m in ms:
