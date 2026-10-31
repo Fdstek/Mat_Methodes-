@@ -12,6 +12,8 @@ from mat_methode import VERSION  # noqa: E402
 
 datas = [
     (str(RACINE / "mat_methode" / "data" / "exemples.json"), "mat_methode/data"),
+    (str(RACINE / "mat_methode" / "data" / "fleche_bas_clair.png"), "mat_methode/data"),
+    (str(RACINE / "mat_methode" / "data" / "fleche_bas_sombre.png"), "mat_methode/data"),
     (str(RACINE / "build" / "MatMethode.ico"), "."),
 ]
 datas += collect_data_files("reportlab")   # polices Vera (repli si Segoe UI absente), données

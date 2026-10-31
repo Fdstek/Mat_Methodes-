@@ -166,7 +166,8 @@ class PageReglages(QWidget):
     # ------------------------------------------------------------ laboratoires
     def _laboratoires(self):
         x = self._section("Laboratoires", f"{len(self.r.laboratoires)}")
-        x.ajouter(etiquette("Pour chaque laboratoire : le volume à prélever et les analyses demandées. Chaque nouvel échantillon les reprend ; "
+        x.ajouter(etiquette("Pour chaque laboratoire : le volume à prélever et les analyses qu’il réalise. Choisir ce laboratoire pour un échantillon "
+                            "n’affiche que ces analyses (toutes cochées au départ) ; "
                             "on peut toujours les changer échantillon par échantillon.", secondaire=True, wrap=True))
         tous = [p for m in self.ctrl.manips for p in m.prelevements]
         for lab in self.r.laboratoires:
@@ -189,7 +190,7 @@ class PageReglages(QWidget):
                 b.setCheckable(True)
                 b.setChecked(a in lab.analyses)
                 an.append(b)
-            v.addWidget(champ("Analyses demandées", flux_widgets(an)))
+            v.addWidget(champ("Analyses possibles (proposées et cochées sur un nouvel échantillon)", flux_widgets(an)))
             x.ajouter(f)
         nouveau = ChampTexte("", "Nouveau laboratoire")
         ajout = lambda: O.ajouter_laboratoire(self.r, nouveau.text()) and (self._changer(), self.rafraichir())

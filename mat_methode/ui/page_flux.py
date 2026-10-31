@@ -922,13 +922,16 @@ class PageFlux(QWidget):
             labo.choisi.connect(lambda val, p=p: (R.changer_labo(p, r, val), self._toucher(True)))
             v.addWidget(champ("Laboratoire", labo))
             an = []
-            for a in list(r.analyses) + [a for a in p.analyses if a not in r.analyses]:
+            labo_p = r.laboratoire(p.labo)
+            possibles = R.analyses_possibles(r, p)
+            for a in possibles:
                 b = bouton(a, lambda p=p, a=a: (setattr(p, "analyses", R.basculer_analyse(p.analyses, a)), self._toucher()))
                 b.setProperty("chip", True)
                 b.setCheckable(True)
                 b.setChecked(a in p.analyses)
                 an.append(b)
-            v.addWidget(champ("Analyses demandées", flux_widgets(an)))
+            v.addWidget(champ(f"Analyses possibles au {p.labo}" if labo_p and labo_p.analyses else "Analyses demandées",
+                              flux_widgets(an) if an else etiquette("Aucune analyse définie pour ce laboratoire (Réglages)", secondaire=True)))
             sc = ChampTexte(p.scirius, "à saisir", mono=True)
             sc.modifie.connect(lambda val, p=p: (setattr(p, "scirius", val.strip()), self._toucher()))
             ar = ChampTexte(p.aramis, "à saisir", mono=True)

@@ -286,6 +286,14 @@ def changer_labo(p: Prelevement, reglages: Reglages, nom: str) -> None:
         p.analyses = list(labo.analyses)
 
 
+def analyses_possibles(reglages: Reglages, p: Prelevement) -> list[str]:
+    """Analyses proposées pour un échantillon : celles de son laboratoire (Réglages), plus celles déjà cochées ;
+    toutes les analyses si le laboratoire n'en a pas de définies."""
+    labo = reglages.laboratoire(p.labo)
+    base = list(labo.analyses) if labo and labo.analyses else list(reglages.analyses)
+    return base + [a for a in p.analyses if a not in base]
+
+
 def changer_moment(p: Prelevement, moment: str) -> None:
     p.moment = moment  # type: ignore[assignment]
     if moment != "pendant":
