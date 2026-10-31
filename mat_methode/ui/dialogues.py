@@ -93,7 +93,7 @@ def informer(parent, titre: str, message: str) -> None:
     d.exec()
 
 
-def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str = "") -> str | None:
+def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str = "", bouton_ok: str = "Renommer") -> str | None:
     """Petite fenêtre de saisie (renommer). Retourne le texte, ou None si annulé."""
     d = Dialogue(parent, titre)
     if aide:
@@ -102,7 +102,7 @@ def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str
     champ_.selectAll()
     d.lay.addWidget(champ(libelle, champ_))
     d.boutons.addWidget(bouton("Annuler", d.reject))
-    ok = bouton("Renommer", d.accept, accent=True)
+    ok = bouton(bouton_ok, d.accept, accent=True)
     ok.setDefault(True)
     d.boutons.addWidget(ok)
     d.finir()
@@ -110,6 +110,81 @@ def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str
     if d.exec() != QDialog.DialogCode.Accepted:
         return None
     return champ_.text().strip()
+
+
+def chercher_scirius(parent, lire, requete: str = "", pour: str = "") -> dict | None:
+    """Recherche dans le fichier Scirius de SharePoint. `lire(forcer, etape)` retourne une Lecture.
+    Retourne la ligne choisie (dict) ou None (on saisit alors à la main)."""
+    from PySide6.QtWidgets import QApplication
+
+    from mat_methode import scirius as S
+    d = Dialogue(parent, "Chercher dans Scirius" + (f" · {pour}" if pour else ""), 1000)
+    etat = etiquette("Lecture du fichier Scirius…", secondaire=True, wrap=True)
+    zone = ChampTexte(requete, "Nom du produit, lot, n° Scirius, fournisseur…")
+    zone.setClearButtonEnabled(True)
+    d.lay.addWidget(champ("Rechercher", zone))
+    d.lay.addWidget(etat)
+    t = QTableWidget(0, len(S.COLONNES))
+    t.setHorizontalHeaderLabels([titre for _, titre in S.COLONNES])
+    t.verticalHeader().hide()
+    t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    t.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+    t.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+    t.setMinimumHeight(380)
+    t.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+    d.lay.addWidget(t)
+    etat_lecture = {"lu": None, "visibles": []}
+
+    def afficher():
+        lu = etat_lecture["lu"]
+        if lu is None:
+            return
+        lignes = S.chercher(lu.lignes, zone.text())
+        etat_lecture["visibles"] = lignes
+        t.setRowCount(len(lignes))
+        for i, ln in enumerate(lignes):
+            for k, (cle, _) in enumerate(S.COLONNES):
+                t.setItem(i, k, QTableWidgetItem(ln.get(cle, "")))
+        t.resizeColumnsToContents()
+        t.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        if lignes:
+            t.selectRow(0)
+        n = len(lu.lignes)
+        etat.setText(f"{len(lignes)} ligne(s) sur {n} · {lu.origine}" if n else
+                     "Fichier Scirius introuvable ou illisible depuis ce poste. Vous pouvez saisir les informations à la main. "
+                     + (" | ".join(lu.ecartes[:3]) if lu.ecartes else ""))
+
+    def charger(forcer=False):
+        etat.setText("Lecture du fichier Scirius… (l’ouverture par Excel peut prendre une minute)")
+
+        def etape(texte):
+            etat.setText(texte)
+            QApplication.processEvents()
+        QApplication.processEvents()
+        etat_lecture["lu"] = lire(forcer, etape)
+        afficher()
+
+    choix = {"ligne": None}
+
+    def utiliser():
+        i = t.currentRow()
+        if 0 <= i < len(etat_lecture["visibles"]):
+            choix["ligne"] = etat_lecture["visibles"][i]
+            d.accept()
+
+    zone.textChanged.connect(lambda *_: afficher())
+    zone.returnPressed.connect(utiliser)
+    t.doubleClicked.connect(lambda *_: utiliser())
+    d.boutons.insertWidget(0, bouton("Relire le fichier", lambda: charger(True), tip="Relire le fichier Scirius sur SharePoint"))
+    d.boutons.addWidget(bouton("Saisir à la main", d.reject))
+    ok = bouton("Utiliser cette ligne", utiliser, accent=True)
+    d.boutons.addWidget(ok)
+    d.finir()
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(50, lambda: charger(False))
+    zone.setFocus()
+    d.exec()
+    return choix["ligne"]
 
 
 def nouvelle_manip(parent, manips: list[tuple[str, str]]) -> tuple[str, str] | None:

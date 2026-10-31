@@ -214,11 +214,62 @@ def test_non_realisee_puis_suppression(fen, monkeypatch):
 
 
 def test_renommer_donneur_depuis_reglages(fen, monkeypatch):
-    monkeypatch.setattr(D, "demander_texte", lambda *a, **k: "R&D Lyon")
+    from mat_methode.domain import reglages_ops as O
+    monkeypatch.setattr(D, "demander_texte", lambda *a, **k: "Pierre BURGUN-MARTIN")
+    for m in fen.ctrl.manips[:2]:
+        m.contexte.donneur = "Pierre BURGUN"
     fen.aller("reglages")
     pr = fen.p_reglages
-    pr._renommer("Donneurs d’ordre", "Interne · R&D", pr._ren(__import__("mat_methode.domain.reglages_ops", fromlist=["x"]).renommer_donneur,
-                                                              lambda: pr.r.donneurs_ordre))
-    assert "R&D Lyon" in fen.ctrl.reglages.donneurs_ordre
-    assert sum(1 for m in fen.ctrl.manips if m.contexte.donneur == "R&D Lyon") == 3
-    assert fen.ctrl.reglages_sales or (fen.ctrl.st.f_reglages.exists())
+    pr._renommer("Personnes", "Pierre BURGUN", pr._ren(O.renommer_donneur, lambda: pr.r.donneurs_ordre))
+    assert "Pierre BURGUN-MARTIN" in fen.ctrl.reglages.donneurs_ordre
+    assert sum(1 for m in fen.ctrl.manips if m.contexte.donneur == "Pierre BURGUN-MARTIN") == 2
+
+
+def test_volume_et_nouveau_reactif_depuis_le_flux(fen, monkeypatch):
+    from mat_methode.ui.widgets import ChoixVolume
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "comp")
+    fen.p_flux.aller(m.etapes[2].id)
+    choix = fen.p_flux.findChildren(ChoixVolume)
+    assert choix and [choix[0].itemText(i) for i in range(choix[0].count())][:3] == ["30 mL", "50 mL  (hors liste)", "60 mL"]
+    choix = fen.p_flux.findChildren(ChoixVolume)[0]
+    i = choix.findText("1 L")
+    choix.setCurrentIndex(i)
+    choix.activated.emit(i)
+    assert 1000 in [p.volume_ml for p in m.prelevements]
+    monkeypatch.setattr(D, "demander_texte", lambda *a, **k: "Acide phosphorique 85 %")
+    fen.p_flux._nouveau_reactif(m.etapes[2].reactifs[0])
+    assert fen.ctrl.reglages.reactif("Acide phosphorique 85 %") is not None
+    assert m.etapes[2].reactifs[0].nom == "Acide phosphorique 85 %"
+
+
+def test_scirius_charge_et_reactif(fen, monkeypatch):
+    ligne_charge = {"product": "Graisse animale brute", "batch": "GA-2026-09", "stock_item": "000777", "supplier": "Interne",
+                    "storage": "Chambre froide"}
+    monkeypatch.setattr(D, "chercher_scirius", lambda *a, **k: dict(ligne_charge))
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "comp")
+    fen.p_flux._scirius_charge()
+    c = m.contexte
+    assert (c.matiere, c.lot, c.scirius, c.fournisseur) == ("Graisse animale brute", "GA-2026-09", "000777", "Interne")
+    re_ = m.etapes[2].reactifs[1]  # Eau distillée
+    fen.p_flux._scirius_reactif(re_)
+    inv = fen.ctrl.reglages.reactif("Eau distillée")
+    assert inv.scirius == "000777" and inv.emplacement == "Chambre froide" and re_.nom == "Eau distillée"
+
+
+def test_reglages_en_cartes_et_reference(fen):
+    fen.aller("reglages")
+    assert fen.p_reglages.section is None
+    cles = [c for c, *_ in fen.p_reglages.sections()]
+    assert {"personnes", "laboratoires", "operations", "reactifs", "scirius"} <= set(cles)
+    for c in cles:
+        fen.p_reglages.ouvrir(c)  # chaque carte s'ouvre sans erreur
+    fen.aller("reglages")
+    assert fen.p_reglages.section is None
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.ctrl.reglages.personnes[0].initiales = "PB"
+    m.contexte.ref = ""
+    fen.p_flux._choisir_donneur(fen.ctrl.reglages.personnes[0].nom)
+    assert m.contexte.ref.startswith("PB-2026-10-30-")

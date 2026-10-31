@@ -12,7 +12,7 @@ from mat_methode.domain.texte import cap, fmt_num, fmt_vol, norm
 SUIVI_DEMANDE = {
     "donneur": "donneur d’ordre", "type": "type de demande", "objectif": "objectif", "idee": "idée testée",
     "precisions": "contexte", "ref": "référence", "volume_depart_ml": "volume de départ", "matiere": "matière",
-    "lot": "lot", "date": "date", "operateur": "opérateur",
+    "lot": "lot", "scirius": "n° Scirius de la charge", "fournisseur": "fournisseur de la charge", "date": "date", "operateur": "opérateur",
 }
 SUIVI_ETAPE = [("operation", "opération", ""), ("temperature_c", "température", " °C"), ("duree_min", "durée", " min"),
                ("agitation_trmin", "agitation", " tr/min"), ("filtre_um", "membrane", " µm"), ("remarque", "remarque", "")]

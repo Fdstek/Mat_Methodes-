@@ -200,7 +200,8 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     t21 = (f"Demande : {c.donneur or ph('donneur d’ordre')}{', type ' + c.type if c.type else ''} (réf. {c.ref or ph('n°')}). "
            + phrase("Objectif", c.objectif) + (phrase("Idée testée", c.idee) if est_test(c.type) else "")
            + phrase("Contexte", c.precisions)
-           + f"Matière étudiée : {c.matiere or ph('matière')} (lot {c.lot or ph('n°')}). "
+           + f"Matière étudiée : {c.matiere or ph('matière')} (lot {c.lot or ph('n°')}"
+           + (f", n° Scirius {c.scirius}" if c.scirius else "") + (f", fournisseur {c.fournisseur}" if c.fournisseur else "") + "). "
            + "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
            + (f", dont {fmt_vol(total_preleve(m))} mL prélevés sous forme de {ns} échantillon{'s' if ns > 1 else ''}" if ns else "")
            + "."

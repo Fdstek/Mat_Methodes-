@@ -131,8 +131,11 @@ def _renommer_liste(liste: list[str], ancien: str, nouveau: str) -> bool:
 
 
 def renommer_donneur(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
-    if not _renommer_liste(r.donneurs_ordre, ancien, nouveau):
+    p = r.personne(ancien)
+    nouveau = nouveau.strip()
+    if p is None or not nouveau or nouveau == ancien or any(norm(x.nom) == norm(nouveau) and x is not p for x in r.personnes):
         return []
+    p.nom = nouveau
     ch = [m for m in manips if m.contexte.donneur == ancien]
     for m in ch:
         m.contexte.donneur = nouveau.strip()
@@ -213,6 +216,19 @@ def renommer_tag(manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
             m.tags = tags
             ch.append(m)
     return ch
+
+
+# ------------------------------------------------------------------ volumes d'échantillon
+def ajouter_volume(r: Reglages, v: float | None) -> bool:
+    if v is None or v <= 0 or v in r.volumes_ml:
+        return False
+    r.volumes_ml = sorted(r.volumes_ml + [v])
+    return True
+
+
+def supprimer_volume(r: Reglages, v: float) -> None:
+    """Les échantillons et laboratoires qui l'utilisent gardent leur volume."""
+    r.volumes_ml = [x for x in r.volumes_ml if x != v]
 
 
 # ------------------------------------------------------------------ opérations (sous-étapes)

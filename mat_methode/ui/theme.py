@@ -122,6 +122,13 @@ def appliquer(app, preference: str = "systeme") -> Palette:
     return P
 
 
+def fleche(p: Palette) -> str:
+    """Chemin de l'image de la flèche des listes déroulantes (visible en clair et en sombre)."""
+    from importlib import resources
+    nom = "fleche_bas_sombre.png" if p.sombre else "fleche_bas_clair.png"
+    return str(resources.files("mat_methode.data").joinpath(nom)).replace("\\", "/")
+
+
 def qss(p: Palette) -> str:
     return f"""
 * {{ color: {p.texte}; }}
@@ -178,7 +185,9 @@ QLineEdit:hover, QComboBox:hover, QPlainTextEdit:hover {{ background: {p.champ_s
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus {{ border-bottom: 2px solid {p.accent}; }}
 QLineEdit:read-only {{ color: {p.texte2}; }}
 QLineEdit[mono="true"] {{ font-family: "Cascadia Mono", Consolas, monospace; }}
-QComboBox::drop-down {{ border: none; width: 24px; }}
+QComboBox::drop-down {{ border: none; width: 28px; subcontrol-origin: padding; subcontrol-position: center right; }}
+QComboBox::down-arrow {{ image: url("{fleche(p)}"); width: 12px; height: 12px; }}
+QComboBox {{ padding-right: 28px; }}
 QComboBox QAbstractItemView {{ background: {p.carte}; border: 1px solid {p.trait}; selection-background-color: {p.selection}; selection-color: {p.texte}; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}
 QScrollBar::handle:vertical {{ background: {"#C2C2C2" if not p.sombre else "#5A5A5A"}; border-radius: 4px; min-height: 30px; }}

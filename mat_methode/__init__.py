@@ -2,4 +2,4 @@
 
 NOM_APPLICATION = "Mat & Méthode"
 VERSION = "1.0.0"
-SCHEMA_DONNEES = 2  # version du format des fichiers de données (2 : grandes étapes) ; voir storage.stockage.migrer
+SCHEMA_DONNEES = 3  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge) ; voir storage.stockage.migrer

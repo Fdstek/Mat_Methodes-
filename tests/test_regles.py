@@ -165,3 +165,12 @@ def test_avertissements(ethanol, exemples):
     msgs = R.avertissements(ethanol, exemples[1])
     assert any("après la fin de l’étape" in x for x in msgs)
     assert any("Aramis 000873 en double" in x for x in msgs)
+
+
+def test_analyses_possibles_selon_le_labo(ethanol, reglages):
+    p = next(p for p in ethanol.prelevements if p.labo == "Labo externe")
+    assert R.analyses_possibles(reglages, p) == ["Métaux (ICP)", "Phosphore"]
+    p.analyses.append("Teneur en eau")  # déjà cochée hors labo : reste visible
+    assert R.analyses_possibles(reglages, p)[-1] == "Teneur en eau"
+    p.labo = "Labo inconnu"
+    assert R.analyses_possibles(reglages, p)[:5] == reglages.analyses

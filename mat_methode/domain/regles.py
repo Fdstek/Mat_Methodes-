@@ -268,7 +268,8 @@ def nouvel_echantillon(m: Manip, reglages: Reglages, etape_id: str | None) -> Pr
     dernier = m.prelevements[-1] if m.prelevements else None
     labo_nom = dernier.labo if dernier else (reglages.laboratoires[0].nom if reglages.laboratoires else "")
     labo = reglages.laboratoire(labo_nom)
-    volume = labo.volume_ml if labo and labo.volume_ml is not None else 50
+    defaut = reglages.volumes_ml[0] if reglages.volumes_ml else 50
+    volume = labo.volume_ml if labo and labo.volume_ml is not None else defaut
     analyses = list(labo.analyses) if labo and labo.analyses else (list(dernier.analyses) if dernier else [])
     p = Prelevement(etape_id=etape_id, moment="effluent" if etape_id else "avant",
                     volume_ml=volume, labo=labo_nom or "", analyses=analyses)
@@ -285,6 +286,14 @@ def changer_labo(p: Prelevement, reglages: Reglages, nom: str) -> None:
         p.analyses = list(labo.analyses)
 
 
+def analyses_possibles(reglages: Reglages, p: Prelevement) -> list[str]:
+    """Analyses proposées pour un échantillon : celles de son laboratoire (Réglages), plus celles déjà cochées ;
+    toutes les analyses si le laboratoire n'en a pas de définies."""
+    labo = reglages.laboratoire(p.labo)
+    base = list(labo.analyses) if labo and labo.analyses else list(reglages.analyses)
+    return base + [a for a in p.analyses if a not in base]
+
+
 def changer_moment(p: Prelevement, moment: str) -> None:
     p.moment = moment  # type: ignore[assignment]
     if moment != "pendant":
@@ -293,6 +302,32 @@ def changer_moment(p: Prelevement, moment: str) -> None:
 
 def basculer_analyse(liste_analyses: list[str], a: str) -> list[str]:
     return [x for x in liste_analyses if x != a] if a in liste_analyses else liste_analyses + [a]
+
+
+# ------------------------------------------------------------------ référence automatique
+REF_AUTO = re.compile(r"^[A-Z]{1,6}-\d{4}-\d{2}-\d{2}-\d{2,}$")
+
+
+def generer_reference(manips: list[Manip], initiales: str, jour: str) -> str:
+    """« PB-2026-10-31-01 » : initiales du donneur d'ordre, date (AAAA-MM-JJ), numéro du jour pour ces initiales."""
+    prefixe = f"{(initiales or 'XX').upper()}-{jour}-"
+    nums = [int(m.contexte.ref[len(prefixe):]) for m in manips
+            if m.contexte.ref.startswith(prefixe) and m.contexte.ref[len(prefixe):].isdigit()]
+    return f"{prefixe}{(max(nums) + 1 if nums else 1):02d}"
+
+
+def reference_auto(m: Manip, reglages: Reglages, manips: list[Manip], jour: str | None = None, forcer: bool = False) -> bool:
+    """Donne une référence automatique si elle est vide (ou déjà automatique, ou si `forcer`). Retourne True si changée."""
+    p = reglages.personne(m.contexte.donneur)
+    if p is None or not p.sigle():
+        return False
+    if not (forcer or not m.contexte.ref.strip() or REF_AUTO.match(m.contexte.ref.strip())):
+        return False
+    jour = jour or (m.contexte.date or maintenant_iso()[:10])
+    if REF_AUTO.match(m.contexte.ref.strip()) and m.contexte.ref.startswith(f"{p.sigle()}-{jour}-") and not forcer:
+        return False  # déjà la bonne
+    m.contexte.ref = generer_reference([x for x in manips if x.id != m.id], p.sigle(), jour)
+    return True
 
 
 # ------------------------------------------------------------------ duplication (§6.1)
