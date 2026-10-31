@@ -8,10 +8,12 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from mat_methode import SCHEMA_DONNEES
+from mat_methode.domain.catalogue import OPERATIONS
 
 Moment = Literal["avant", "pendant", "effluent"]
 Ton = Literal["neutre", "info", "ok", "warn", "danger"]
 ARCHIVEE = "archivee"
+NON_REALISEE = "non_realisee"  # état fixe : manip non réalisée, qu'on peut archiver ou supprimer
 
 
 def nouvel_id() -> str:
@@ -32,6 +34,12 @@ class Laboratoire(_Modele):
     nom: str
     volume_ml: Optional[float] = 50
     analyses: list[str] = Field(default_factory=list)
+
+
+class Operation(_Modele):
+    """Opération proposée dans « Définir le flux » (sous-étape), avec le participe passé utilisé dans le texte 2.3."""
+    nom: str
+    participe: str = ""
 
 
 class Etat(_Modele):
@@ -72,6 +80,7 @@ class Reglages(_Modele):
     etats: list[Etat] = Field(default_factory=lambda: [e.model_copy() for e in ETATS_DEFAUT])
     reactifs: list[ReactifInventaire] = Field(default_factory=list)
     grandes_etapes: list[str] = Field(default_factory=lambda: list(GRANDES_ETAPES_DEFAUT))
+    operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
@@ -88,6 +97,18 @@ class Reglages(_Modele):
         from mat_methode.domain.texte import norm
         k = norm(nom)
         return next((r for r in self.reactifs if norm(r.nom) == k), None)
+
+    def operation(self, nom: str) -> Optional[Operation]:
+        from mat_methode.domain.texte import norm
+        k = norm(nom)
+        return next((o for o in self.operations if norm(o.nom) == k), None)
+
+    def participe(self, operation: str) -> str:
+        """Participe passé d'une opération (« filtré ») ; sinon « traité (nom de l'étape) »."""
+        o = self.operation(operation)
+        if o is not None and o.participe.strip():
+            return o.participe.strip()
+        return OPERATIONS.get(operation, f"traité ({operation})")
 
     def assurer_reactif(self, nom: str) -> ReactifInventaire | None:
         """Ajoute le nom à la liste s'il n'y est pas (import d'un ancien rapport)."""

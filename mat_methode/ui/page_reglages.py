@@ -57,20 +57,26 @@ class PageReglages(QWidget):
                                      "avec les autres utilisateurs du dossier.", secondaire=True, wrap=True))
         lecture_seule = self.ctrl.st.lecture_seule
         self._laboratoires()
+        self._operations()
         self._liste_simple("Réactifs", [x.nom for x in self.r.reactifs], self._suppr_reactif, self._ajout_reactif, "Nouveau réactif",
                            "Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape "
-                           "et sont gardés pour la prochaine fois.")
+                           "et sont gardés pour la prochaine fois.",
+                           renommer=self._ren(O.renommer_reactif, lambda: [x.nom for x in self.r.reactifs]))
         self._liste_simple("Analyses disponibles", self.r.analyses, self._suppr_analyse,
-                           lambda v: O.ajouter_analyse(self.r, v), "Nouvelle analyse")
+                           lambda v: O.ajouter_analyse(self.r, v), "Nouvelle analyse",
+                           renommer=self._ren(O.renommer_analyse, lambda: self.r.analyses))
         self._liste_simple("Donneurs d’ordre", self.r.donneurs_ordre, lambda v: self.r.donneurs_ordre.remove(v),
                            lambda v: O.ajouter_simple(self.r.donneurs_ordre, v), "Nouveau donneur d’ordre",
-                           "Chaque donneur d’ordre devient un tag coloré dans « Mes manips ».")
+                           "Chaque donneur d’ordre devient un tag coloré dans « Mes manips ». ✎ renomme aussi dans toutes les manips.",
+                           renommer=self._ren(O.renommer_donneur, lambda: self.r.donneurs_ordre))
         self._liste_simple("Types de demande", self.r.types_demande, lambda v: self.r.types_demande.remove(v),
                            lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
-                           "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».")
+                           "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».",
+                           renommer=self._ren(O.renommer_type, lambda: self.r.types_demande))
         self._liste_simple("Grandes étapes", self.r.grandes_etapes, lambda v: self.r.grandes_etapes.remove(v),
                            lambda v: O.ajouter_simple(self.r.grandes_etapes, v), "Nouvelle grande étape",
-                           "Noms proposés pour regrouper des étapes du flux (ex. Degumming : chauffage, ajout d’acide, centrifugation…).")
+                           "Noms proposés pour regrouper des étapes du flux (ex. Degumming : chauffage, ajout d’acide, centrifugation…).",
+                           renommer=self._ren(O.renommer_grande_etape, lambda: self.r.grandes_etapes))
         self._etats()
         self._tags()
         a = etiquette(f"{NOM_APPLICATION} · version {VERSION} · données : {self.ctrl.st.donnees}", secondaire=True, wrap=True)
@@ -81,6 +87,61 @@ class PageReglages(QWidget):
             w = self.lay.itemAt(i).widget()
             if isinstance(w, Expander):
                 w.corps.setEnabled(not lecture_seule)
+
+    # ------------------------------------------------------------ opérations (sous-étapes)
+    def _operations(self):
+        ops = self.r.operations
+        x = self._section("Opérations (sous-étapes du flux)", f"{len(ops)}")
+        x.ajouter(etiquette("Les boutons proposés dans « Définir le flux ». Le participe passé sert au texte : « Étape 2 : il a ensuite été "
+                            "filtré… ». Renommer une opération met à jour les étapes de toutes les manips ; la supprimer de la liste "
+                            "ne touche pas les étapes existantes.", secondaire=True, wrap=True))
+        n = len(ops)
+        for i, o in enumerate(ops):
+            nom = ChampTexte(o.nom)
+            nom.editingFinished.connect(lambda nom=nom, o=o: self._renommer_operation(o, nom.text()))
+            part = ChampTexte(o.participe, f"ex. {o.nom[:-3] + 'é' if o.nom.endswith('age') else 'traité'}")
+            part.modifie.connect(lambda v, o=o: (setattr(o, "participe", v), self.ctrl.toucher_reglages()))
+            nb = sum(1 for m in self.ctrl.manips for e in m.etapes if norm(e.operation) == norm(o.nom))
+            haut = icone("↑", f"Monter {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, -1), self._changer(), self.rafraichir()))
+            haut.setEnabled(i > 0)
+            bas = icone("↓", f"Descendre {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, 1), self._changer(), self.rafraichir()))
+            bas.setEnabled(i < n - 1)
+            x.ajouter(ligne(champ("Opération", nom), champ("Participe passé (texte)", part),
+                            etiquette(f"{nb} étape{'s' if nb > 1 else ''}", secondaire=True), "stretch", haut, bas,
+                            icone("✕", f"Supprimer {o.nom}", lambda o=o: self._suppr_operation(o), danger=True)))
+        nouveau = ChampTexte("", "ex. neutralisation")
+        npart = ChampTexte("", "ex. neutralisé")
+
+        def ajout():
+            if O.ajouter_operation(self.r, nouveau.text(), npart.text()):
+                self._changer()
+                self.rafraichir()
+            elif nouveau.text().strip():
+                self.ctrl.toast.emit("Cette opération existe déjà")
+
+        nouveau.returnPressed.connect(ajout)
+        npart.returnPressed.connect(ajout)
+        x.ajouter(ligne(champ("Nouvelle opération", nouveau), champ("Participe passé", npart), bouton("Ajouter", ajout), "stretch"))
+
+    def _renommer_operation(self, o, nouveau):
+        nouveau = nouveau.strip()
+        if not nouveau or nouveau == o.nom:
+            return
+        ancien = o.nom
+        ch = O.renommer_operation(self.r, self.ctrl.manips, ancien, nouveau)
+        if o.nom == ancien:
+            self.ctrl.toast.emit("Impossible : cette opération existe déjà")
+            self.rafraichir()
+            return
+        self._changer(ch)
+        self.ctrl.toast.emit(f"Opération renommée ({len(ch)} manip{'s' if len(ch) > 1 else ''} mise{'s' if len(ch) > 1 else ''} à jour)")
+
+    def _suppr_operation(self, o):
+        if confirmer(self, "Retirer cette opération ?", f"« {o.nom} » ne sera plus proposée dans « Définir le flux ». "
+                     "Les étapes existantes qui l’utilisent ne changent pas.", "Retirer"):
+            O.supprimer_operation(self.r, o.nom)
+            self._changer()
+            self.rafraichir()
 
     # ------------------------------------------------------------ laboratoires
     def _laboratoires(self):
@@ -130,11 +191,12 @@ class PageReglages(QWidget):
             self.rafraichir()
 
     # ------------------------------------------------------------ listes simples
-    def _liste_simple(self, titre, items, supprimer, ajouter, libelle, aide=""):
+    def _liste_simple(self, titre, items, supprimer, ajouter, libelle, aide="", renommer=None):
         x = self._section(titre, f"{len(items)}")
         if aide:
             x.ajouter(etiquette(aide, secondaire=True, wrap=True))
-        x.ajouter(flux_widgets([ChipSupprimable(a, lambda a=a: (supprimer(a), self._changer(), self.rafraichir()), f"Supprimer {a}")
+        x.ajouter(flux_widgets([ChipSupprimable(a, lambda a=a: (supprimer(a), self._changer(), self.rafraichir()), f"Supprimer {a}",
+                                                renommer=(lambda a=a: self._renommer(titre, a, renommer)) if renommer else None)
                                 for a in items]) if items else etiquette("Aucun pour l’instant", secondaire=True))
         nouveau = ChampTexte("", libelle)
 
@@ -145,6 +207,32 @@ class PageReglages(QWidget):
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ(libelle, nouveau), bouton("Ajouter", ajout), "stretch"))
+
+    def _renommer(self, titre: str, ancien: str, fn, tag=False) -> None:
+        """Renomme une entrée et met à jour toutes les manips qui l'utilisent."""
+        from mat_methode.ui.dialogues import demander_texte
+        nouveau = demander_texte(self, f"Renommer « {ancien} »", "Nouveau nom", ancien,
+                                 f"{titre} : toutes les manips qui utilisent « {ancien} » seront mises à jour.")
+        if not nouveau or nouveau == ancien:
+            return
+        ch = fn(ancien, nouveau)
+        if ch is None:
+            self.ctrl.toast.emit("Impossible : ce nom existe déjà")
+            return
+        for m in ch:
+            self.ctrl.toucher(m)
+        if not tag:
+            self.ctrl.toucher_reglages()
+        n = len(ch)
+        self.ctrl.toast.emit(f"Renommé en « {nouveau} »" + (f" ({n} manip{'s' if n > 1 else ''} mise{'s' if n > 1 else ''} à jour)" if n else ""))
+        self.rafraichir()
+
+    def _ren(self, fn, liste_apres):
+        """Adapte une fonction de reglages_ops : None si le renommage a été refusé."""
+        def f(a, b):
+            ch = fn(self.r, self.ctrl.manips, a, b)
+            return ch if b.strip() in liste_apres() or ch else None
+        return f
 
     def _ajout_reactif(self, v):
         return O.ajouter_reactif(self.r, v)
@@ -200,12 +288,15 @@ class PageReglages(QWidget):
     def _tags(self):
         ts = tous_les_tags(self.ctrl.manips)
         x = self._section("Tags utilisés", f"{len(ts)}")
-        x.ajouter(etiquette("Les tags se créent dans la manip (carte « Ma demande »). Ici, on peut en retirer un de toutes les manips.",
+        x.ajouter(etiquette("Les tags se créent dans la manip (carte « Ma demande »). Ici, on peut en renommer (✎) ou en retirer (✕) un dans toutes les manips.",
                             secondaire=True, wrap=True))
         chips = []
         for t in ts:
             nb = sum(1 for m in self.ctrl.manips if any(norm(y) == norm(t) for y in m.tags))
-            chips.append(ChipSupprimable(f"#{t}  {nb}", lambda t=t: self._retirer_tag(t), f"Retirer {t} de toutes les manips"))
+            chips.append(ChipSupprimable(f"#{t}  {nb}", lambda t=t: self._retirer_tag(t), f"Retirer {t} de toutes les manips",
+                                         renommer=lambda t=t: self._renommer("Tags", t, lambda a, b: O.renommer_tag(self.ctrl.manips, a, b) or None,
+                                                                             tag=True),
+                                         tip_renommer=f"Renommer le tag {t} dans toutes les manips"))
         x.ajouter(flux_widgets(chips) if chips else etiquette("Aucun tag pour l’instant", secondaire=True))
 
     def _retirer_tag(self, t):

@@ -198,3 +198,27 @@ def test_grande_etape_dans_definir_et_completer(fen):
     assert cadres
     fl._defaire_groupe(g)
     assert m.groupes == []
+
+
+def test_non_realisee_puis_suppression(fen, monkeypatch):
+    from mat_methode.domain.models import NON_REALISEE
+    monkeypatch.setattr(D, "confirmer", lambda *a, **k: True)
+    m = next(x for x in fen.ctrl.manips if x.nom == "Désacidification acétone")
+    fen.aller("manips")
+    fen.p_manips._non_realisee(m)
+    assert m.etat == NON_REALISEE and fichier(fen, m)["etat"] == NON_REALISEE
+    fen.p_manips._supprimer(m)
+    assert m not in fen.ctrl.manips and not (fen.ctrl.st.d_manips / f"{m.id}.json").exists()
+    fen._annuler()  # Ctrl+Z
+    assert any(x.id == m.id for x in fen.ctrl.manips)
+
+
+def test_renommer_donneur_depuis_reglages(fen, monkeypatch):
+    monkeypatch.setattr(D, "demander_texte", lambda *a, **k: "R&D Lyon")
+    fen.aller("reglages")
+    pr = fen.p_reglages
+    pr._renommer("Donneurs d’ordre", "Interne · R&D", pr._ren(__import__("mat_methode.domain.reglages_ops", fromlist=["x"]).renommer_donneur,
+                                                              lambda: pr.r.donneurs_ordre))
+    assert "R&D Lyon" in fen.ctrl.reglages.donneurs_ordre
+    assert sum(1 for m in fen.ctrl.manips if m.contexte.donneur == "R&D Lyon") == 3
+    assert fen.ctrl.reglages_sales or (fen.ctrl.st.f_reglages.exists())

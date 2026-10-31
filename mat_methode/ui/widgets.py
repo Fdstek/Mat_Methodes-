@@ -310,7 +310,9 @@ def numero(n: int, taille=22) -> QLabel:
 
 
 class ChipSupprimable(QFrame):
-    def __init__(self, texte: str, retirer: Callable, tip: str = ""):
+    """Pastille avec ✕ (retirer) et, si `renommer` est donné, ✎ (renommer)."""
+
+    def __init__(self, texte: str, retirer: Callable, tip: str = "", renommer: Callable | None = None, tip_renommer: str = ""):
         super().__init__()
         self.setObjectName("chip")
         self.setStyleSheet(f"QFrame#chip{{background:{theme.P.bouton};border:1px solid {theme.P.trait};border-radius:4px;}}")
@@ -320,6 +322,14 @@ class ChipSupprimable(QFrame):
         l = QLabel(texte)
         l.setStyleSheet("border:none;")
         lay.addWidget(l)
+        if renommer is not None:
+            r = QPushButton("✎")
+            r.setCursor(Qt.CursorShape.PointingHandCursor)
+            r.setAccessibleName(tip_renommer or f"Renommer {texte}")
+            r.setToolTip(tip_renommer or f"Renommer {texte}")
+            r.setStyleSheet("QPushButton{border:none;background:transparent;padding:2px 4px;font-size:9pt;}")
+            r.clicked.connect(lambda *_: renommer())
+            lay.addWidget(r)
         x = QPushButton("✕")
         x.setCursor(Qt.CursorShape.PointingHandCursor)
         x.setAccessibleName(tip or f"Retirer {texte}")

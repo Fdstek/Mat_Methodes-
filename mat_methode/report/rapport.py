@@ -127,7 +127,7 @@ def quantite_texte(q: str) -> str:
     return re.sub(r"\s*\(([^()]*)\)\s*$", r", \1", q)
 
 
-def clause_etape(e: Etape) -> str:
+def clause_etape(e: Etape, reglages: Reglages | None = None) -> str:
     """« filtré sous vide sur membrane de 5 µm pendant 10 min »."""
     b = []
     if e.vide is not None:
@@ -147,7 +147,8 @@ def clause_etape(e: Etape) -> str:
                  else f"sous agitation à {fmt_num(e.agitation_trmin)} tr/min")
     b += autres_conditions(e)
     rem = e.remarque.strip()
-    return participe(e.operation) + ("".join(" " + x for x in b)) + (f" ({rem})" if rem else "")
+    part = reglages.participe(e.operation) if reglages is not None else participe(e.operation)
+    return part + ("".join(" " + x for x in b)) + (f" ({rem})" if rem else "")
 
 
 def sujet(i: int, n: int) -> str:
@@ -230,7 +231,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     for g, idx in blocs(m):
         if g is not None:
             morceaux23.append(f"{g.nom} ({plage([i + 1 for i in idx])}).")
-        morceaux23 += [f"Étape {i + 1} : {sujet(i, ne)} {clause_etape(m.etapes[i])}." for i in idx]
+        morceaux23 += [f"Étape {i + 1} : {sujet(i, ne)} {clause_etape(m.etapes[i], reglages)}." for i in idx]
     t23 = " ".join(morceaux23) if ne else ph("protocole")
     sections.append(Section("2.3 Méthodes", t23))
 
