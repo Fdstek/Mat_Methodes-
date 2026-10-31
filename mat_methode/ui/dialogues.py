@@ -93,7 +93,7 @@ def informer(parent, titre: str, message: str) -> None:
     d.exec()
 
 
-def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str = "") -> str | None:
+def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str = "", bouton_ok: str = "Renommer") -> str | None:
     """Petite fenêtre de saisie (renommer). Retourne le texte, ou None si annulé."""
     d = Dialogue(parent, titre)
     if aide:
@@ -102,7 +102,7 @@ def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str
     champ_.selectAll()
     d.lay.addWidget(champ(libelle, champ_))
     d.boutons.addWidget(bouton("Annuler", d.reject))
-    ok = bouton("Renommer", d.accept, accent=True)
+    ok = bouton(bouton_ok, d.accept, accent=True)
     ok.setDefault(True)
     d.boutons.addWidget(ok)
     d.finir()

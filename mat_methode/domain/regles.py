@@ -268,7 +268,8 @@ def nouvel_echantillon(m: Manip, reglages: Reglages, etape_id: str | None) -> Pr
     dernier = m.prelevements[-1] if m.prelevements else None
     labo_nom = dernier.labo if dernier else (reglages.laboratoires[0].nom if reglages.laboratoires else "")
     labo = reglages.laboratoire(labo_nom)
-    volume = labo.volume_ml if labo and labo.volume_ml is not None else 50
+    defaut = reglages.volumes_ml[0] if reglages.volumes_ml else 50
+    volume = labo.volume_ml if labo and labo.volume_ml is not None else defaut
     analyses = list(labo.analyses) if labo and labo.analyses else (list(dernier.analyses) if dernier else [])
     p = Prelevement(etape_id=etape_id, moment="effluent" if etape_id else "avant",
                     volume_ml=volume, labo=labo_nom or "", analyses=analyses)

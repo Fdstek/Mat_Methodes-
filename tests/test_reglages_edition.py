@@ -88,3 +88,16 @@ def test_fusion_operations():
     O.ajouter_operation(leur, "hydrogénation", "hydrogéné")
     noms = [o.nom for o in fusionner(base, mien, leur).operations]
     assert "neutralisation" in noms and "hydrogénation" in noms
+
+
+def test_volumes_echantillon():
+    from mat_methode.domain.texte import libelle_volume
+    r = Reglages()
+    assert r.volumes_ml == [30, 60, 120, 250, 500, 1000]
+    assert [libelle_volume(v) for v in (30, 250, 1000, 2000)] == ["30 mL", "250 mL", "1 L", "2 L"]
+    assert O.ajouter_volume(r, 2000) and not O.ajouter_volume(r, 60) and not O.ajouter_volume(r, None)
+    O.supprimer_volume(r, 30)
+    assert r.volumes_ml == [60, 120, 250, 500, 1000, 2000]
+    r.laboratoires = []
+    p = R.nouvel_echantillon(Manip(), r, None)
+    assert p.volume_ml == 60  # sans laboratoire : premier volume de la liste

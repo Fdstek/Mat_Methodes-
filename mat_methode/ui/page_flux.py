@@ -27,6 +27,7 @@ from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.widgets import (
     ChampTexte,
     ChipSupprimable,
+    ChoixVolume,
     Expander,
     InfoBar,
     Liste,
@@ -827,7 +828,10 @@ class PageFlux(QWidget):
                               icone("✕", f"Retirer le réactif {k + 1}", lambda k=k: self._retirer_reactif(e, k), danger=True)))
             nom = Liste(noms, re_.nom)
             nom.choisi.connect(lambda val, re_=re_: (setattr(re_, "nom", val), self._toucher(True)))
+            nouveau = bouton("+ Nouveau réactif…", lambda re_=re_: self._nouveau_reactif(re_), lien=True,
+                             tip="Ajouter un réactif à la liste des Réglages et le choisir ici")
             v.addWidget(champ("Réactif", nom))
+            v.addWidget(nouveau)
             q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
             v.addWidget(champ("Quantité ou ratio", q))
@@ -854,6 +858,26 @@ class PageFlux(QWidget):
         x.ajouter(flux_widgets([bouton("+ Ajouter un réactif à cette étape", lambda: (e.reactifs.append(ReactifEtape()), self._toucher(True)), ajout=True),
                                 bouton("Un réactif manque ? Ajoute-le dans les Réglages.", self.voir_reglages.emit, lien=True)]))
         return x
+
+    def _nouveau_reactif(self, re_):
+        """Ajoute un nom de réactif à la liste des Réglages depuis l'étape, et le choisit."""
+        from mat_methode.domain import reglages_ops as O
+        from mat_methode.ui.dialogues import demander_texte
+        nom = demander_texte(self, "Nouveau réactif", "Nom du réactif", "",
+                             "Le réactif est ajouté à la liste des Réglages (pour toutes les manips) et choisi pour cette étape. "
+                             "Son n° Scirius et son emplacement se renseignent ensuite ici.", bouton_ok="Ajouter")
+        if not nom:
+            return
+        existant = self.ctrl.reglages.reactif(nom)
+        if existant is None:
+            O.ajouter_reactif(self.ctrl.reglages, nom)
+            self.ctrl.toucher_reglages()
+            existant = self.ctrl.reglages.reactif(nom)
+            self.ctrl.toast.emit(f"« {existant.nom} » ajouté aux Réglages")
+        else:
+            self.ctrl.toast.emit(f"« {existant.nom} » existait déjà : il est choisi")
+        re_.nom = existant.nom
+        self._toucher(True)
 
     def _inv(self, inv, cle, val):
         setattr(inv, cle, val)
@@ -890,8 +914,8 @@ class PageFlux(QWidget):
                 tm = NumberBox(p.temps_min, "min", "ex. 10")
                 tm.valeur.connect(lambda val, p=p: (setattr(p, "temps_min", val), self._toucher()))
                 ch.append(champ("À quelle minute ?", tm))
-            vol = NumberBox(p.volume_ml, "mL")
-            vol.valeur.connect(lambda val, p=p: (setattr(p, "volume_ml", val), self._toucher()))
+            vol = ChoixVolume(r.volumes_ml, p.volume_ml)
+            vol.choisi.connect(lambda val, p=p: (setattr(p, "volume_ml", val), self._toucher(True)))
             ch.append(champ("Volume prélevé", vol))
             v.addWidget(ligne(*ch))
             labo = Liste([l.nom for l in r.laboratoires], p.labo, vide=None if p.labo else "Choisir…")

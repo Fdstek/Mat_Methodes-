@@ -49,6 +49,15 @@ def fmt_vol_ou(v) -> str:
     return "?" if v is None else fmt_vol(v)
 
 
+def libelle_volume(v: float | None) -> str:
+    """Volume d'échantillon dans les listes : « 250 mL », « 1 L »."""
+    if v is None:
+        return ""
+    if v >= 1000 and v % 1000 == 0:
+        return f"{fmt_num(v / 1000)} L"
+    return f"{fmt_num(v)} mL"
+
+
 def fmt_dur(minutes: float | None) -> str:
     """< 60 min en « min », multiples de 60 en « h », sinon « 1 h 05 »."""
     if minutes is None:

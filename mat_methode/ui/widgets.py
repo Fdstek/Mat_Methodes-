@@ -171,6 +171,25 @@ class Liste(QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i) or ""))
 
 
+class ChoixVolume(QComboBox):
+    """Volume d'échantillon choisi dans la liste des Réglages (30 mL … 1 L).
+    Un volume existant hors liste reste affiché comme option."""
+    choisi = Signal(object)
+
+    def __init__(self, volumes: list[float], valeur: float | None):
+        super().__init__()
+        from mat_methode.domain.texte import libelle_volume
+        opts = sorted(set(volumes) | ({valeur} if valeur is not None else set()))
+        for v in opts:
+            self.addItem(libelle_volume(v) + ("" if v in volumes else "  (hors liste)"), float(v))
+        if valeur is None:
+            self.insertItem(0, "Choisir…", None)
+            self.setCurrentIndex(0)
+        else:
+            self.setCurrentIndex(self.findData(float(valeur)))
+        self.activated.connect(lambda i: self.choisi.emit(self.itemData(i)))
+
+
 # ------------------------------------------------------------------ ToggleSwitch
 class ToggleSwitch(QAbstractButton):
     def __init__(self, texte: str = "", coche=False):

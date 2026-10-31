@@ -63,6 +63,7 @@ ETATS_DEFAUT = [Etat(id="brouillon", nom="Brouillon", ton="warn"),
 TYPES_DEFAUT = ["Support", "R&D", "Technologique", "Test d’idée"]
 ANALYSES_DEFAUT = ["FFA / indice d’acide", "Teneur en eau", "Impuretés insolubles", "Métaux (ICP)", "Phosphore"]
 DONNEURS_DEFAUT = ["Interne · R&D", "Interne · Production", "Client externe"]
+VOLUMES_DEFAUT = [30, 60, 120, 250, 500, 1000]  # mL ; 1000 = 1 L
 GRANDES_ETAPES_DEFAUT = ["Degumming", "Neutralisation", "Blanchiment", "Désodorisation", "Winterisation"]
 
 
@@ -80,6 +81,7 @@ class Reglages(_Modele):
     etats: list[Etat] = Field(default_factory=lambda: [e.model_copy() for e in ETATS_DEFAUT])
     reactifs: list[ReactifInventaire] = Field(default_factory=list)
     grandes_etapes: list[str] = Field(default_factory=lambda: list(GRANDES_ETAPES_DEFAUT))
+    volumes_ml: list[float] = Field(default_factory=lambda: list(VOLUMES_DEFAUT))  # volumes proposés pour un échantillon
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)

@@ -48,6 +48,12 @@ renomment, se suppriment et s'ordonnent dans Réglages, avec le participe passé
 Les donneurs d'ordre, types de demande, analyses, réactifs, grandes étapes et tags se renomment avec ✎ : toutes les manips
 qui les utilisent sont mises à jour.
 
+**Volumes d'échantillon** : choisis dans une liste (30, 60, 120, 250, 500 mL et 1 L par défaut), modifiable dans
+Réglages ; elle sert aussi au volume par défaut des laboratoires. Un volume existant hors liste reste affiché.
+
+**Nouveau réactif depuis le flux** : dans l'étape, « + Nouveau réactif… » ajoute le nom à la liste des Réglages et le
+choisit pour l'étape (le nom reste ainsi pris dans une liste commune, sans doublon).
+
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.
 

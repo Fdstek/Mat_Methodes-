@@ -6,13 +6,14 @@ from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
 from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.regles import basculer_analyse, tous_les_tags
-from mat_methode.domain.texte import norm
+from mat_methode.domain.texte import libelle_volume, norm
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.dialogues import confirmer
 from mat_methode.ui.widgets import (
     ChampTexte,
     ChipSupprimable,
+    ChoixVolume,
     Expander,
     Liste,
     NumberBox,
@@ -58,6 +59,7 @@ class PageReglages(QWidget):
         lecture_seule = self.ctrl.st.lecture_seule
         self._laboratoires()
         self._operations()
+        self._volumes()
         self._liste_simple("Réactifs", [x.nom for x in self.r.reactifs], self._suppr_reactif, self._ajout_reactif, "Nouveau réactif",
                            "Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape "
                            "et sont gardés pour la prochaine fois.",
@@ -123,6 +125,24 @@ class PageReglages(QWidget):
         npart.returnPressed.connect(ajout)
         x.ajouter(ligne(champ("Nouvelle opération", nouveau), champ("Participe passé", npart), bouton("Ajouter", ajout), "stretch"))
 
+    def _volumes(self):
+        vs = self.r.volumes_ml
+        x = self._section("Volumes d’échantillon", f"{len(vs)}")
+        x.ajouter(etiquette("Volumes proposés pour chaque échantillon et pour le volume par défaut des laboratoires. "
+                            "Retirer un volume ne change pas les échantillons existants.", secondaire=True, wrap=True))
+        x.ajouter(flux_widgets([ChipSupprimable(libelle_volume(v), lambda v=v: (O.supprimer_volume(self.r, v), self._changer(), self.rafraichir()),
+                                                f"Retirer {libelle_volume(v)}") for v in vs]) if vs else etiquette("Aucun", secondaire=True))
+        nouveau = NumberBox(None, "mL", "ex. 1000 pour 1 L")
+        nouveau.setMaximumWidth(200)
+
+        def ajout():
+            if O.ajouter_volume(self.r, nouveau.lire()):
+                self._changer()
+                self.rafraichir()
+
+        nouveau.returnPressed.connect(ajout)
+        x.ajouter(ligne(champ("Nouveau volume", nouveau), bouton("Ajouter", ajout), "stretch"))
+
     def _renommer_operation(self, o, nouveau):
         nouveau = nouveau.strip()
         if not nouveau or nouveau == o.nom:
@@ -157,8 +177,8 @@ class PageReglages(QWidget):
             n = sum(1 for p in tous if p.labo == lab.nom)
             nom = ChampTexte(lab.nom)
             nom.editingFinished.connect(lambda nom=nom, lab=lab: self._renommer_labo(lab.nom, nom.text()))
-            vol = NumberBox(lab.volume_ml, "mL")
-            vol.valeur.connect(lambda val, lab=lab: (setattr(lab, "volume_ml", val), self.ctrl.toucher_reglages()))
+            vol = ChoixVolume(self.r.volumes_ml, lab.volume_ml)
+            vol.choisi.connect(lambda val, lab=lab: (setattr(lab, "volume_ml", val), self.ctrl.toucher_reglages()))
             v.addWidget(ligne(champ("Nom du laboratoire", nom), champ("Volume par échantillon", vol), "stretch",
                               etiquette(f"utilisé dans {n} échantillon{'s' if n > 1 else ''}", secondaire=True),
                               icone("✕", f"Supprimer {lab.nom}", lambda lab=lab: self._suppr_labo(lab.nom), danger=True)))
