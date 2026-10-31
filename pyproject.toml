@@ -1,0 +1,18 @@
+[project]
+name = "mat_methode"
+version = "1.0.0"
+description = "Mat & Méthode : saisie d'une manip de prétraitement et génération du « Matériel et méthodes »"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+qt_api = "pyside6"
+
+[tool.ruff]
+line-length = 200
+target-version = "py312"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E702", "E741", "E731"]

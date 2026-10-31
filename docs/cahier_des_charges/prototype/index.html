@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mat &amp; Méthode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Plan : outil de labo, thème sombre unique (vert d'eau sur noir verdâtre), ambre réservé aux prélèvements et aux champs à saisir.
+   Mise en page : en-tête, onglets, bandeau de contexte (donneur d'ordre), vue de travail ; une colonne sur téléphone. */
+:root{
+  --bg:#0F1715; --rail:#131D1A; --panel:#17231F; --panel2:#1D2B26; --line:#2C3D37;
+  --ink:#E6EFEC; --muted:#9DB0AA; --soft:#C5D4CF;
+  --accent:#5FD0B5; --on-accent:#06231C; --accent-soft:#8FE3CE; --chip:#1F4A40; --chip-ink:#BFF0E3; --seg:#2F5A4F;
+  --amber:#F0B35A; --amber-bg:#3A2C12; --amber-line:#B8862F; --danger:#F29B8E;
+  --field:#0F1715; --field-line:#6F857E;
+  --mono:'IBM Plex Mono',ui-monospace,monospace; --sans:'IBM Plex Sans',system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#app{min-height:100%;display:flex;flex-direction:column}
+
+/* en-tête */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 16px;background:var(--rail);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center}
+.top .name{flex:1 1 220px;min-width:0}
+.top .name input{width:100%;height:44px;border:1px solid transparent;background:transparent;border-radius:8px;padding:0 10px;font-weight:600;font-size:16px}
+.top .name input:hover,.top .name input:focus{border-color:var(--field-line);background:var(--field)}
+.savestate{font:400 12px/1.35 var(--mono);color:var(--muted);text-align:right}
+.lanc{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px dashed var(--line);border-radius:12px;background:var(--panel)}.lanc.on{border:1px solid var(--accent)}
+.jr{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px}.jr .mono{color:var(--muted);font-size:12px}.jr b{color:var(--accent-soft)}.jwrap{max-height:52vh;overflow:auto;margin:8px 0}
+.tabs{display:flex;gap:4px;padding:8px 16px;background:var(--rail);border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{flex:none;height:44px;padding:0 16px;border-radius:10px;border:0;background:transparent;color:var(--soft);font-weight:500;white-space:nowrap}
+.tab[aria-current="page"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+.tab:disabled{opacity:.45;cursor:default}
+
+/* contexte */
+.ctx{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 16px;padding:12px 16px;background:var(--rail);border-bottom:1px solid var(--line)}
+.ctx .fld{flex:1 1 150px;max-width:260px}
+.ctx>[data-region]{margin-left:auto}
+.ctx .info{font:400 13px var(--mono);color:var(--soft);padding-bottom:12px}
+.mrow>.fld{width:44px;height:44px;align-items:center;justify-content:center}
+
+/* champs */
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld>label,.lbl{font-size:12.5px;font-weight:500;color:var(--soft)}
+.in,.fld input,.fld select,.fld textarea,.ta{width:100%;min-height:44px;border:1px solid var(--field-line);border-radius:8px;padding:0 12px;background:var(--field);color:var(--ink)}
+.fld textarea,.ta{padding:10px 12px;min-height:88px;line-height:1.5;resize:vertical}
+.mono{font-family:var(--mono);font-size:14px}
+.fld input[type=checkbox]{width:18px;min-height:18px;height:18px;accent-color:var(--accent)}
+.fld input:disabled,.fld select:disabled{opacity:.5}
+
+/* boutons */
+.btn{min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--field-line);background:transparent;color:var(--ink);font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn:hover{border-color:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn.accent{border-color:var(--accent);color:var(--accent-soft)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.sm{min-height:40px;padding:0 12px;font-size:13.5px;border-radius:8px}
+.btn.icon{width:44px;padding:0}
+.btn.dash{border-style:dashed}
+.btn:disabled{opacity:.45;cursor:default}
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;flex-wrap:wrap}
+.seg button{min-height:40px;padding:0 14px;border-radius:9px;border:0;background:transparent;color:var(--soft);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--seg);color:var(--ink);font-weight:600}
+
+/* vues */
+.view{flex:1;padding:16px;display:flex;flex-direction:column;gap:16px;max-width:1500px;width:100%;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel>h2,.panel .ph2{font-size:16px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.hint{font-size:13px;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+/* pastilles, badges */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12.5px;font-weight:500;background:var(--panel2);color:var(--soft);border:1px solid var(--line)}
+.chip.ok{background:var(--chip);color:var(--chip-ink);border-color:transparent}
+.chip.warn{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+.chip.info{background:#1B3045;color:#A9CCF2;border-color:#3F6A96}
+.chip.danger{background:#43201C;color:var(--danger);border-color:#A5594F}
+.dtag{--h:172;display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;font:600 12.5px var(--sans);background:hsl(var(--h) 42% 22%);color:hsl(var(--h) 75% 80%);border:1px solid hsl(var(--h) 40% 38%)}
+button.dtag{cursor:pointer;min-height:34px;padding:0 12px}button.dtag[aria-pressed=true]{background:hsl(var(--h) 50% 34%);border-color:hsl(var(--h) 70% 70%);box-shadow:0 0 0 1px hsl(var(--h) 70% 70%)}
+.tagp{display:inline-flex;align-items:center;padding:1px 9px;border-radius:6px;font-size:12px;background:var(--panel2);color:var(--soft);border:1px solid var(--line)}button.tagp{cursor:pointer}button.tagp:hover{border-color:var(--accent)}
+.frow{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}.frow .lbl{margin-right:2px}
+.tgs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}textarea.ctx{min-height:74px;width:100%}
+.todo,.ph{display:inline-block;padding:0 7px;border-radius:6px;border:1px dashed var(--amber-line);background:var(--amber-bg);color:var(--amber);font-size:.88em}
+.badge{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--amber);color:#2B1B00;font:600 11px var(--mono);flex:none}
+.badge.sm{width:18px;height:18px;font-size:10.5px}
+
+/* bibliothèque */
+.mlist{display:flex;flex-direction:column;gap:10px}
+.mrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.mrow.on{border-color:var(--accent)}
+.mrow .nm{font-weight:600;font-size:15.5px;overflow-wrap:anywhere}
+.mrow .meta{font-size:13px;color:var(--muted);display:flex;gap:6px 14px;flex-wrap:wrap}
+.mrow .acts{grid-column:1 / 3;display:flex;flex-wrap:wrap;gap:8px}
+.bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border:1px solid var(--accent);border-radius:12px;background:var(--chip)}
+.bulk b{margin-right:auto}
+
+/* flux */
+.flowwrap{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:start}
+.palette{display:flex;flex-direction:column;gap:6px;position:sticky;top:8px}
+.palette .btn{justify-content:space-between;background:var(--panel);border-color:var(--line)}
+.cards{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 10px}
+.cards>.card{flex:0 0 240px;scroll-snap-align:start}
+@media (min-width:981px){.cards{flex-wrap:wrap;overflow:visible}.cards>.card{flex:1 1 235px;max-width:320px}}
+.card{position:relative;display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;min-width:0}
+.card.sel{border:2px solid var(--accent);padding:11px;background:var(--panel2)}
+.card.entry{cursor:default;border-style:dashed}
+.card header{display:flex;align-items:center;gap:8px}
+.card>h3{flex:none}
+.card h3{font-size:15px;font-weight:600;flex:1;min-width:0;overflow-wrap:break-word;word-break:normal;hyphens:manual;line-height:1.2}
+.num{width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:600 12.5px var(--mono);flex:none}
+.cfoot{display:flex;align-items:center;gap:8px;margin-top:4px}
+.cfoot .mv{margin-left:auto;display:flex;gap:2px}
+.card .mv button{width:40px;height:40px;border-radius:8px;border:0;background:transparent;color:var(--soft);font-size:18px}
+.card .mv button:hover:not(:disabled){background:var(--line)}
+.card .mv button:disabled{opacity:.35;cursor:default}
+.reac{font:600 13px var(--sans);color:var(--ink)}
+.par{font:400 12.5px var(--mono);color:var(--accent-soft);overflow-wrap:anywhere}
+.eq{font-size:12.5px;color:var(--muted)}
+.frise{position:relative;height:42px;margin:6px 4px 0}
+.frise .track{position:absolute;left:0;right:0;top:15px;height:3px;border-radius:2px;background:#3E6B5F}
+.frise .badge{position:absolute;top:6px;margin-left:-10px}
+.frise .t0,.frise .t1{position:absolute;top:26px;font:400 10.5px var(--mono);color:var(--muted)}
+.frise .t0{left:0}.frise .t1{right:0}
+.pills{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.pill{display:flex;align-items:center;gap:8px;min-height:36px;padding:3px 10px 3px 6px;border-radius:8px;border:1px solid var(--amber-line);background:var(--amber-bg);color:var(--amber);font:500 12.5px var(--mono);text-align:left}
+.pill small{font:400 11.5px var(--sans);color:var(--soft)}
+.addp{align-self:flex-start;min-height:36px;padding:0 10px;border-radius:8px;border:1px dashed var(--field-line);background:transparent;color:var(--soft);font:400 12.5px var(--mono)}
+.timebar{display:flex;gap:3px;height:26px}
+.timebar>div{border-radius:5px;background:var(--seg);display:grid;place-items:center;font:400 11px var(--mono);min-width:2px;overflow:hidden}
+.timebar>div.on{background:var(--accent);color:var(--on-accent);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:12.5px;color:var(--soft)}
+.insp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.rrow{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chipx{display:inline-flex;align-items:center;gap:2px;min-height:36px;padding:0 4px 0 12px;border-radius:999px;background:var(--chip);color:var(--chip-ink);font-size:13px}
+.chipx button{width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:var(--chip-ink)}
+.phrase{padding:12px 14px;border-radius:10px;background:var(--bg);font-size:14px;line-height:1.7}
+
+/* échantillons */
+.scards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.scard{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);display:flex;flex-direction:column;gap:10px}
+.scard.sel{border:2px solid var(--accent);padding:13px}
+.scard>header{display:flex;align-items:center;gap:10px}
+.scard .sid{font:600 16px var(--mono);color:var(--amber)}
+.tgl{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--field-line);background:transparent;color:var(--soft);font-size:13.5px}
+.tgl[aria-pressed="true"]{background:var(--chip);border-color:var(--accent);color:var(--chip-ink)}
+.bar{display:flex;gap:3px;height:26px}
+.bar>div{border-radius:5px;min-width:2px}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{background:var(--rail);text-align:left;font:500 12px var(--mono);color:var(--muted);padding:10px 12px;white-space:nowrap}
+td{padding:6px 10px;border-top:1px solid var(--line);vertical-align:middle}
+td input{min-width:120px;min-height:44px}
+.tw.read td{padding:10px 12px}
+
+/* texte */
+.doc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;max-width:820px}
+.doc h2{font-size:20px}.doc h3{font-size:15px;margin-top:6px}
+.doc p{line-height:1.75;max-width:70ch}
+
+/* modale, toast */
+.ov{position:fixed;inset:0;background:rgba(5,10,9,.7);display:grid;place-items:center;padding:16px;z-index:20}
+.dlg{width:min(640px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--field-line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px}
+.dlg h2{font-size:18px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--accent);color:var(--on-accent);font-weight:600;padding:10px 18px;border-radius:999px;z-index:30;display:none;max-width:90vw}
+.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+
+.seg.big{display:flex;width:100%}.seg.big button{flex:1;min-height:52px;font-size:15px}
+.btn.big{min-height:52px;font-size:16px;width:100%}
+.defl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.defl li{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.defl .top{display:flex;align-items:center;gap:10px}
+.defl .btns{display:flex;flex-wrap:wrap;gap:6px}
+.opgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.q{font-size:16px;margin-top:6px}
+.conds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cond{display:flex;flex-direction:column;gap:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.tgl.big{min-height:48px;font-size:15px;font-weight:600;justify-content:flex-start;width:100%}
+.editor{display:flex;flex-direction:column;gap:14px;scroll-margin-top:8px}
+.eh{font-size:22px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;gap:10px}.nav .btn{flex:1;min-height:52px}
+details.more>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--soft);font-size:13.5px}
+details.more[open]>summary{margin-bottom:8px}
+.ctitle{display:block;max-width:100%;background:none;border:0;padding:0;font:inherit;line-height:inherit;overflow-wrap:break-word;white-space:normal;font-weight:600;color:inherit;text-align:left;cursor:pointer}
+.todo-line{font-size:12.5px;color:var(--amber)}
+.phr{padding:8px 0;border-top:1px solid var(--line)}
+.rrow.r3{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+@media (max-width:980px){
+  .flowwrap{grid-template-columns:minmax(0,1fr)}
+  .palette{position:static;flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .palette .btn{flex:none}
+  .insp{grid-template-columns:minmax(0,1fr)}
+  .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  .g2,.g3{grid-template-columns:minmax(0,1fr)}
+  .rrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .rrow>.fld:first-child{grid-column:1 / 3}
+  .rrow.r3{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto}
+  .rrow.r3>.fld:first-child{grid-column:auto}
+  .conds{grid-template-columns:minmax(0,1fr)}
+  .scards{grid-template-columns:minmax(0,1fr)}
+  .view{padding:12px}
+  .ctx .fld{max-width:none}
+  .ctx .info{margin-left:0;padding-bottom:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modalRoot"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<noscript>Cette page demande JavaScript.</noscript>
+
+<script>
+'use strict';
+/* ====================== utilitaires ====================== */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const nowIso = () => new Date().toISOString();
+const num = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : null; };
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const fmtVol = v => v == null ? '?' : Number(v).toLocaleString('fr-FR');
+const fmtDur = m => { if (m == null) return ''; m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; if (!h) return m + ' min'; return r ? `${h} h ${String(r).padStart(2, '0')}` : `${h} h`; };
+const fmtDT = iso => { try { const d = new Date(iso); return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+const who = m => (m && m.contexte && m.contexte.operateur && m.contexte.operateur.trim()) || 'Opérateur';
+const fmtDate = iso => { try { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (e) { return ''; } };
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const lowerFirst = s => s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+const clone = o => JSON.parse(JSON.stringify(o));
+const list = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1];
+const de = s => /^[aeiouyhéèêàâîôû]/i.test(s) ? 'd’' + s : 'de ' + s;
+
+/* ====================== données ====================== */
+const OPS = {
+  'chauffage': { part: 'chauffé', d: { temperature: 60, duree: 30, agitation: 300, equipement: ['Plaque chauffante agitatrice'] } },
+  'filtration': { part: 'filtré', d: { filtre: 5, duree: 10, vide: { mbar: null }, equipement: ['Entonnoir Büchner', 'Fiole à vide', 'Membrane 5 µm'] } },
+  'désacidification': { part: 'désacidifié', d: { temperature: 25, duree: 15, agitation: 300, equipement: ['Ampoule à décanter 500 mL'], reactifs: [{ nom: 'Éthanol 96 %', quantite: '1 : 1 (v/v)', role: 'Solvant' }] } },
+  'décantation': { part: 'décanté', d: { temperature: 40, duree: 120, equipement: ['Ampoule à décanter 500 mL'] } },
+  'séchage': { part: 'séché', d: { temperature: 105, duree: 60, equipement: ['Étuve'] } },
+  'centrifugation': { part: 'centrifugé', d: { agitation: 4000, duree: 10, equipement: ['Centrifugeuse'] } },
+  'lavage': { part: 'lavé', d: { duree: 10, agitation: 200, reactifs: [{ nom: 'Eau distillée', quantite: '', role: 'Lavage' }] } },
+  'broyage': { part: 'broyé', d: { duree: 5, equipement: ['Broyeur'] } },
+  'extraction par solvant': { part: 'extrait', d: { temperature: 25, duree: 30, agitation: 300, reactifs: [{ nom: 'Éthanol 96 %', quantite: '', role: 'Solvant' }] } },
+  'étape libre': { part: 'traité', d: {} },
+};
+const ROLES = ['Solvant', 'Additif', 'Réactif', 'Lavage'];
+const MOMENTS = [['avant', 'Avant traitement'], ['pendant', 'Pendant la réaction'], ['effluent', 'À l’effluent']];
+const ANALYSES0 = ['FFA / indice d’acide', 'Teneur en eau', 'Impuretés insolubles', 'Métaux (ICP)', 'Phosphore'];
+const LABOS0 = ['Labo interne', 'Labo externe'];
+const TYPES0 = ['Support', 'R&D', 'Technologique', 'Test d’idée'];
+const STATUTS0 = [{ id: 'brouillon', nom: 'Brouillon', ton: 'warn' }, { id: 'encours', nom: 'En cours', ton: 'info' }, { id: 'terminee', nom: 'Terminée', ton: 'ok' }];
+const TONS = [['', 'Neutre'], ['info', 'Bleu'], ['ok', 'Vert'], ['warn', 'Orange'], ['danger', 'Rouge']];
+const mkLab = (nom, volume = 50, analyses = []) => ({ nom, volume, analyses });
+
+const mkStep = (op, over = {}) => Object.assign({ id: uid(), operation: op, temperature: null, duree: null, agitation: null, filtre: null, vide: null, autres: [], equipement: [], reactifs: [], remarque: '' }, over);
+const sd = (op, over = {}) => mkStep(op, Object.assign(clone((OPS[op] || { d: {} }).d), over));
+const mkSample = (etapeId, moment, over = {}) => Object.assign({ id: uid(), etapeId, moment, temps: null, volume: 50, scirius: '', aramis: '', labo: 'Labo interne', analyses: [] }, over);
+const mkManip = (nom, over = {}) => Object.assign({ id: uid(), nom, tags: [], statut: 'brouillon', modele: false, maj: nowIso(), rev: 1, lancee: null, journal: [], base: null, texteManuel: null,
+  contexte: { donneur: 'Interne · R&D', type: '', objectif: '', idee: '', precisions: '', ref: '', date: new Date().toISOString().slice(0, 10), operateur: '', volumeDepart: 1000, matiere: 'Graisse animale', lot: '' },
+  communes: { temperature: null, agitation: null, vide: null }, etapes: [], prelevements: [] }, over);
+const inv = (nom, scirius, emplacement, fournisseur = '', lot = '') => ({ id: uid(), nom, scirius, emplacement, fournisseur, lot });
+
+function seed() {
+  const A = ANALYSES0;
+  const e1 = [sd('chauffage'), sd('filtration'),
+    sd('désacidification', { reactifs: [{ nom: 'Éthanol 96 %', quantite: '1 : 1 (v/v)', role: 'Solvant' }, { nom: 'Eau distillée', quantite: '5 % (v/v)', role: 'Additif' }] }),
+    sd('décantation'), sd('séchage')];
+  const m1 = mkManip('Désacidification éthanol', { tags: ['graisse animale', 'FFA', 'éthanol'], statut: 'encours', maj: '2026-10-30T20:00:00Z', etapes: e1,
+    contexte: { donneur: 'Interne · R&D', ref: 'DA-2026-0158', date: '2026-10-30', operateur: '', volumeDepart: 1000, matiere: 'Graisse animale', lot: '' },
+    prelevements: [
+      mkSample(null, 'avant', { scirius: '000412', aramis: '000873', analyses: [A[0], A[1], A[2]] }),
+      mkSample(e1[1].id, 'effluent', { scirius: '000413', analyses: [A[0], A[2]] }),
+      mkSample(e1[2].id, 'pendant', { temps: 10, scirius: '000414', analyses: [A[0], A[1], A[2]] }),
+      mkSample(e1[2].id, 'effluent', { volume: 25, labo: 'Labo externe', analyses: [A[3], A[4]] }),
+      mkSample(e1[4].id, 'pendant', { temps: 30, analyses: [A[0], A[1]] }),
+      mkSample(e1[4].id, 'effluent', { volume: 100, labo: 'Labo externe', analyses: [A[0], A[1], A[3], A[4]] })] });
+  const e2 = [sd('chauffage'), sd('filtration'), sd('désacidification', { reactifs: [{ nom: 'Acétone', quantite: '1 : 1 (v/v)', role: 'Solvant' }] }), sd('décantation'), sd('séchage')];
+  const m2 = mkManip('Désacidification acétone', { tags: ['graisse animale', 'FFA', 'acétone'], statut: 'terminee', maj: '2026-10-28T15:00:00Z', etapes: e2,
+    contexte: { donneur: 'Interne · R&D', ref: 'DA-2026-0149', date: '2026-10-28', operateur: '', volumeDepart: 800, matiere: 'Graisse animale', lot: '' },
+    prelevements: [mkSample(null, 'avant', { scirius: '000398', aramis: '000861', analyses: [A[0]] }), mkSample(e2[4].id, 'effluent', { scirius: '000399', aramis: '000862', analyses: [A[0], A[1]] })] });
+  const e3 = [sd('filtration'), sd('séchage')];
+  const m3 = mkManip('Filtration seule 5 µm', { tags: ['graisse animale', 'filtration'], statut: 'terminee', modele: true, maj: '2026-10-21T10:00:00Z', etapes: e3,
+    contexte: { donneur: 'Interne · Production', ref: 'DA-2026-0121', date: '2026-10-21', operateur: '', volumeDepart: 500, matiere: 'Graisse animale', lot: '' } });
+  const e4 = [sd('séchage', { temperature: 80 })];
+  const m4 = mkManip('Essai séchage étuve 80 °C', { tags: ['graisse animale', 'séchage'], statut: 'archivee', maj: '2026-10-02T09:00:00Z', etapes: e4,
+    contexte: { donneur: 'Interne · R&D', ref: '', date: '2026-10-02', operateur: '', volumeDepart: 300, matiere: 'Graisse animale', lot: '' } });
+  Object.assign(m1.contexte, { type: 'R&D', objectif: 'Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %', precisions: 'Essai de référence avant le passage à l’échelle pilote.' });
+  Object.assign(m2.contexte, { type: 'Test d’idée', idee: 'Remplacer l’éthanol par l’acétone comme solvant de désacidification', objectif: 'Comparer le taux de FFA obtenu avec l’acétone à celui de l’éthanol' });
+  Object.assign(m3.contexte, { type: 'Support', objectif: 'Filtrer un lot de graisse pour la production' });
+  Object.assign(m4.contexte, { type: 'Technologique', objectif: 'Vérifier le séchage à 80 °C en étuve' });
+  m1.contexte.operateur = 'Pierre'; m1.rev = 4; m1.maj = '2026-10-30T21:10:00Z';
+  m1.lancee = { le: '2026-10-30T19:45:00Z', par: 'Pierre' };
+  m1.journal = [{ t: '2026-10-30T20:30:00Z', par: 'Pierre', txt: 'Étape 3 · Désacidification : durée 20 → 15 min' }, { t: '2026-10-30T21:05:00Z', par: 'Pierre', txt: 'Échantillon S3a : volume 40 → 50 mL' }];
+  m1.base = JSON.stringify(snapshotOf(m1));
+  m2.rev = 3; m3.rev = 2; m4.rev = 1;
+  return { v: 2, types: TYPES0.slice(), statuts: clone(STATUTS0),
+    manips: [m1, m2, m3, m4],
+    inventaire: [inv('Éthanol 96 %', '001245', 'Armoire inflammables 1 · étagère 2'), inv('Eau distillée', '', 'Distillateur · labo 2', 'production interne'),
+      inv('Acétone', '001302', 'Armoire inflammables 2 · étagère 1'), inv('Éthanol absolu', '001251', 'Armoire inflammables 1 · étagère 2')],
+    labos: [mkLab('Labo interne', 50, [A[0], A[1], A[2]]), mkLab('Labo externe', 100, [A[3], A[4]])], analyses: ANALYSES0.slice(), donneurs: ['Interne · R&D', 'Interne · Production', 'Client externe'] };
+}
+
+/* ====================== état ====================== */
+const S = { data: seed(), ui: { tab: 'flux', manipId: null, stepId: null, sampleId: null, sel: new Set(), filtre: 'actives', q: '', mode: 'comp', scrollTo: null, insertAfter: null, replace: false, modal: null }, persist: { mode: 'local', status: 'idle', ref: null, dl: null, dirty: false, cloudChecked: false } };
+S.ui.manipId = S.data.manips[0].id;
+S.ui.stepId = S.data.manips[0].etapes[2].id;
+
+const curManip = () => S.data.manips.find(m => m.id === S.ui.manipId) || null;
+const stepIndex = (m, id) => m.etapes.findIndex(e => e.id === id);
+const sampleStepNo = (m, p) => { if (!p.etapeId) return 0; const i = stepIndex(m, p.etapeId); return i < 0 ? 0 : i + 1; };
+const rank = p => p.moment === 'avant' ? -1 : p.moment === 'pendant' ? (p.temps ?? 0) : 1e9;
+const sortedSamples = m => m.prelevements.map((p, i) => ({ p, i })).sort((a, b) => (sampleStepNo(m, a.p) - sampleStepNo(m, b.p)) || (rank(a.p) - rank(b.p)) || (a.i - b.i)).map(x => x.p);
+function labels(m) {
+  const out = {}, groups = {};
+  sortedSamples(m).forEach(p => { (groups[sampleStepNo(m, p)] = groups[sampleStepNo(m, p)] || []).push(p); });
+  Object.keys(groups).forEach(k => groups[k].forEach((p, i) => { out[p.id] = 'S' + k + (groups[k].length > 1 ? String.fromCharCode(97 + i) : ''); }));
+  return out;
+}
+const codeOf = l => String(l).replace(/^S(\d+)([a-z]*)$/, (x, d, s) => s || d);
+const totalPreleve = m => m.prelevements.reduce((a, p) => a + (p.volume || 0), 0);
+const missingCount = m => m.prelevements.reduce((a, p) => a + (p.scirius ? 0 : 1) + (p.aramis ? 0 : 1), 0);
+function momentText(m, p, L) {
+  const n = sampleStepNo(m, p), e = m.etapes[n - 1];
+  if (p.moment === 'avant' || n === 0) return 'avant traitement (entrée du flux)';
+  if (p.moment === 'pendant') return `pendant l’étape ${n} (${e.operation})${p.temps != null ? ', à ' + fmtDur(p.temps) : ''}`;
+  return `à l’effluent de l’étape ${n} (${e.operation})`;
+}
+const invFind = nom => S.data.inventaire.find(r => norm(r.nom) === norm(nom));
+function ensureInv(nom) { if (nom && nom.trim() && !invFind(nom)) S.data.inventaire.push(inv(nom.trim(), '', '')); }
+function usedReagents(m) {
+  const out = [];
+  m.etapes.forEach((e, i) => e.reactifs.forEach(r => { if (!r.nom) return; let x = out.find(o => norm(o.nom) === norm(r.nom)); if (!x) { x = { nom: r.nom, etapes: [] }; out.push(x); } if (!x.etapes.includes(i + 1)) x.etapes.push(i + 1); }));
+  return out;
+}
+
+/* ====================== génération du texte ====================== */
+function stepClause(e) {
+  const part = (OPS[e.operation] || {}).part || ('traité (' + e.operation + ')');
+  const b = [];
+  if (e.filtre != null) b.push(`sur membrane de ${e.filtre} µm`);
+  if (e.reactifs.length) b.push('en présence ' + list(e.reactifs.filter(r => r.nom).map(r => de(lowerFirst(r.nom)) + (r.quantite ? ` (${r.quantite})` : ''))));
+  if (e.temperature != null) b.push(`à ${e.temperature} °C`);
+  if (e.duree != null) b.push(`pendant ${fmtDur(e.duree)}`);
+  if (e.vide) b.push('sous vide' + (e.vide.mbar ? ` (${e.vide.mbar} mbar)` : ''));
+  if (e.agitation != null) b.push(e.operation === 'centrifugation' ? `à ${e.agitation} tr/min` : `sous agitation (${e.agitation} tr/min)`);
+  (e.autres || []).filter(a => a.nom && a.nom.trim()).forEach(a => b.push(`${a.nom.trim()} ${a.valeur || ''}`.trim()));
+  return part + (b.length ? ' ' + b.join(' ') : '') + (e.remarque && e.remarque.trim() ? ` (${e.remarque.trim()})` : '');
+}
+const etapesTxt = a => a.length > 1 ? 'étapes ' + a.join(', ') : 'étape ' + a[0];
+const sent = (lab, t) => t && String(t).trim() ? `${lab} : ${String(t).trim().replace(/[.\s]+$/, '')}. ` : '';
+function report(m) {
+  const c = m.contexte, L = labels(m), S_ = sortedSamples(m);
+  const ph = x => `{{?${x}}}`;
+  const sec = [];
+  const nS = m.prelevements.length;
+  sec.push({ titre: '2.1 Échantillon', texte:
+    `Demande : ${c.donneur || ph('donneur d’ordre')}${c.type ? ', type ' + c.type : ''} (réf. ${c.ref || ph('n°')}). ` +
+    sent('Objectif', c.objectif) + (isTest(c) ? sent('Idée testée', c.idee) : '') + sent('Contexte', c.precisions) +
+    `Matière étudiée : ${c.matiere || ph('matière')} (lot ${c.lot || ph('n°')}). ` +
+    `Volume de départ : ${c.volumeDepart != null ? fmtVol(c.volumeDepart) + ' mL' : ph('volume de départ')}` +
+    (nS ? `, dont ${fmtVol(totalPreleve(m))} mL prélevés sous forme de ${nS} échantillon${nS > 1 ? 's' : ''}` : '') + '.' +
+    (m.etapes.length ? ` Le flux comporte ${m.etapes.length} étape${m.etapes.length > 1 ? 's' : ''}${m.etapes.length > 1 ? ' (étapes 1 à ' + m.etapes.length + ')' : ''}, décrites en 2.3.` : '') });
+  const eq = [], eqSt = {}; m.etapes.forEach((e, i) => e.equipement.forEach(x => { const k = norm(x); if (!eq.some(y => norm(y) === k)) { eq.push(x); eqSt[k] = []; } if (!eqSt[k].includes(i + 1)) eqSt[k].push(i + 1); }));
+  const reacs = usedReagents(m);
+  const reacTxt = reacs.map(r => { const f = invFind(r.nom) || {}; return `${lowerFirst(r.nom)} (${etapesTxt(r.etapes)}, fournisseur ${f.fournisseur || ph('nom')}, lot ${f.lot || ph('n°')})`; });
+  sec.push({ titre: '2.2 Matériel et réactifs', texte: `Matériel : ${eq.length ? eq.map(x => `${x} (${etapesTxt(eqSt[norm(x)])})`).join(', ') : ph('matériel')}.` + (reacTxt.length ? ` Réactifs : ${reacTxt.join(' ; ')}.` : '') });
+  sec.push({ titre: '2.3 Méthodes', texte: m.etapes.length
+    ? m.etapes.map((e, i) => `Étape ${i + 1} : ` + (i === 0 ? 'le produit a été ' : 'il a ensuite été ') + stepClause(e) + '.').join(' ') : ph('protocole') });
+  if (nS) sec.push({ titre: '2.4 Prélèvements', texte: S_.map(p => {
+    const lab = p.labo ? 'au ' + p.labo : ph('laboratoire');
+    const ids = [p.scirius ? `n° Scirius ${p.scirius}` : '', p.aramis ? `n° Aramis ${p.aramis}` : ''].filter(Boolean).join(', ');
+    return `Un échantillon de ${fmtVol(p.volume)} mL (${L[p.id]}) a été prélevé ${momentText(m, p, L)}, puis analysé ${lab}` +
+      (p.analyses.length ? ` (${p.analyses.join(', ')})` : '') + (ids ? ` [${ids}]` : '') + '.'; }).join(' ') });
+  const tabReac = reacs.map(r => { const f = invFind(r.nom) || {}; return { nom: r.nom, scirius: f.scirius || '', emplacement: f.emplacement || '', fournisseur: f.fournisseur || '', lot: f.lot || '', etapes: r.etapes }; });
+  const tabEch = S_.map(p => { const n = sampleStepNo(m, p); return { id: L[p.id], etape: n ? `${n} · ${m.etapes[n - 1].operation}` : 'entrée', moment: p.moment === 'avant' || !n ? 'avant traitement' : p.moment === 'pendant' ? 'pendant' + (p.temps != null ? ' · à ' + fmtDur(p.temps) : '') : 'effluent', volume: p.volume, scirius: p.scirius, aramis: p.aramis, labo: p.labo, analyses: p.analyses }; });
+  const rowOf = p => { const n = sampleStepNo(m, p); return { id: L[p.id], volume: p.volume, moment: p.moment === 'avant' || !n ? 'avant traitement' : p.moment === 'pendant' ? 'pendant' + (p.temps != null ? ' · à ' + fmtDur(p.temps) : '') : 'effluent', labo: p.labo, analyses: p.analyses, scirius: p.scirius, aramis: p.aramis }; };
+  const condOf = e => [condSummary(e)].concat((e.autres || []).filter(a => a.nom && a.nom.trim()).map(a => `${a.nom.trim()} ${a.valeur || ''}`.trim())).filter(Boolean).join(' · ');
+  const phases = [{ titre: 'Départ', cond: '', materiel: [], reactifs: [], echantillons: S_.filter(p => sampleStepNo(m, p) === 0).map(rowOf) }].concat(m.etapes.map((e, i) => ({
+    titre: `${i + 1} · ${cap(e.operation)}`, cond: condOf(e), materiel: e.equipement,
+    reactifs: e.reactifs.filter(r => r.nom).map(r => { const f = invFind(r.nom) || {}; return { nom: r.nom, quantite: r.quantite || '', scirius: f.scirius || '', emplacement: f.emplacement || '', fournisseur: f.fournisseur || '', lot: f.lot || '' }; }),
+    echantillons: S_.filter(p => p.etapeId === e.id).map(rowOf) })));
+  return { sections: sec, reactifs: tabReac, echantillons: tabEch, phases };
+}
+const toHtml = s => esc(s).replace(/\{\{\?([^}]*)\}\}/g, (x, a) => `<span class="ph">${a} à saisir</span>`);
+const toMd = s => s.replace(/\{\{\?([^}]*)\}\}/g, (x, a) => `[${a} à saisir]`);
+function markdown(m) {
+  const r = report(m), ln = [`# ${m.nom}`, '', `Donneur d’ordre : ${m.contexte.donneur || '[à saisir]'}${m.contexte.type ? ' · Type : ' + m.contexte.type : ''} · Réf. : ${m.contexte.ref || '[à saisir]'}`, ...(m.tags && m.tags.length ? ['', 'Tags : ' + m.tags.map(t => '#' + t).join(' ')] : []), '', `Version ${m.rev} · enregistrée le ${fmtDT(m.maj)}${m.lancee ? ` · lancée le ${fmtDT(m.lancee.le)} par ${m.lancee.par}` : ''}`, ...(m.lancee && m.journal.length ? ['', `⚠ Modifiée après lancement (${m.journal.length} modification${m.journal.length > 1 ? 's' : ''}), voir la fin du document.`] : []), '', '## 2. Matériel et méthodes', ''];
+  if (m.texteManuel != null) ln.push(m.texteManuel, ''); else r.sections.forEach(s => ln.push(`### ${s.titre}`, '', toMd(s.texte), ''));
+  ln.push('### Détail par phase du flux', '');
+  r.phases.forEach(ph => {
+    ln.push(`#### ${ph.titre}`, '');
+    if (ph.cond) ln.push(`- Conditions : ${ph.cond}`);
+    if (ph.materiel.length) ln.push(`- Matériel : ${ph.materiel.join(', ')}`);
+    if (ph.titre !== 'Départ') { ln.push(`- Réactifs : ${ph.reactifs.length ? '' : 'aucun'}`); ph.reactifs.forEach(x => ln.push(`  - ${x.nom}${x.quantite ? ' · ' + x.quantite : ''} · n° Scirius ${x.scirius || 'à saisir'} · emplacement ${x.emplacement || 'à saisir'} · fournisseur ${x.fournisseur || 'à saisir'} · lot ${x.lot || 'à saisir'}`)); }
+    ln.push(`- Échantillons : ${ph.echantillons.length ? '' : 'aucun'}`);
+    ph.echantillons.forEach(x => ln.push(`  - ${x.id} · ${fmtVol(x.volume)} mL · ${x.moment} · ${x.labo} · ${x.analyses.join(', ') || 'aucune analyse'} · n° Scirius ${x.scirius || 'à saisir'} · n° Aramis ${x.aramis || 'à saisir'}`));
+    ln.push('');
+  });
+  if (r.reactifs.length) { ln.push('### Réactifs', '', '| Réactif | N° Scirius | Emplacement | Fournisseur | Lot | Étape |', '|---|---|---|---|---|---|');
+    r.reactifs.forEach(x => ln.push(`| ${x.nom} | ${x.scirius || 'à saisir'} | ${x.emplacement || 'à saisir'} | ${x.fournisseur || 'à saisir'} | ${x.lot || 'à saisir'} | ${x.etapes.join(', ')} |`)); ln.push(''); }
+  if (r.echantillons.length) { ln.push('### Échantillons', '', '| Éch. | Étape | Moment | Volume | N° Scirius | N° Aramis | Laboratoire | Analyses |', '|---|---|---|---|---|---|---|---|');
+    r.echantillons.forEach(x => ln.push(`| ${x.id} | ${x.etape} | ${x.moment} | ${fmtVol(x.volume)} mL | ${x.scirius || 'à saisir'} | ${x.aramis || 'à saisir'} | ${x.labo} | ${x.analyses.join(', ')} |`)); ln.push(''); }
+  if (m.lancee) { ln.push('### Modifications après lancement', ''); if (m.journal.length) { ln.push('| Date et heure | Par | Modification |', '|---|---|---|'); m.journal.forEach(j => ln.push(`| ${fmtDT(j.t)} | ${j.par} | ${j.txt} |`)); } else ln.push('Aucune modification depuis le lancement.'); ln.push(''); }
+  return ln.join('\n');
+}
+function exportJson(m) {
+  const r = report(m), L = labels(m);
+  return {
+    titre: m.nom, contexte: Object.assign({}, m.contexte, { tags: m.tags || [] }), version: m.rev, enregistree_le: m.maj, lancee: m.lancee, journal: m.journal,
+    etapes: m.etapes.map((e, i) => ({ n: i + 1, operation: e.operation, parametres: Object.assign({},
+      e.temperature != null && { temperature_c: e.temperature }, e.duree != null && { duree_min: e.duree }, e.agitation != null && { agitation_trmin: e.agitation }, e.filtre != null && { filtre_um: e.filtre }, e.vide && { vide: true, vide_mbar: e.vide.mbar ?? null }),
+      equipement: e.equipement, reactifs: e.reactifs.map(x => lowerFirst(x.nom)).filter(Boolean), reactifs_detail: e.reactifs, remarque: e.remarque })),
+    sous_sections: r.sections.map(s => ({ titre: s.titre, texte: toMd(s.texte) })),
+    materiel: [].concat(...m.etapes.map(e => e.equipement)).filter((x, i, a) => a.indexOf(x) === i),
+    reactifs: usedReagents(m).map(x => lowerFirst(x.nom)),
+    prelevements: sortedSamples(m).map(p => ({ id: L[p.id], apres_etape: sampleStepNo(m, p), moment: sampleStepNo(m, p) ? p.moment : 'avant', temps_min: p.temps, volume_ml: p.volume, scirius: p.scirius || null, aramis: p.aramis || null, labo: p.labo, analyses: p.analyses })),
+    phases: r.phases.map(ph => ({ titre: ph.titre, conditions: ph.cond, materiel: ph.materiel, reactifs: ph.reactifs, echantillons: ph.echantillons })),
+    inventaire_reactifs: usedReagents(m).map(x => { const f = invFind(x.nom) || {}; return { nom: lowerFirst(x.nom), scirius: f.scirius || null, emplacement: f.emplacement || null, fournisseur: f.fournisseur || null, lot: f.lot || null }; }),
+  };
+}
+function reportHtml(m) {
+  const r = report(m), L = labels(m), c = m.contexte;
+  const cards = m.etapes.map((e, i) => {
+    const ps = sortedSamples(m).filter(p => sampleStepNo(m, p) === i + 1);
+    const par = condSummary(e);
+    return `<div class="c"><b>${i + 1}. ${esc(cap(e.operation))}</b>${e.reactifs.map(x => `<div class="r">${esc(x.nom)}${x.quantite ? ' (' + esc(x.quantite) + ')' : ''}</div>`).join('')}<div class="p">${esc(par)}</div><div class="e">${esc(e.equipement.join(', '))}</div>` +
+      ps.map(p => `<div class="s"><b>${esc(L[p.id])}</b> · ${fmtVol(p.volume)} mL<br><small>${esc(p.moment === 'pendant' ? 'pendant' + (p.temps != null ? ' · à ' + fmtDur(p.temps) : '') : 'effluent')}</small></div>`).join('') + '</div>';
+  }).join('');
+  const t1 = r.reactifs.length ? `<h3>Réactifs</h3><table><tr><th>Réactif</th><th>N° Scirius</th><th>Emplacement</th><th>Fournisseur</th><th>Lot</th><th>Étape</th></tr>${r.reactifs.map(x => `<tr><td><b>${esc(x.nom)}</b></td><td>${esc(x.scirius) || '<i>à saisir</i>'}</td><td>${esc(x.emplacement) || '<i>à saisir</i>'}</td><td>${esc(x.fournisseur) || '<i>à saisir</i>'}</td><td>${esc(x.lot) || '<i>à saisir</i>'}</td><td>${x.etapes.join(', ')}</td></tr>`).join('')}</table>` : '';
+  const t2 = r.echantillons.length ? `<h3>Échantillons</h3><table><tr><th>Éch.</th><th>Étape</th><th>Moment</th><th>Volume</th><th>N° Scirius</th><th>N° Aramis</th><th>Laboratoire</th><th>Analyses</th></tr>${r.echantillons.map(x => `<tr><td>${esc(x.id)}</td><td>${esc(x.etape)}</td><td>${esc(x.moment)}</td><td>${fmtVol(x.volume)} mL</td><td>${esc(x.scirius) || '<i>à saisir</i>'}</td><td>${esc(x.aramis) || '<i>à saisir</i>'}</td><td>${esc(x.labo)}</td><td>${esc(x.analyses.join(', '))}</td></tr>`).join('')}</table>` : '';
+  const tj = m.lancee ? `<h3>Modifications après lancement</h3>` + (m.journal.length ? `<table><tr><th>Date et heure</th><th>Par</th><th>Modification</th></tr>${m.journal.map(j => `<tr><td>${fmtDT(j.t)}</td><td>${esc(j.par)}</td><td>${esc(j.txt)}</td></tr>`).join('')}</table>` : '<p>Aucune modification depuis le lancement.</p>') : '';
+  const tdp = x => x ? esc(x) : '<i>à saisir</i>';
+  const phasesPrint = `<h3>Détail par phase du flux</h3>` + r.phases.map(ph => `<div class="c" style="margin:6px 0"><b>${esc(ph.titre)}</b> <span class="p">${esc(ph.cond)}</span>${ph.materiel.length ? `<div class="e">${esc(ph.materiel.join(', '))}</div>` : ''}
+    ${ph.titre !== 'Départ' ? `<div><b>Réactifs</b> ${ph.reactifs.length ? ph.reactifs.map(x => `<div>${esc(x.nom)}${x.quantite ? ' · ' + esc(x.quantite) : ''} — n° Scirius ${tdp(x.scirius)}, emplacement ${tdp(x.emplacement)}, fournisseur ${tdp(x.fournisseur)}, lot ${tdp(x.lot)}</div>`).join('') : 'aucun'}</div>` : ''}
+    <div><b>Échantillons</b> ${ph.echantillons.length ? ph.echantillons.map(x => `<div class="s"><b>${esc(x.id)}</b> · ${fmtVol(x.volume)} mL · ${esc(x.moment)} · ${esc(x.labo)} · ${esc(x.analyses.join(', '))} — n° Scirius ${tdp(x.scirius)}, n° Aramis ${tdp(x.aramis)}</div>`).join('') : 'aucun'}</div></div>`).join('');
+  const body = m.texteManuel != null ? `<p style="white-space:pre-wrap">${esc(m.texteManuel)}</p>` : r.sections.map(s => `<h3>${esc(s.titre)}</h3><p>${toHtml(s.texte)}</p>`).join('');
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(m.nom)}</title><style>
+body{font:14px/1.6 system-ui,sans-serif;color:#14201D;max-width:860px;margin:24px auto;padding:0 16px}h1{margin:0 0 6px}h2{color:#0F6B5C;margin-top:26px}h3{margin:14px 0 4px}
+.meta{background:#E1F0EC;padding:8px 12px;border-radius:6px;margin-bottom:6px}.flow{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.c{border:1px solid #BFCBC7;border-radius:8px;padding:8px;font-size:12.5px}.r{font-weight:600}.p{color:#0F6B5C}.e{color:#566360;font-size:11.5px}.s{margin-top:6px;background:#FDF1DC;border:1px solid #8A4B00;color:#8A4B00;border-radius:6px;padding:3px 6px;font-size:11.5px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border:1px solid #BFCBC7;padding:4px 6px;text-align:left}th{background:#E1F0EC}i,.ph{color:#8A4B00}
+@media print{body{margin:0}}</style></head><body><h1>${esc(m.nom)}</h1><div class="meta"><b>Donneur d’ordre :</b> ${esc(c.donneur)} &nbsp; ${c.type ? `<b>Type :</b> ${esc(c.type)} &nbsp; ` : ''}<b>Réf. demande :</b> ${esc(c.ref) || '<i>à saisir</i>'} &nbsp; <b>Date :</b> ${esc(c.date)}<br><b>Version :</b> ${m.rev} · enregistrée le ${fmtDT(m.maj)}${m.lancee ? ` · <b>lancée le</b> ${fmtDT(m.lancee.le)} par ${esc(m.lancee.par)}` : ''}${m.lancee && m.journal.length ? ` <b style="color:#8A4B00">· modifiée après lancement (${m.journal.length})</b>` : ''}${m.tags && m.tags.length ? `<br><b>Tags :</b> ${m.tags.map(t => '#' + esc(t)).join(' ')}` : ''}</div>
+<h2>Flux de prétraitement</h2><div class="flow">${cards}</div><h2>Matériel et méthodes</h2>${body}${phasesPrint}${t1}${t2}${tj}</body></html>`;
+}
+
+function normalize(d) {
+  d.types = d.types || TYPES0.slice(); d.statuts = (d.statuts && d.statuts.length) ? d.statuts : clone(STATUTS0);
+  (d.manips || []).forEach(m => { m.tags = Array.isArray(m.tags) ? m.tags : (m.tag ? [m.tag] : []); delete m.tag; m.contexte = Object.assign({ type: '', objectif: '', idee: '', precisions: '' }, m.contexte);
+    if (m.statut !== 'archivee' && !d.statuts.some(x => x.id === m.statut)) m.statut = d.statuts[0].id;
+    m.rev = m.rev || 1; m.lancee = m.lancee || null; m.journal = Array.isArray(m.journal) ? m.journal : []; m.base = m.base || null; });
+  (d.manips || []).forEach(m => { m.communes = m.communes || { temperature: null, agitation: null, vide: null }; m.prelevements = m.prelevements || []; m.texteManuel = null; (m.etapes || []).forEach(e => { if (e.vide === undefined) e.vide = null; if (!e.autres) e.autres = []; e.reactifs = e.reactifs || []; e.equipement = e.equipement || []; }); });
+  d.labos = (d.labos || LABOS0).map(l => typeof l === 'string' ? mkLab(l) : l); d.analyses = d.analyses || ANALYSES0.slice(); d.donneurs = d.donneurs || ['Interne · R&D', 'Interne · Production', 'Client externe']; d.inventaire = d.inventaire || [];
+  (d.manips || []).forEach(m => { if (m.lancee) trackNow(m, true); });
+  return d;
+}
+/* ====================== persistance ====================== */
+let saveTimer = null;
+const DIRTY = new Set(), TRK = {};
+function touch(m) { if (m) { m.maj = nowIso(); DIRTY.add(m.id); trackSoon(m); } }
+/* --- suivi des modifications après le lancement --- */
+const TRACK_LAB = { donneur: 'donneur d’ordre', type: 'type de demande', objectif: 'objectif', idee: 'idée testée', precisions: 'contexte', ref: 'référence', volumeDepart: 'volume de départ', matiere: 'matière', lot: 'lot', date: 'date', operateur: 'opérateur' };
+function snapshotOf(m) { return { contexte: clone(m.contexte), tags: clone(m.tags || []), etapes: clone(m.etapes), prelevements: clone(m.prelevements) }; }
+const vv = v => (v === null || v === undefined || v === '') ? 'vide' : v;
+function diffSnap(a, b, m) {
+  const out = [], L = labels(m), eq = (x, y) => (x ?? '') === (y ?? '');
+  Object.keys(TRACK_LAB).forEach(k => { if (!eq(a.contexte[k], b.contexte[k])) out.push(`Demande · ${TRACK_LAB[k]} : ${vv(a.contexte[k])} → ${vv(b.contexte[k])}${k === 'volumeDepart' ? ' mL' : ''}`); });
+  b.tags.filter(t => !a.tags.some(x => norm(x) === norm(t))).forEach(t => out.push(`Tag ajouté : #${t}`));
+  a.tags.filter(t => !b.tags.some(x => norm(x) === norm(t))).forEach(t => out.push(`Tag retiré : #${t}`));
+  const ia = {}, ib = {}; a.etapes.forEach((e, i) => { ia[e.id] = [e, i]; }); b.etapes.forEach((e, i) => { ib[e.id] = [e, i]; });
+  const ra0 = a.etapes.filter(e => b.etapes.some(x => x.id === e.id)).map(e => e.id), rb0 = b.etapes.filter(e => a.etapes.some(x => x.id === e.id)).map(e => e.id);
+  b.etapes.forEach((e, i) => { const lab = `Étape ${i + 1} · ${cap(e.operation)}`, o = ia[e.id];
+    if (!o) { out.push(`Étape ajoutée : ${lab}`); return; }
+    const [oe, oi] = o; if (ra0.indexOf(e.id) !== rb0.indexOf(e.id)) out.push(`${lab} : déplacée (étape ${oi + 1} → ${i + 1})`);
+    [['operation', 'opération', ''], ['temperature', 'température', ' °C'], ['duree', 'durée', ' min'], ['agitation', 'agitation', ' tr/min'], ['filtre', 'membrane', ' µm'], ['remarque', 'remarque', '']].forEach(([k, n, u]) => { if (!eq(oe[k], e[k])) out.push(`${lab} : ${n} ${vv(oe[k])} → ${vv(e[k])}${u}`); });
+    if (!!oe.vide !== !!e.vide) out.push(`${lab} : sous vide ${e.vide ? 'activé' : 'désactivé'}`); else if (e.vide && !eq(oe.vide.mbar, e.vide.mbar)) out.push(`${lab} : pression ${vv(oe.vide.mbar)} → ${vv(e.vide.mbar)} mbar`);
+    e.equipement.filter(x => !oe.equipement.includes(x)).forEach(x => out.push(`${lab} : matériel ajouté (${x})`)); oe.equipement.filter(x => !e.equipement.includes(x)).forEach(x => out.push(`${lab} : matériel retiré (${x})`));
+    const ra = {}, rb = {}; oe.reactifs.forEach(r => { ra[norm(r.nom)] = r; }); e.reactifs.forEach(r => { rb[norm(r.nom)] = r; });
+    Object.keys(rb).forEach(k => { if (!ra[k]) out.push(`${lab} : réactif ajouté (${rb[k].nom}${rb[k].quantite ? ', ' + rb[k].quantite : ''})`); else if (!eq(ra[k].quantite, rb[k].quantite)) out.push(`${lab} : réactif ${rb[k].nom}, quantité ${vv(ra[k].quantite)} → ${vv(rb[k].quantite)}`); });
+    Object.keys(ra).forEach(k => { if (!rb[k]) out.push(`${lab} : réactif retiré (${ra[k].nom})`); });
+    const aa = {}, ab = {}; (oe.autres || []).forEach(x => { if (x.nom) aa[norm(x.nom)] = x; }); (e.autres || []).forEach(x => { if (x.nom) ab[norm(x.nom)] = x; });
+    Object.keys(ab).forEach(k => { if (!aa[k]) out.push(`${lab} : condition ajoutée (${ab[k].nom} ${ab[k].valeur || ''})`.replace(' )', ')')); else if (!eq(aa[k].valeur, ab[k].valeur)) out.push(`${lab} : ${ab[k].nom} ${vv(aa[k].valeur)} → ${vv(ab[k].valeur)}`); });
+    Object.keys(aa).forEach(k => { if (!ab[k]) out.push(`${lab} : condition retirée (${aa[k].nom})`); }); });
+  a.etapes.forEach((e, i) => { if (!ib[e.id]) out.push(`Étape supprimée : ${cap(e.operation)} (était l’étape ${i + 1})`); });
+  const pa = {}; a.prelevements.forEach(p => { pa[p.id] = p; }); const pb = {}; b.prelevements.forEach(p => { pb[p.id] = p; });
+  b.prelevements.forEach(p => { const lab = L[p.id] || 'échantillon', o = pa[p.id];
+    if (!o) { out.push(`Échantillon ajouté : ${lab} (${fmtVol(p.volume)} mL, ${momentShort(p)})`); return; }
+    [['volume', 'volume', ' mL'], ['moment', 'moment', ''], ['temps', 'temps', ' min'], ['labo', 'laboratoire', ''], ['scirius', 'n° Scirius', ''], ['aramis', 'n° Aramis', '']].forEach(([k, n, u]) => { if (!eq(o[k], p[k])) out.push(`Échantillon ${lab} : ${n} ${vv(o[k])} → ${vv(p[k])}${u}`); });
+    p.analyses.filter(x => !o.analyses.includes(x)).forEach(x => out.push(`Échantillon ${lab} : analyse ajoutée (${x})`)); o.analyses.filter(x => !p.analyses.includes(x)).forEach(x => out.push(`Échantillon ${lab} : analyse retirée (${x})`)); });
+  a.prelevements.forEach(p => { if (!pb[p.id]) out.push(`Échantillon supprimé : ${fmtVol(p.volume)} mL (${momentShort(p)})`); });
+  return out;
+}
+function trackNow(m, boot) {
+  if (!m.lancee) return; clearTimeout(TRK[m.id]); delete TRK[m.id];
+  const cur = snapshotOf(m); if (!m.base) { m.base = JSON.stringify(cur); return; }
+  const d = diffSnap(JSON.parse(m.base), cur, m); if (!d.length) return;
+  const t = boot ? m.maj : nowIso(), par = who(m); d.forEach(txt => m.journal.push({ t, par, txt })); m.base = JSON.stringify(cur);
+  if (!boot) { DIRTY.add(m.id); save(); }
+}
+function trackSoon(m) { if (!m.lancee) return; clearTimeout(TRK[m.id]); TRK[m.id] = setTimeout(() => { trackNow(m); refresh(); }, 600); }
+function flushTrack() { Object.keys(TRK).forEach(id => { const m = S.data.manips.find(x => x.id === id); if (m) trackNow(m); }); }
+function save() { S.persist.dirty = true; S.persist.status = 'pending'; paintSave(); clearTimeout(saveTimer); saveTimer = setTimeout(persist, 900); }
+async function persist() {
+  const P = S.persist; flushTrack(); const stamp = nowIso();
+  DIRTY.forEach(id => { const m = S.data.manips.find(x => x.id === id); if (m) { m.rev = (m.rev || 1) + 1; m.maj = stamp; } }); DIRTY.clear(); P.savedAt = stamp;
+  const json = JSON.stringify(S.data);
+  try { localStorage.setItem('cahier-manip-v1', json); } catch (e) { /* stockage local indisponible */ }
+  if (P.ref) { try { await P.ref.set({ v: 1, json, maj: nowIso() }); P.status = 'cloud'; } catch (e) { P.status = 'local'; P.mode = 'local'; } } else { P.status = 'local'; }
+  P.dirty = false; paintSave();
+}
+function paintSave() { const el = $('#savestate'); if (!el) return; const P = S.persist, m = curManip(), cur = m && !['biblio', 'reglages'].includes(S.ui.tab);
+  el.innerHTML = P.status === 'pending' ? 'Enregistrement automatique…' : `Enregistré automatiquement<br>${fmtDT(cur ? m.maj : (P.savedAt || nowIso()))}${cur ? ' · version ' + m.rev : ''}`; }
+async function initPersist() {
+  try { const raw = localStorage.getItem('cahier-manip-v1'); if (raw) { const d = JSON.parse(raw); if (d && d.manips) { S.data = normalize(d); reopenFirst(); render(); } } } catch (e) { /* ignoré */ }
+  if (!window.claude || !window.claude.use) return;
+  try { S.persist.dl = await window.claude.use('downloads'); } catch (e) { S.persist.dl = null; }
+  try {
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) { render(); return; }
+    const id = await user.id(); if (!id) { render(); return; }
+    const ref = db.collection('data/users/' + id).doc('etat');
+    const snap = await ref.get();
+    if (snap.exists && snap.data() && snap.data().json && !S.persist.dirty) { const d = JSON.parse(snap.data().json); if (d && d.manips) { S.data = normalize(d); reopenFirst(); } }
+    S.persist.ref = ref; S.persist.mode = 'cloud'; S.persist.status = 'cloud';
+    if (S.persist.dirty) persist();
+  } catch (e) { S.persist.ref = null; }
+  render();
+}
+function reopenFirst() { const m = S.data.manips.find(x => x.statut !== 'archivee') || S.data.manips[0]; S.ui.manipId = m ? m.id : null; S.ui.stepId = 'depart'; S.ui.mode = m && m.etapes.length ? 'comp' : 'def'; S.ui.sel = new Set(); }
+
+/* ====================== rendu ====================== */
+const TABS = [['biblio', 'Mes manips'], ['flux', 'Flux'], ['rapport', 'Rapport'], ['reglages', 'Réglages']];
+const DEPART = 'depart';
+const REG = {};
+const region = (name, html) => `<div data-region="${name}">${html}</div>`;
+function refresh() { const m = curManip(); if (!m) return; document.querySelectorAll('[data-region]').forEach(el => { const f = REG[el.dataset.region]; if (f && !el.contains(document.activeElement)) el.innerHTML = f(m); }); fitTitles(); }
+const condSummary = e => [e.temperature != null && e.temperature + ' °C', e.duree != null && fmtDur(e.duree), e.agitation != null && e.agitation + ' tr/min', e.vide && ('sous vide' + (e.vide.mbar ? ' ' + e.vide.mbar + ' mbar' : '')), e.filtre != null && e.filtre + ' µm'].filter(Boolean).join(' · ');
+const opsOptions = cur => Object.keys(OPS).filter(o => o !== 'étape libre').map(o => `<option value="${esc(o)}" ${o === cur ? 'selected' : ''}>${esc(cap(o))}</option>`).join('') + (OPS[cur] && cur !== 'étape libre' ? '' : `<option value="${esc(cur)}" selected>${esc(cap(cur))}</option>`);
+
+/* le titre d'une étape se réduit un peu si un mot ne tient pas, puis passe à la ligne */
+function fitTitles() {
+  document.querySelectorAll('.card h3').forEach(h => { const b = h.querySelector('.ctitle') || h; b.style.fontSize = ''; let sz = parseFloat(getComputedStyle(b).fontSize) || 15;
+    while (sz > 11 && h.scrollWidth > h.clientWidth + 1) { sz -= 0.5; b.style.fontSize = sz + 'px'; } });
+}
+window.addEventListener('resize', fitTitles);
+function render() {
+  flushTrack();
+  const m = curManip();
+  if (!['biblio', 'reglages'].includes(S.ui.tab) && !m) S.ui.tab = 'biblio';
+  if (m) { if (S.ui.stepId !== DEPART && !m.etapes.some(e => e.id === S.ui.stepId)) S.ui.stepId = DEPART; if (!m.etapes.length) S.ui.mode = 'def'; }
+  const view = ({ biblio: biblioHtml, flux: fluxHtml, rapport: rapportHtml, reglages: reglagesHtml })[S.ui.tab](m);
+  $('#app').innerHTML = `
+  <header class="top">
+    <div class="brand"><span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-5.500 9.500A1.500 1.500 0 0 0 5.800 21h12.400a1.500 1.500 0 0 0 1.300-2.500L14 9V3M7.500 15h9"/></svg></span>Mat &amp; Méthode</div>
+    ${m && !['biblio', 'reglages'].includes(S.ui.tab) ? `<div class="name fld"><label for="f-nom" class="sr">Nom de la manip</label><input id="f-nom" data-bind="m:nom" value="${esc(m.nom)}"></div>` : '<div class="name"></div>'}
+    <span class="savestate" id="savestate"></span>
+  </header>
+  <nav class="tabs" aria-label="Sections">${TABS.map(([k, t]) => `<button class="tab" data-act="tab" data-id="${k}" ${S.ui.tab === k ? 'aria-current="page"' : ''} ${!['biblio', 'reglages'].includes(k) && !m ? 'disabled' : ''}>${t}</button>`).join('')}</nav>
+  <main class="view">${view}</main>`;
+  paintSave(); paintModal(); fitTitles();
+  if (S.ui.refocus) { const f = document.getElementById(S.ui.refocus); S.ui.refocus = null; if (f) f.focus(); }
+  if (S.ui.scrollTo) { const el = document.getElementById(S.ui.scrollTo); S.ui.scrollTo = null; if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+
+/* ---- bibliothèque ---- */
+const statInfo = id => id === 'archivee' ? ['Archivée', ''] : (S.data.statuts.find(x => x.id === id) ? [S.data.statuts.find(x => x.id === id).nom, S.data.statuts.find(x => x.id === id).ton || ''] : ['—', '']);
+const firstStatut = () => S.data.statuts[0].id;
+const HUES = [172, 210, 38, 285, 340, 95];
+const donStyle = n => `--h:${HUES[Math.max(0, S.data.donneurs.indexOf(n)) % HUES.length]}`;
+const donTag = n => n ? `<span class="dtag" style="${donStyle(n)}">${esc(n)}</span>` : '';
+const allTags = () => { const out = []; S.data.manips.forEach(m => (m.tags || []).forEach(t => { if (!out.some(x => norm(x) === norm(t))) out.push(t); })); return out.sort((a, b) => a.localeCompare(b, 'fr')); };
+const isTest = c => norm(c.type || '').includes('test');
+function visibleManips() {
+  const q = norm(S.ui.q), arch = S.ui.filtre === 'archivees';
+  return S.data.manips.filter(m => (arch ? m.statut === 'archivee' : m.statut !== 'archivee') && (!q || norm([m.nom, m.contexte.donneur, m.contexte.ref, m.contexte.type, m.contexte.objectif, m.contexte.idee, (m.tags || []).join(' ')].join(' ')).includes(q))
+    && (!S.ui.fDo || m.contexte.donneur === S.ui.fDo) && (!S.ui.fType || m.contexte.type === S.ui.fType) && (!S.ui.fTag || (m.tags || []).some(t => norm(t) === norm(S.ui.fTag)))).sort((a, b) => b.maj.localeCompare(a.maj));
+}
+function biblioHtml() {
+  const d = S.data.manips, arch = S.ui.filtre === 'archivees', rows = visibleManips();
+  const nA = d.filter(m => m.statut !== 'archivee').length, nR = d.length - nA;
+  return `
+  <div class="row" style="justify-content:space-between">
+    <div class="seg" role="group" aria-label="Filtre"><button data-act="filtre" data-id="actives" aria-pressed="${!arch}">Mes manips <span class="mono">${nA}</span></button><button data-act="filtre" data-id="archivees" aria-pressed="${arch}">Archivées <span class="mono">${nR}</span></button></div>
+    <button class="btn primary" data-act="open-new">+ Nouvelle manip</button>
+  </div>
+  <div class="fld"><label for="q" class="sr">Rechercher</label><input id="q" type="search" placeholder="Rechercher une manip, un tag, un objectif…" value="${esc(S.ui.q)}" data-bind="ui:q"></div>
+  <div class="frow" role="group" aria-label="Filtrer par donneur d’ordre"><span class="lbl">Donneur d’ordre</span>
+    <button class="chip" style="cursor:pointer;min-height:34px" data-act="f-do" data-k="" aria-pressed="${!S.ui.fDo}">${!S.ui.fDo ? '● ' : ''}Tous</button>
+    ${S.data.donneurs.map(n => `<button class="dtag" style="${donStyle(n)}" data-act="f-do" data-k="${esc(n)}" aria-pressed="${S.ui.fDo === n}">${esc(n)} <span class="mono">${d.filter(m => m.contexte.donneur === n && (arch ? m.statut === 'archivee' : m.statut !== 'archivee')).length}</span></button>`).join('')}</div>
+  <div class="frow"><span class="lbl">Type</span><div class="fld" style="min-width:170px"><label for="f-type" class="sr">Type de demande</label><select id="f-type" data-act-change="f-type"><option value="">Tous les types</option>${S.data.types.map(t => `<option ${S.ui.fType === t ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+    ${S.ui.fTag ? `<span class="chipx">Tag : ${esc(S.ui.fTag)}<button data-act="f-tag" data-k="" aria-label="Retirer le filtre tag">×</button></span>` : '<span class="hint">Touche un tag pour filtrer.</span>'}</div>
+  <div class="mlist">${rows.length ? rows.map(m => { const [st, cl] = statInfo(m.statut); return `
+    <div class="mrow">
+      <div><div class="nm">${esc(m.nom)}</div>
+        <div class="tgs">${donTag(m.contexte.donneur)}${m.contexte.type ? `<span class="chip">${esc(m.contexte.type)}</span>` : ''}${(m.tags || []).map(t => `<button class="tagp" data-act="f-tag" data-k="${esc(t)}">#${esc(t)}</button>`).join('')}${m.lancee ? `<span class="chip ${m.journal.length ? 'warn' : 'ok'}">Lancée${m.journal.length ? ' · modifiée après lancement (' + m.journal.length + ')' : ''}</span>` : ''}</div>
+        ${m.contexte.objectif ? `<div class="meta" style="font-style:italic">${esc(m.contexte.objectif)}</div>` : ''}
+        <div class="meta"><span class="mono">${m.etapes.length} étape${m.etapes.length > 1 ? 's' : ''}</span><span class="mono">${m.prelevements.length} éch.</span><span>enregistrée le ${fmtDT(m.maj)} · v${m.rev}</span></div></div>
+      <span class="chip ${cl}">${st}</span>
+      <div class="acts"><button class="btn sm primary" data-act="open" data-id="${m.id}">Ouvrir</button><button class="btn sm" data-act="open-flow" data-id="${m.id}">Modifier le flux</button><button class="btn sm" data-act="dup" data-id="${m.id}">Dupliquer</button>
+        <button class="btn sm" data-act="exp" data-id="${m.id}">Exporter</button><button class="btn sm" data-act="arch" data-id="${m.id}">${m.statut === 'archivee' ? 'Restaurer' : 'Archiver'}</button>${m.statut === 'archivee' ? `<button class="btn sm danger" data-act="del" data-id="${m.id}">Supprimer</button>` : ''}</div>
+    </div>`; }).join('') : `<div class="empty">${arch ? 'Aucune manip archivée.' : 'Aucune manip. Crée-en une avec « Nouvelle manip ».'}</div>`}</div>
+  <div class="row hint"><button class="btn sm" data-act="open-import">Importer un ancien rapport</button><button class="btn sm" data-act="reset">Restaurer les exemples</button></div>`;
+}
+
+/* ---- flux : aperçu visuel ---- */
+function friseHtml(e, ps, L) {
+  if (!e.duree && !ps.length) return '';
+  const badges = ps.map(p => { const pct = p.moment === 'pendant' && e.duree && p.temps != null ? Math.max(0, Math.min(100, p.temps / e.duree * 100)) : p.moment === 'pendant' ? 50 : 100; return `<span class="badge" style="left:${pct}%">${esc(codeOf(L[p.id]))}</span>`; }).join('');
+  return `<div class="frise" role="img" aria-label="Frise de l’étape, ${e.duree ? fmtDur(e.duree) : 'durée inconnue'}"><div class="track"></div>${badges}<span class="t0">0</span><span class="t1">${e.duree ? fmtDur(e.duree) : 'fin'}</span></div>`;
+}
+REG.flow = m => {
+  const L = labels(m), S_ = sortedSamples(m);
+  const pill = p => `<span class="pill"><span class="badge sm">${esc(codeOf(L[p.id]))}</span>${esc(L[p.id])} · ${fmtVol(p.volume)} mL <small>${p.moment === 'avant' ? 'avant' : p.moment === 'pendant' ? 'à ' + (p.temps != null ? fmtDur(p.temps) : '?') : 'sortie'}</small></span>`;
+  const sel = id => S.ui.stepId === id ? 'sel' : '';
+  const dep = S_.filter(p => sampleStepNo(m, p) === 0);
+  const depart = `<article class="card entry ${sel(DEPART)}" data-act="go-step" data-id="${DEPART}"><h3><button class="ctitle" data-act="go-step" data-id="${DEPART}">Départ</button></h3>
+    <div class="eq">${esc(m.contexte.matiere || 'matière ?')}${m.contexte.volumeDepart != null ? ' · ' + fmtVol(m.contexte.volumeDepart) + ' mL' : ''}</div><div class="pills">${dep.map(pill).join('')}</div></article>`;
+  const cards = m.etapes.map((e, i) => {
+    const ps = S_.filter(p => p.etapeId === e.id), par = condSummary(e);
+    return `<article class="card ${sel(e.id)}" data-act="go-step" data-id="${e.id}"><header><span class="num">${i + 1}</span><h3><button class="ctitle" data-act="go-step" data-id="${e.id}">${esc(cap(e.operation))}</button></h3></header>
+      ${e.reactifs.filter(r => r.nom).map(r => `<div class="reac">${esc(r.nom)}${r.quantite ? ` <span class="eq">${esc(r.quantite)}</span>` : ''}</div>`).join('')}
+      ${par ? `<div class="par">${esc(par)}</div>` : '<div class="todo-line">conditions à compléter</div>'}
+      ${e.equipement.length ? `<div class="eq">${esc(e.equipement.join(' · '))}</div>` : ''}
+      ${friseHtml(e, ps, L)}<div class="pills">${ps.map(pill).join('')}</div></article>`;
+  }).join('');
+  return `<div class="cards">${depart}${cards}</div><div class="legend"><span><span class="badge sm">a</span> prélèvement : sa place sur la frise donne le moment, le bord droit est la sortie de l’étape</span></div>`;
+};
+REG.bilan = m => {
+  const vd = m.contexte.volumeDepart || 0, tot = totalPreleve(m), reste = vd - tot, miss = missingCount(m), n = m.prelevements.length;
+  return `<div class="row"><span class="chip">${fmtVol(vd)} mL au départ</span><span class="chip">${fmtVol(tot)} mL prélevés (${n} éch.)</span><span class="chip ${reste < 0 ? 'warn' : 'ok'}">${reste < 0 ? 'dépassement de ' + fmtVol(-reste) + ' mL' : fmtVol(reste) + ' mL restants'}</span>${miss ? `<span class="chip warn">${miss} numéro${miss > 1 ? 's' : ''} à saisir</span>` : ''}</div>`;
+};
+
+REG.lancement = m => {
+  const n = m.journal.length;
+  if (!m.lancee) return `<div class="lanc"><div><b>Manip pas encore lancée</b><div class="hint">Quand elle démarre, lance-la : chaque modification sera ensuite notée avec la date, l’heure et ton nom.</div></div><button class="btn primary" data-act="lancer">▶ Lancer la manip</button></div>`;
+  return `<div class="lanc on"><div><b>Manip lancée le ${fmtDT(m.lancee.le)} par ${esc(m.lancee.par)}</b><div class="row" style="margin-top:6px">${n ? `<span class="chip warn">⚠ Modifiée après lancement · ${n} modification${n > 1 ? 's' : ''}</span><button class="btn sm" data-act="open-journal">Voir le journal</button>` : `<span class="chip ok">Aucune modification depuis le lancement</span><button class="btn sm" data-act="annuler-lancement">Annuler le lancement</button>`}</div></div></div>`;
+};
+function fluxHtml(m) {
+  const c = m.contexte, def = S.ui.mode === 'def';
+  return `
+  ${region('lancement', REG.lancement(m))}
+  <section class="panel"><h2>Ma demande</h2>
+    <div class="grid g3">
+      <div class="fld"><label for="c-do">Donneur d’ordre</label><select id="c-do" data-bind="c:donneur"><option value="">Choisir…</option>${S.data.donneurs.concat(c.donneur && !S.data.donneurs.includes(c.donneur) ? [c.donneur] : []).map(d => `<option value="${esc(d)}" ${d === c.donneur ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="c-ref">Référence de la demande</label><input id="c-ref" class="mono" data-bind="c:ref" value="${esc(c.ref)}" placeholder="n° ?"></div>
+      <div class="fld"><label for="c-vol">Volume de départ (mL)</label><input id="c-vol" class="mono" inputmode="decimal" data-bind="c:volumeDepart" value="${c.volumeDepart ?? ''}"></div>
+    </div>
+    <div class="grid g2">
+      <div class="fld"><label for="c-ty">Type de demande</label><select id="c-ty" data-bind="c:type"><option value="">Choisir…</option>${S.data.types.concat(c.type && !S.data.types.includes(c.type) ? [c.type] : []).map(t => `<option value="${esc(t)}" ${t === c.type ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="c-op">Opérateur (ton nom)</label><input id="c-op" data-bind="c:operateur" value="${esc(c.operateur || '')}" placeholder="Ex. Pierre"></div>
+    </div>
+    ${isTest(c) ? `<div class="fld"><label for="c-id">Idée testée</label><input id="c-id" data-bind="c:idee" value="${esc(c.idee)}" placeholder="Hypothèse ou référence de l’idée"></div>` : ''}
+    <div class="fld"><label for="c-ob">Objectif</label><input id="c-ob" data-bind="c:objectif" value="${esc(c.objectif)}" placeholder="Ex. Réduire les FFA à moins de 2 %"></div>
+    <div class="fld"><label for="c-px">Contexte (facultatif)</label><textarea id="c-px" class="ta ctx" data-bind="c:precisions" placeholder="Origine de la demande, contraintes, remarques…">${esc(c.precisions)}</textarea></div>
+    <div class="fld"><span class="lbl">Tags</span><div class="tgs" style="margin:4px 0">${(m.tags || []).map(t => `<span class="chipx">#${esc(t)}<button data-act="del-tag" data-k="${esc(t)}" aria-label="Retirer le tag ${esc(t)}">×</button></span>`).join('') || '<span class="hint">Aucun tag</span>'}</div>
+      <div class="row"><div class="fld" style="flex:1;min-width:180px"><label for="t-new" class="sr">Nouveau tag</label><input id="t-new" list="tags-sug" placeholder="Ajouter un tag (Entrée)" autocomplete="off"><datalist id="tags-sug">${allTags().filter(t => !(m.tags || []).some(x => norm(x) === norm(t))).map(t => `<option value="${esc(t)}">`).join('')}</datalist></div><button class="btn" data-act="add-tag">Ajouter</button></div></div>
+    ${region('bilan', REG.bilan(m))}</section>
+  <div class="seg big" role="group" aria-label="Où en es-tu ?"><button data-act="mode" data-id="def" aria-pressed="${def}">1 · Définir le flux</button><button data-act="mode" data-id="comp" aria-pressed="${!def}">2 · Compléter les étapes</button></div>
+  ${def ? defHtml(m) : compHtml(m)}`;
+}
+function communPanel(m) {
+  const c = m.communes || {};
+  const T = (key, label, on, inner) => `<div class="cond"><button class="tgl big" data-act="comm-tgl" data-k="${key}" aria-pressed="${on}">${label}</button>${on ? inner : ''}</div>`;
+  return `<section class="panel"><h2>2 · Conditions communes à toutes les étapes</h2>
+    <p class="hint">Active ce qui est identique partout (par exemple l’agitation), puis applique-le au flux. Tu pourras ajuster chaque étape ensuite.</p>
+    <div class="conds">${T('temperature', 'Chauffage', c.temperature != null, fnum('cm-t', 'Température (°C)', 'k:temperature', c.temperature))}${T('agitation', 'Agitation', c.agitation != null, fnum('cm-a', 'Vitesse (tr/min)', 'k:agitation', c.agitation))}${T('vide', 'Sous vide', !!c.vide, fnum('cm-v', 'Pression en mbar (facultatif)', 'k:videMbar', c.vide && c.vide.mbar))}</div>
+    <button class="tgl" data-act="tgl-replace" aria-pressed="${!!S.ui.replace}">Remplacer aussi les valeurs déjà saisies</button>
+    <button class="btn primary" data-act="comm-apply" ${m.etapes.length ? '' : 'disabled'}>Appliquer à toutes les étapes (${m.etapes.length})</button>
+    <p class="hint">Les étapes que tu ajouteras ensuite reprennent ces conditions automatiquement.</p></section>`;
+}
+function labPanel() {
+  const tous = [].concat(...S.data.manips.map(x => x.prelevements));
+  return `<section class="panel"><h2>Laboratoires : volume et analyses</h2>
+    <p class="hint">Définis une fois, pour chaque laboratoire, le volume à prélever et les analyses demandées. Chaque nouvel échantillon, dans n’importe quelle manip, les reprend. Tu peux toujours les changer échantillon par échantillon.</p>
+    ${S.data.labos.map((l, i) => { const mine = tous.filter(p => p.labo === l.nom); return `<div class="scard">
+      <header><span class="sid" style="color:var(--accent-soft)">${esc(l.nom || 'Laboratoire')}</span><span class="hint" style="flex:1">utilisé dans ${mine.length} échantillon${mine.length > 1 ? 's' : ''}</span><button class="btn icon danger" data-act="del-lab" data-id="${i}" aria-label="Supprimer ${esc(l.nom)}">×</button></header>
+      <div class="grid g2"><div class="fld"><label for="l-n${i}">Nom du laboratoire</label><input id="l-n${i}" data-bind="l:${i}:nom" value="${esc(l.nom)}"></div>${fnum(`l-v${i}`, 'Volume par échantillon (mL)', `l:${i}:volume`, l.volume)}</div>
+      <div><span class="lbl">Analyses demandées</span><div class="chips" style="margin-top:6px">${S.data.analyses.map(a => `<button class="tgl" data-act="lab-an" data-id="${i}" data-k="${esc(a)}" aria-pressed="${l.analyses.includes(a)}">${esc(a)}</button>`).join('')}</div></div></div>`; }).join('')}
+    <div class="row"><div class="fld" style="flex:1;min-width:200px"><label for="n-lab">Nouveau laboratoire</label><input id="n-lab"></div><button class="btn" data-act="add-lab" style="align-self:flex-end">Ajouter</button></div></section>`;
+}
+function listPanel(titre, items, delAct, inputId, addAct, label, hint = '') {
+  return `<section class="panel"><h2>${titre}</h2>${hint ? `<p class="hint">${hint}</p>` : ''}<div class="chips">${items.map(a => `<span class="chipx">${esc(a)}<button data-act="${delAct}" data-k="${esc(a)}" aria-label="Supprimer ${esc(a)}">×</button></span>`).join('') || '<span class="hint">Aucun pour l’instant</span>'}</div>
+    <div class="row"><div class="fld" style="flex:1;min-width:200px"><label for="${inputId}">${label}</label><input id="${inputId}"></div><button class="btn" data-act="${addAct}" style="align-self:flex-end">Ajouter</button></div></section>`;
+}
+function statutPanel() {
+  const n = S.data.statuts.length;
+  return `<section class="panel"><h2>États des manips</h2>
+    <p class="hint">Les états proposés dans « Mes manips » et dans le Rapport. Le premier de la liste est celui d’une nouvelle manip. « Archivée » est fixe : il sert à ranger les manips (bouton Archiver).</p>
+    ${S.data.statuts.map((x, i) => { const nb = S.data.manips.filter(m => m.statut === x.id).length; return `<div class="scard"><header><span class="chip ${x.ton}">${esc(x.nom || 'État')}</span><span class="hint" style="flex:1">${nb} manip${nb > 1 ? 's' : ''}</span>
+      <button class="btn icon" data-act="st-up" data-id="${i}" aria-label="Monter" ${i === 0 ? 'disabled' : ''}>↑</button><button class="btn icon" data-act="st-down" data-id="${i}" aria-label="Descendre" ${i === n - 1 ? 'disabled' : ''}>↓</button>
+      <button class="btn icon danger" data-act="del-st" data-id="${i}" aria-label="Supprimer ${esc(x.nom)}" ${n < 2 ? 'disabled' : ''}>×</button></header>
+      <div class="grid g2"><div class="fld"><label for="s-n${i}">Nom de l’état</label><input id="s-n${i}" data-bind="s:${i}:nom" value="${esc(x.nom)}"></div>
+      <div class="fld"><label for="s-t${i}">Couleur</label><select id="s-t${i}" data-bind="s:${i}:ton">${TONS.map(([v, l]) => `<option value="${v}" ${v === (x.ton || '') ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div></div>`; }).join('')}
+    <div class="row"><div class="fld" style="flex:1;min-width:200px"><label for="n-st">Nouvel état</label><input id="n-st" placeholder="Ex. En attente de résultats"></div><button class="btn" data-act="add-st" style="align-self:flex-end">Ajouter</button></div></section>`;
+}
+function tagsPanel() {
+  const ts = allTags();
+  return `<section class="panel"><h2>Tags utilisés</h2><p class="hint">Les tags se créent dans la manip (carte « Ma demande »). Ici, tu peux en retirer un de toutes les manips.</p>
+    <div class="chips">${ts.map(t => { const nb = S.data.manips.filter(m => (m.tags || []).some(x => norm(x) === norm(t))).length; return `<span class="chipx">#${esc(t)} <span class="mono" style="opacity:.7">${nb}</span><button data-act="del-tag-all" data-k="${esc(t)}" aria-label="Retirer ${esc(t)} de toutes les manips">×</button></span>`; }).join('') || '<span class="hint">Aucun tag pour l’instant</span>'}</div></section>`;
+}
+function reglagesHtml() {
+  return `<div><h2 style="font-size:18px">Réglages</h2><p class="hint" style="margin-top:4px">Réglages de base de l’application : ils servent pour toutes tes manips.</p></div>
+  ${labPanel()}${listPanel('Réactifs', S.data.inventaire.map(r => r.nom), 'del-reac-nom', 'n-rn', 'add-reac-nom', 'Nouveau réactif', 'Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape et sont gardés pour la prochaine fois.')}${listPanel('Analyses disponibles', S.data.analyses, 'del-an', 'n-an', 'add-an', 'Nouvelle analyse')}${listPanel('Donneurs d’ordre', S.data.donneurs, 'del-do', 'n-do', 'add-do', 'Nouveau donneur d’ordre', 'Chaque donneur d’ordre devient un tag coloré dans « Mes manips ».')}${listPanel('Types de demande', S.data.types, 'del-type', 'n-ty', 'add-type', 'Nouveau type', 'Support, R&D, Technologique, Test d’idée… Dans une manip, on choisit seulement dans cette liste.')}${statutPanel()}${tagsPanel()}`;
+}
+function defHtml(m) {
+  const n = m.etapes.length, ia = S.ui.insertAfter;
+  const q = ia != null ? `Insérer ${ia < 0 ? 'au début' : 'après l’étape ' + (ia + 1)} : que fais-tu ?` : `Étape ${n + 1} : que fais-tu ${n ? 'ensuite' : 'en premier'} ?`;
+  return `<section class="panel"><h2>1 · Les étapes de ta manip</h2>
+    <p class="hint">Ajoute, déplace, duplique ou supprime les étapes. Tu complèteras chacune ensuite : conditions, réactifs, échantillons.</p>
+    ${n ? `<button class="btn sm" data-act="ins-after" data-id="-1" style="align-self:flex-start">+ Insérer une étape au début</button>
+    <ol class="defl">${m.etapes.map((e, i) => `<li><div class="top"><span class="num">${i + 1}</span>
+      <div class="fld" style="flex:1"><label class="sr" for="d-${e.id}">Étape ${i + 1}</label><select id="d-${e.id}" data-bind="e:${e.id}:operation">${opsOptions(e.operation)}</select></div></div>
+      <div class="btns"><button class="btn sm" data-act="mv-l" data-id="${e.id}" aria-label="Monter l’étape ${i + 1}" ${i === 0 ? 'disabled' : ''}>↑ Monter</button><button class="btn sm" data-act="mv-r" data-id="${e.id}" aria-label="Descendre l’étape ${i + 1}" ${i === n - 1 ? 'disabled' : ''}>↓ Descendre</button>
+        <button class="btn sm" data-act="dup-step" data-id="${e.id}">Dupliquer</button><button class="btn sm" data-act="ins-after" data-id="${i}">+ Insérer après</button>
+        <button class="btn sm danger" data-act="del-step" data-id="${e.id}" aria-label="Supprimer l’étape ${i + 1}">Supprimer</button></div></li>`).join('')}</ol>` : '<div class="empty">Aucune étape pour l’instant.</div>'}
+    <h3 class="q">${q}</h3>
+    ${ia != null ? '<button class="btn sm" data-act="ins-cancel" style="align-self:flex-start">Annuler l’insertion</button>' : ''}
+    <div class="opgrid">${Object.keys(OPS).filter(o => o !== 'étape libre').map(o => `<button class="btn" data-act="add-step" data-id="${esc(o)}">${esc(cap(o))}</button>`).join('')}</div>
+    <div class="row"><div class="fld" style="flex:1;min-width:200px"><label for="autre-op">Autre étape</label><input id="autre-op" placeholder="Ex. neutralisation"></div><button class="btn" data-act="add-custom" style="align-self:flex-end">Ajouter</button></div></section>
+  ${communPanel(m)}
+  <button class="btn primary big" data-act="to-comp" ${n ? '' : 'disabled'}>Mon flux est prêt : compléter les étapes →</button>`;
+}
+
+/* ---- flux : compléter une étape ---- */
+function compHtml(m) {
+  const order = [DEPART].concat(m.etapes.map(e => e.id)), i = order.indexOf(S.ui.stepId), last = i >= order.length - 1;
+  const e = m.etapes.find(x => x.id === S.ui.stepId);
+  return `<section aria-label="Flux"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h2 style="font-size:18px">Ton flux</h2><span class="hint">Touche une étape pour la compléter</span><button class="btn sm" data-act="mode" data-id="def">Modifier le flux</button></div>${region('flow', REG.flow(m))}</section>
+  <section id="editor" class="editor" aria-label="Étape en cours">
+    ${e ? editorStep(m, e) : editorDepart(m)}
+    <div class="nav"><button class="btn" data-act="prev-step" ${i <= 0 ? 'disabled' : ''}>← Précédente</button><button class="btn primary" data-act="next-step">${last ? 'Terminer : voir le rapport' : 'Étape suivante →'}</button></div>
+  </section>`;
+}
+const fnum = (id, label, bind, v, ph = '') => `<div class="fld"><label for="${id}">${label}</label><input id="${id}" class="mono" inputmode="decimal" data-bind="${bind}" value="${v ?? ''}" placeholder="${ph}"></div>`;
+function editorDepart(m) {
+  const c = m.contexte;
+  return `<h2 class="eh">Départ</h2>
+  <section class="panel"><h2>Matière de départ</h2><div class="grid g2">
+    <div class="fld"><label for="c-mat">Matière</label><input id="c-mat" data-bind="c:matiere" value="${esc(c.matiere)}"></div>
+    <div class="fld"><label for="c-lot">Lot</label><input id="c-lot" class="mono" data-bind="c:lot" value="${esc(c.lot)}" placeholder="lot ?"></div></div></section>
+  ${sampSection(m, '')}`;
+}
+function editorStep(m, e) {
+  const i = stepIndex(m, e.id);
+  return `<h2 class="eh"><span class="num">${i + 1}</span>${esc(cap(e.operation))}</h2>${condSection(e)}${reacSection(e)}${sampSection(m, e.id)}`;
+}
+function condSection(e) {
+  const T = (key, label, on, inner) => `<div class="cond"><button class="tgl big" data-act="cond-tgl" data-id="${e.id}" data-k="${key}" aria-pressed="${on}">${label}</button>${on ? inner : ''}</div>`;
+  return `<section class="panel"><h2>1 · Conditions opératoires</h2>
+    <div class="conds">
+      ${T('temperature', 'Chauffage', e.temperature != null, fnum('k-t', 'Température (°C)', `e:${e.id}:temperature`, e.temperature))}
+      ${T('agitation', e.operation === 'centrifugation' ? 'Vitesse de centrifugation' : 'Agitation', e.agitation != null, fnum('k-a', 'Vitesse (tr/min)', `e:${e.id}:agitation`, e.agitation))}
+      ${T('vide', 'Sous vide', !!e.vide, fnum('k-v', 'Pression en mbar (facultatif)', `e:${e.id}:videMbar`, e.vide && e.vide.mbar))}
+      ${T('filtre', 'Membrane filtrante', e.filtre != null, fnum('k-f', 'Taille des pores (µm)', `e:${e.id}:filtre`, e.filtre))}
+    </div>
+    ${fnum('k-d', 'Durée de l’étape (min)', `e:${e.id}:duree`, e.duree, 'ex. 30')}
+    <div class="fld"><label for="i-eq">Matériel utilisé</label>
+      <div class="chips">${e.equipement.map((q, k) => `<span class="chipx">${esc(q)}<button data-act="rm-eq" data-id="${e.id}" data-k="${k}" aria-label="Retirer ${esc(q)}">×</button></span>`).join('')}</div>
+      <div class="row"><input id="i-eq" class="in" list="dl-eq" placeholder="Ex. plaque chauffante agitatrice" style="flex:1"><datalist id="dl-eq">${eqSuggestions().map(x => `<option value="${esc(x)}">`).join('')}</datalist><button class="btn" data-act="add-eq" data-id="${e.id}">Ajouter</button></div></div>
+    ${(e.autres || []).map((a, k) => `<div class="rrow r3"><div class="fld"><label for="a-n${k}">Autre condition</label><input id="a-n${k}" data-bind="a:${e.id}:${k}:nom" value="${esc(a.nom)}" placeholder="ex. pH, atmosphère"></div>
+      <div class="fld"><label for="a-v${k}">Valeur</label><input id="a-v${k}" data-bind="a:${e.id}:${k}:valeur" value="${esc(a.valeur)}"></div>
+      <button class="btn icon danger" data-act="rm-autre" data-id="${e.id}" data-k="${k}" aria-label="Retirer cette condition">×</button></div>`).join('')}
+    <button class="btn dash" data-act="add-autre" data-id="${e.id}">+ Autre condition</button>
+  </section>`;
+}
+const eqSuggestions = () => { const s = new Set(); S.data.manips.forEach(m => m.etapes.forEach(e => e.equipement.forEach(x => s.add(x)))); return [...s]; };
+function reacSection(e) {
+  return `<section class="panel"><h2>2 · Réactifs <span class="hint">${e.reactifs.length ? e.reactifs.length + ' dans cette étape' : 'aucun pour l’instant'}</span></h2>
+    ${e.reactifs.map((r, k) => { const f = invFind(r.nom) || {}, b = `rinv:${e.id}:${k}:`; return `<div class="scard">
+      <header><span class="sid" style="color:var(--accent-soft)">Réactif ${k + 1}</span><span style="flex:1"></span><button class="btn icon danger" data-act="rm-reac" data-id="${e.id}" data-k="${k}" aria-label="Retirer le réactif ${k + 1}">×</button></header>
+      <div class="grid g2"><div class="fld"><label for="r-n${k}">Réactif</label><select id="r-n${k}" data-bind="r:${e.id}:${k}:nom"><option value="">Choisir…</option>${S.data.inventaire.map(x => x.nom).concat(r.nom && !invFind(r.nom) ? [r.nom] : []).map(nm => `<option value="${esc(nm)}" ${nm === r.nom ? 'selected' : ''}>${esc(nm)}</option>`).join('')}</select></div>
+        <div class="fld"><label for="r-q${k}">Quantité ou ratio</label><input id="r-q${k}" class="mono" data-bind="r:${e.id}:${k}:quantite" value="${esc(r.quantite)}" placeholder="ex. 1 : 1 (v/v)"></div>
+        <div class="fld"><label for="r-s${k}">N° Scirius</label><input id="r-s${k}" class="mono" data-bind="${b}scirius" value="${esc(f.scirius || '')}" placeholder="à saisir"></div>
+        <div class="fld"><label for="r-e${k}">Emplacement</label><input id="r-e${k}" data-bind="${b}emplacement" value="${esc(f.emplacement || '')}" placeholder="ex. armoire 1, étagère 2"></div></div>
+      <details class="more"><summary>Fournisseur et lot</summary><div class="grid g2"><div class="fld"><label for="r-f${k}">Fournisseur</label><input id="r-f${k}" data-bind="${b}fournisseur" value="${esc(f.fournisseur || '')}"></div>
+        <div class="fld"><label for="r-l${k}">Lot</label><input id="r-l${k}" class="mono" data-bind="${b}lot" value="${esc(f.lot || '')}"></div></div></details></div>`; }).join('')}
+    <button class="btn dash" data-act="add-reac" data-id="${e.id}">+ Ajouter un réactif à cette étape</button>
+    <button class="btn sm" data-act="tab" data-id="reglages" style="align-self:flex-start">Un réactif manque ? Ajoute-le dans les Réglages</button></section>`;
+}
+function sampSection(m, ownerId) {
+  const L = labels(m), list = sortedSamples(m).filter(p => ownerId ? p.etapeId === ownerId : !p.etapeId), step = ownerId ? '3 · ' : '';
+  return `<section class="panel"><h2>${ownerId ? '3 · Échantillons à prélever' : 'Échantillons à prélever avant le traitement'} <span class="hint">${list.length ? list.length + ' prévu' + (list.length > 1 ? 's' : '') : 'aucun pour l’instant'}</span></h2>
+    ${list.map(p => `<article class="scard"><header><span class="badge">${esc(codeOf(L[p.id]))}</span><span class="sid">${esc(L[p.id])}</span><span style="flex:1"></span><button class="btn icon danger" data-act="del-s" data-id="${p.id}" aria-label="Supprimer ${esc(L[p.id])}">×</button></header>
+      ${ownerId ? `<div><span class="lbl">Quand ?</span><div class="seg" style="margin-top:6px"><button data-act="set-moment" data-id="${p.id}" data-k="pendant" aria-pressed="${p.moment === 'pendant'}">Pendant l’étape</button><button data-act="set-moment" data-id="${p.id}" data-k="effluent" aria-pressed="${p.moment !== 'pendant'}">À la sortie (effluent)</button></div></div>` : ''}
+      <div class="grid g2">${p.moment === 'pendant' && ownerId ? fnum(`p-t-${p.id}`, 'À quelle minute ?', `p:${p.id}:temps`, p.temps, 'ex. 10') : ''}${fnum(`p-v-${p.id}`, 'Volume prélevé (mL)', `p:${p.id}:volume`, p.volume)}
+        <div class="fld"><label for="p-l-${p.id}">Laboratoire</label><select id="p-l-${p.id}" data-bind="p:${p.id}:labo">${S.data.labos.map(l => l.nom).concat(S.data.labos.some(l => l.nom === p.labo) || !p.labo ? [] : [p.labo]).map(l => `<option ${l === p.labo ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div></div>
+      <div><span class="lbl">Analyses demandées</span><div class="chips" style="margin-top:6px">${S.data.analyses.map(a => `<button class="tgl" data-act="tgl-an" data-id="${p.id}" data-k="${esc(a)}" aria-pressed="${p.analyses.includes(a)}">${esc(a)}</button>`).join('')}</div></div>
+      <div class="grid g2"><div class="fld"><label for="p-s-${p.id}">N° Scirius</label><input id="p-s-${p.id}" class="mono" data-bind="p:${p.id}:scirius" value="${esc(p.scirius)}" placeholder="à saisir"></div>
+        <div class="fld"><label for="p-a-${p.id}">N° Aramis</label><input id="p-a-${p.id}" class="mono" data-bind="p:${p.id}:aramis" value="${esc(p.aramis)}" placeholder="à saisir"></div></div>
+    </article>`).join('')}
+    <button class="btn dash" data-act="add-s" data-id="${ownerId}">+ Ajouter un échantillon</button>
+    <button class="btn sm" data-act="tab" data-id="reglages" style="align-self:flex-start">Réglages des laboratoires</button>
+  </section>`;
+}
+
+/* ---- rapport ---- */
+function phasesHtml(r) {
+  const td = x => x ? esc(x) : '<span class="todo">à saisir</span>';
+  return `<div><h3 style="margin-bottom:8px">Détail par phase du flux</h3><div style="display:flex;flex-direction:column;gap:12px">${r.phases.map((ph, i) => `
+    <section class="panel"><h2><span style="display:flex;align-items:center;gap:10px">${i ? `<span class="num">${i}</span>` : ''}${esc(ph.titre.replace(/^\d+ · /, ''))}</span><span class="par">${esc(ph.cond)}</span></h2>
+      ${ph.materiel.length ? `<div class="eq">Matériel : ${esc(ph.materiel.join(' · '))}</div>` : ''}
+      <div class="grid g2">
+        <div><span class="lbl">Réactifs</span>${i === 0 ? '<div class="hint">Sans objet au départ</div>' : ph.reactifs.length ? ph.reactifs.map(x => `<div class="phr"><b>${esc(x.nom)}</b>${x.quantite ? ' · ' + esc(x.quantite) : ''}<div class="eq">n° Scirius ${td(x.scirius)} · emplacement ${td(x.emplacement)}<br>fournisseur ${td(x.fournisseur)} · lot ${td(x.lot)}</div></div>`).join('') : '<div class="hint">Aucun réactif</div>'}</div>
+        <div><span class="lbl">Échantillons</span>${ph.echantillons.length ? ph.echantillons.map(x => `<div class="phr"><span class="row" style="gap:8px"><span class="badge sm">${esc(codeOf(x.id))}</span><b style="color:var(--amber)">${esc(x.id)}</b><span>${fmtVol(x.volume)} mL · ${esc(x.moment)}</span></span><div class="eq">${esc(x.labo)} · ${esc(x.analyses.join(', ') || 'aucune analyse')}<br>n° Scirius ${td(x.scirius)} · n° Aramis ${td(x.aramis)}</div></div>`).join('') : '<div class="hint">Aucun échantillon</div>'}</div>
+      </div></section>`).join('')}</div></div>`;
+}
+function rapportHtml(m) {
+  const r = report(m), td = x => x ? esc(x) : '<span class="todo">à saisir</span>';
+  return `<div class="row" style="justify-content:space-between"><h2 style="font-size:18px">Rapport</h2>
+    <div class="row"><button class="btn primary" data-act="dl-pdf">Exporter en PDF</button><button class="btn primary" data-act="dl-docx">Exporter en Word</button><button class="btn" data-act="copy-md">Copier le texte</button><button class="btn" data-act="open-export">Autres formats…</button>
+    <div class="fld" style="min-width:150px"><label for="m-st" class="sr">État de la manip</label><select id="m-st" data-bind="m:statut" aria-label="État de la manip">${S.data.statuts.map(x => `<option value="${esc(x.id)}" ${x.id === m.statut ? 'selected' : ''}>${esc(x.nom)}</option>`).join('')}${m.statut === 'archivee' ? '<option value="archivee" selected>Archivée</option>' : ''}</select></div></div></div>
+  <p class="hint" style="margin:0">Version ${m.rev} · enregistrée automatiquement le ${fmtDT(m.maj)}${m.lancee ? ` · lancée le ${fmtDT(m.lancee.le)} par ${esc(m.lancee.par)}` : ''}</p>
+  ${m.lancee && m.journal.length ? `<div class="lanc on" style="border-color:var(--amber-line)"><span class="chip warn">⚠ Modifiée après lancement · ${m.journal.length} modification${m.journal.length > 1 ? 's' : ''}</span><span class="hint">Détail en bas du rapport.</span></div>` : ''}
+  <article class="doc"><h2>2. Matériel et méthodes</h2>${r.sections.map(s => `<h3>${esc(s.titre)}</h3><p>${toHtml(s.texte)}</p>`).join('')}</article>
+  ${phasesHtml(r)}
+  ${r.reactifs.length ? `<div><h3 style="margin-bottom:8px">Réactifs</h3><div class="tw read"><table><thead><tr><th>RÉACTIF</th><th>N° SCIRIUS</th><th>EMPLACEMENT</th><th>FOURNISSEUR</th><th>LOT</th><th>ÉTAPE</th></tr></thead><tbody>${r.reactifs.map(x => `<tr><td><b>${esc(x.nom)}</b></td><td class="mono">${td(x.scirius)}</td><td>${td(x.emplacement)}</td><td>${td(x.fournisseur)}</td><td class="mono">${td(x.lot)}</td><td class="mono">${x.etapes.join(', ')}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+  ${r.echantillons.length ? `<div><h3 style="margin-bottom:8px">Échantillons</h3><div class="tw read"><table><thead><tr><th>ÉCH.</th><th>ÉTAPE</th><th>MOMENT</th><th>VOLUME</th><th>N° SCIRIUS</th><th>N° ARAMIS</th><th>LABORATOIRE</th><th>ANALYSES</th></tr></thead><tbody>${r.echantillons.map(x => `<tr><td class="mono" style="color:var(--amber)">${esc(x.id)}</td><td>${esc(x.etape)}</td><td>${esc(x.moment)}</td><td class="mono">${fmtVol(x.volume)} mL</td><td class="mono">${td(x.scirius)}</td><td class="mono">${td(x.aramis)}</td><td>${esc(x.labo)}</td><td>${esc(x.analyses.join(', '))}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
+  ${m.lancee ? `<div><h3 style="margin-bottom:8px">Modifications après lancement</h3>${m.journal.length ? `<div class="tw read"><table><thead><tr><th>DATE ET HEURE</th><th>PAR</th><th>MODIFICATION</th></tr></thead><tbody>${m.journal.map(j => `<tr><td class="mono">${fmtDT(j.t)}</td><td>${esc(j.par)}</td><td>${esc(j.txt)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="hint">Aucune modification depuis le lancement.</p>'}</div>` : ''}`;
+}
+
+/* ---- fenêtres ---- */
+function paintModal() {
+  const M = S.ui.modal, root = $('#modalRoot');
+  if (!M) { root.innerHTML = ''; return; }
+  let body = '';
+  if (M.type === 'new') body = `<h2 id="dlg-t">Nouvelle manip</h2><div class="fld"><label for="n-nom">Nom</label><input id="n-nom" placeholder="Ex. Désacidification acétone"></div>
+    <div class="fld"><label for="n-base">Partir de</label><select id="n-base"><option value="">Une manip vide</option>${S.data.manips.filter(x => x.statut !== 'archivee').map(x => `<option value="${x.id}">${esc(x.nom)}</option>`).join('')}</select></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close-modal">Annuler</button><button class="btn primary" data-act="do-new">Créer</button></div>`;
+  else if (M.type === 'import') body = `<h2 id="dlg-t">Importer un ancien rapport</h2><p class="hint">Colle le JSON produit par le script d’extraction du PDF (extract_mm.py).</p>
+    <div class="fld"><label for="imp">JSON</label><textarea id="imp" class="ta" style="min-height:220px" spellcheck="false"></textarea></div><div id="imp-err" class="hint" style="color:var(--danger)"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close-modal">Annuler</button><button class="btn primary" data-act="do-import">Importer</button></div>`;
+  else if (M.type === 'export') { const bin = M.fmt === 'pdf' || M.fmt === 'docx', sel = v => M.fmt === v ? 'selected' : '';
+    body = `<h2 id="dlg-t">${esc(M.titre)}</h2>
+    <div class="fld"><label for="exp-fmt">Format</label><select id="exp-fmt" data-act-change="exp-fmt"><option value="pdf" ${sel('pdf')}>PDF avec le schéma du flux (.pdf)</option><option value="docx" ${sel('docx')}>Word (.docx)</option><optgroup label="Autres formats"><option value="md" ${sel('md')}>Texte (Markdown)</option><option value="html" ${sel('html')}>Rapport imprimable (HTML)</option><option value="json" ${sel('json')}>Données (JSON)</option></optgroup></select></div>
+    ${bin ? `<p class="hint">Le rapport complet est créé sur ton appareil : flux avec les prélèvements, texte Matériel et méthodes, détail par phase, tableaux. ${S.persist.dl ? 'Il te sera proposé en téléchargement.' : 'Le téléchargement n’est pas disponible dans ce mode.'}</p>` : `<div class="fld"><label for="exp-txt">Contenu</label><textarea id="exp-txt" class="ta mono" style="min-height:240px;font-size:12.5px" readonly>${esc(exportContent(M))}</textarea></div>`}
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close-modal">Fermer</button>${bin ? '' : '<button class="btn" data-act="exp-copy">Copier</button>'}${S.persist.dl ? `<button class="btn primary" data-act="exp-save">Télécharger${bin ? (M.fmt === 'pdf' ? ' le PDF' : ' le document Word') : ''}</button>` : ''}</div>`; }
+  else if (M.type === 'journal') { const m = curManip(), js = m.journal.slice().reverse();
+    body = `<h2 id="dlg-t">Journal des modifications</h2><p class="hint">Manip lancée le ${fmtDT(m.lancee.le)} par ${esc(m.lancee.par)}. Version ${m.rev}, enregistrée le ${fmtDT(m.maj)}.</p>
+    <div class="jwrap">${js.length ? js.map(j => `<div class="jr"><span class="mono">${fmtDT(j.t)}</span><span><b>${esc(j.par)}</b> · ${esc(j.txt)}</span></div>`).join('') : '<div class="empty">Aucune modification depuis le lancement.</div>'}</div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" data-act="close-modal">Fermer</button></div>`; }
+  else if (M.type === 'confirm') body = `<h2 id="dlg-t">${esc(M.titre)}</h2><p>${esc(M.message)}</p><div class="row" style="justify-content:flex-end"><button class="btn" data-act="close-modal">Annuler</button><button class="btn danger" data-act="do-confirm">${esc(M.bouton)}</button></div>`;
+  root.innerHTML = `<div class="ov" data-act="ov"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t">${body}</div></div>`;
+  const f = root.querySelector('input,textarea,select,button.primary,button'); if (f && !M.noFocus) f.focus();
+}
+function exportContent(M) {
+  if (M.custom) return M.custom;
+  if (M.fmt === 'pdf' || M.fmt === 'docx') return '';
+  const ms = M.ids.map(id => S.data.manips.find(x => x.id === id)).filter(Boolean);
+  if (M.fmt === 'md') return ms.map(markdown).join('\n\n---\n\n');
+  if (M.fmt === 'html') return ms.length === 1 ? reportHtml(ms[0]) : ms.map(reportHtml).join('\n');
+  return JSON.stringify(ms.length === 1 ? exportJson(ms[0]) : ms.map(exportJson), null, 2);
+}
+const exportFile = M => ({ md: 'cahier-manip.md', html: 'rapport-manip.html', json: 'manip-pour-script-pdf.json' })[M.fmt];
+
+/* ====================== actions ====================== */
+function toast(t) { const el = $('#toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => { el.style.display = 'none'; }, 2200); }
+async function copyText(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg || 'Copié'); return true; } catch (e) { return false; } }
+async function saveFile(name, data) {
+  if (!S.persist.dl) { toast('Téléchargement indisponible ici : utilise Copier'); return; }
+  try { await S.persist.dl.save({ filename: name, data }); toast('Fichier enregistré'); } catch (e) { if (!e || e.code !== 'declined') toast('Téléchargement impossible : utilise Copier'); }
+}
+function duplicate(m) {
+  const c = clone(m), map = {}; c.id = uid(); c.nom = m.nom + ' (copie)'; c.statut = firstStatut(); c.modele = false; c.rev = 1; c.lancee = null; c.journal = []; c.base = null; c.maj = nowIso(); c.texteManuel = null; c.contexte.lot = ''; c.contexte.ref = '';
+  c.etapes.forEach(e => { const n = uid(); map[e.id] = n; e.id = n; });
+  c.prelevements.forEach(p => { p.id = uid(); if (p.etapeId) p.etapeId = map[p.etapeId]; p.scirius = ''; p.aramis = ''; });
+  S.data.manips.push(c); return c;
+}
+function openManip(id) { const m = S.data.manips.find(x => x.id === id); if (!m) return; S.ui.manipId = id; S.ui.stepId = DEPART; S.ui.mode = m.etapes.length ? 'comp' : 'def'; S.ui.tab = 'flux'; }
+const stepOf = id => curManip().etapes.find(x => x.id === id);
+
+const ACT = {
+  tab: id => { S.ui.tab = id; },
+  mode: id => { S.ui.mode = id; if (id === 'comp') S.ui.stepId = S.ui.stepId || DEPART; },
+  filtre: id => { S.ui.filtre = id; },
+  open: id => openManip(id),
+  dup: id => { const c = duplicate(S.data.manips.find(x => x.id === id)); toast('Copie créée : ' + c.nom); save(); },
+  exp: id => { S.ui.modal = { type: 'export', titre: 'Exporter', ids: [id], fmt: 'pdf' }; },
+  arch: id => { const m = S.data.manips.find(x => x.id === id); const a = m.statut !== 'archivee'; m.statut = a ? 'archivee' : firstStatut(); touch(m); toast(a ? 'Archivée' : 'Restaurée'); save(); },
+  del: id => { const m = S.data.manips.find(x => x.id === id); S.ui.modal = { type: 'confirm', titre: 'Supprimer définitivement ?', message: `« ${m.nom} » sera supprimée. Cette action est définitive.`, bouton: 'Supprimer', run: () => { S.data.manips = S.data.manips.filter(x => x.id !== id); if (S.ui.manipId === id) S.ui.manipId = null; save(); } }; },
+  reset: () => { S.ui.modal = { type: 'confirm', titre: 'Restaurer les exemples ?', message: 'Tes manips et ton inventaire actuels seront remplacés par les exemples.', bouton: 'Restaurer', run: () => { S.data = seed(); reopenFirst(); S.ui.tab = 'biblio'; save(); } }; },
+  'open-new': () => { S.ui.modal = { type: 'new' }; },
+  'open-import': () => { S.ui.modal = { type: 'import' }; },
+  'close-modal': () => { S.ui.modal = null; },
+  ov: (id, t, ev) => { if (ev.target === t) S.ui.modal = null; else return 'skip'; },
+  'do-confirm': () => { const M = S.ui.modal; S.ui.modal = null; M.run(); },
+  'do-new': () => {
+    const nom = ($('#n-nom').value || '').trim() || 'Nouvelle manip', base = $('#n-base').value; let m;
+    if (base) { m = duplicate(S.data.manips.find(x => x.id === base)); m.nom = nom; } else { m = mkManip(nom); m.statut = firstStatut(); S.data.manips.push(m); }
+    S.ui.modal = null; openManip(m.id); toast('Manip créée'); save(); },
+  'do-import': () => {
+    try { const m = importManip(JSON.parse($('#imp').value)); S.data.manips.push(m); S.ui.modal = null; openManip(m.id); toast('Manip importée'); save(); }
+    catch (e) { $('#imp-err').textContent = 'JSON non reconnu : ' + (e.message || 'vérifie le contenu collé.'); return 'skip'; } },
+  /* définir le flux */
+  'add-step': op => { const m = curManip(), e = mkStep(op); inheritCommunes(m, e); insertStep(m, e); touch(m); save(); },
+  'dup-step': id => { const m = curManip(), i = stepIndex(m, id), c = clone(m.etapes[i]); c.id = uid(); m.etapes.splice(i + 1, 0, c); touch(m); save(); toast('Étape dupliquée'); },
+  'ins-after': id => { S.ui.insertAfter = Number(id); },
+  'ins-cancel': () => { S.ui.insertAfter = null; },
+  'comm-tgl': (id, t) => { const m = curManip(), k = t.dataset.k; m.communes = m.communes || {};
+    if (k === 'vide') m.communes.vide = m.communes.vide ? null : { mbar: null }; else m.communes[k] = m.communes[k] != null ? null : (k === 'temperature' ? 60 : 300); touch(m); save(); },
+  'tgl-replace': () => { S.ui.replace = !S.ui.replace; },
+  'comm-apply': () => { const m = curManip(), c = m.communes || {}, r = !!S.ui.replace; let n = 0;
+    m.etapes.forEach(e => { let ch = false;
+      if (c.temperature != null && (r || e.temperature == null)) { e.temperature = c.temperature; ch = true; }
+      if (c.agitation != null && e.operation !== 'centrifugation' && (r || e.agitation == null)) { e.agitation = c.agitation; ch = true; }
+      if (c.vide && (r || !e.vide)) { e.vide = clone(c.vide); ch = true; }
+      if (ch) n++; });
+    touch(m); save(); toast(n ? `Appliqué à ${n} étape${n > 1 ? 's' : ''}` : 'Rien à appliquer : active d’abord une condition'); },
+  'add-reac-nom': () => { const v = $('#n-rn').value.trim(); if (v && !invFind(v)) { S.data.inventaire.push(inv(v, '', '')); save(); } },
+  'del-reac-nom': (id, t) => { S.data.inventaire = S.data.inventaire.filter(r => r.nom !== t.dataset.k); save(); },
+  'del-an': (id, t) => { const a = t.dataset.k; S.data.analyses = S.data.analyses.filter(x => x !== a); S.data.labos.forEach(l => { l.analyses = l.analyses.filter(x => x !== a); }); save(); },
+  lancer: () => { const m = curManip(); S.ui.modal = { type: 'confirm', titre: 'Lancer la manip ?', message: 'À partir de maintenant, chaque modification (étapes, conditions, réactifs, échantillons, demande) sera notée avec la date, l’heure et ton nom, et signalée dans le rapport.', bouton: 'Lancer', run: () => { m.lancee = { le: nowIso(), par: who(m) }; m.journal = []; m.base = JSON.stringify(snapshotOf(m)); touch(m); save(); toast('Manip lancée'); } }; },
+  'annuler-lancement': () => { const m = curManip(); if (m.journal.length) return; m.lancee = null; m.base = null; touch(m); save(); toast('Lancement annulé'); },
+  'open-journal': () => { S.ui.modal = { type: 'journal' }; },
+  'f-do': (id, t) => { S.ui.fDo = t.dataset.k || ''; },
+  'f-tag': (id, t) => { S.ui.fTag = t.dataset.k || ''; },
+  'add-tag': () => { const m = curManip(), inp = $('#t-new'); if (!inp) return; inp.value.split(',').map(x => x.trim().replace(/^#/, '')).filter(Boolean).forEach(v => { const ex = allTags().find(x => norm(x) === norm(v)) || v; if (!m.tags.some(x => norm(x) === norm(ex))) m.tags.push(ex); }); touch(m); save(); S.ui.refocus = 't-new'; },
+  'del-tag': (id, t) => { const m = curManip(); m.tags = m.tags.filter(x => x !== t.dataset.k); touch(m); save(); },
+  'del-tag-all': (id, t) => { const k = norm(t.dataset.k); S.data.manips.forEach(m => { m.tags = (m.tags || []).filter(x => norm(x) !== k); }); if (norm(S.ui.fTag) === k) S.ui.fTag = ''; save(); toast('Tag retiré de toutes les manips'); },
+  'add-type': () => { const v = $('#n-ty').value.trim(); if (v && !S.data.types.includes(v)) { S.data.types.push(v); save(); } },
+  'del-type': (id, t) => { S.data.types = S.data.types.filter(x => x !== t.dataset.k); if (S.ui.fType === t.dataset.k) S.ui.fType = ''; save(); },
+  'add-st': () => { const v = $('#n-st').value.trim(); if (v) { S.data.statuts.push({ id: 's' + uid(), nom: v, ton: '' }); save(); } },
+  'del-st': id => { const i = Number(id), x = S.data.statuts[i]; if (!x || S.data.statuts.length < 2) return; const rest = S.data.statuts.filter((_, k) => k !== i), cible = rest[0], nb = S.data.manips.filter(m => m.statut === x.id).length;
+    S.data.statuts = rest; S.data.manips.forEach(m => { if (m.statut === x.id) m.statut = cible.id; }); save(); toast(nb ? `${nb} manip${nb > 1 ? 's' : ''} passée${nb > 1 ? 's' : ''} en « ${cible.nom} »` : 'État supprimé'); },
+  'st-up': id => { const i = Number(id), a = S.data.statuts; if (i > 0) { [a[i - 1], a[i]] = [a[i], a[i - 1]]; save(); } },
+  'st-down': id => { const i = Number(id), a = S.data.statuts; if (i < a.length - 1) { [a[i + 1], a[i]] = [a[i], a[i + 1]]; save(); } },
+  'add-do': () => { const v = $('#n-do').value.trim(); if (v && !S.data.donneurs.includes(v)) { S.data.donneurs.push(v); save(); } },
+  'del-do': (id, t) => { S.data.donneurs = S.data.donneurs.filter(x => x !== t.dataset.k); save(); },
+  'lab-an': (id, t) => { const l = S.data.labos[Number(id)], a = t.dataset.k; l.analyses = l.analyses.includes(a) ? l.analyses.filter(x => x !== a) : l.analyses.concat(a); save(); },
+  'del-lab': id => { S.data.labos.splice(Number(id), 1); save(); },
+  'open-flow': id => { openManip(id); S.ui.mode = 'def'; },
+  'add-custom': () => { const v = ($('#autre-op').value || '').trim().toLowerCase(); if (!v) { toast('Écris le nom de l’étape'); return 'skip'; } const m = curManip(), e = mkStep(v); inheritCommunes(m, e); insertStep(m, e); touch(m); save(); },
+  'del-step': id => { const m = curManip(); m.etapes.splice(stepIndex(m, id), 1); m.prelevements = m.prelevements.filter(p => p.etapeId !== id); if (S.ui.stepId === id) S.ui.stepId = DEPART; touch(m); save(); },
+  'mv-l': id => { const m = curManip(), i = stepIndex(m, id); if (i > 0) { [m.etapes[i - 1], m.etapes[i]] = [m.etapes[i], m.etapes[i - 1]]; touch(m); save(); } },
+  'mv-r': id => { const m = curManip(), i = stepIndex(m, id); if (i < m.etapes.length - 1) { [m.etapes[i + 1], m.etapes[i]] = [m.etapes[i], m.etapes[i + 1]]; touch(m); save(); } },
+  'to-comp': () => { S.ui.mode = 'comp'; S.ui.stepId = DEPART; S.ui.scrollTo = 'editor'; toast('Complète chaque étape'); },
+  /* compléter une étape */
+  'go-step': id => { S.ui.stepId = id; S.ui.scrollTo = 'editor'; },
+  'prev-step': () => { const m = curManip(), o = [DEPART].concat(m.etapes.map(e => e.id)), i = o.indexOf(S.ui.stepId); if (i > 0) { S.ui.stepId = o[i - 1]; S.ui.scrollTo = 'editor'; } },
+  'next-step': () => { const m = curManip(), o = [DEPART].concat(m.etapes.map(e => e.id)), i = o.indexOf(S.ui.stepId); if (i >= o.length - 1) { S.ui.tab = 'rapport'; } else { S.ui.stepId = o[i + 1]; S.ui.scrollTo = 'editor'; } },
+  'cond-tgl': (id, t) => { const e = stepOf(id), k = t.dataset.k, def = { temperature: 60, agitation: 300, filtre: 5 };
+    if (k === 'vide') e.vide = e.vide ? null : { mbar: null }; else e[k] = e[k] != null ? null : def[k]; touch(curManip()); save(); },
+  'add-eq': id => { const e = stepOf(id), v = $('#i-eq').value.trim(); if (v && !e.equipement.includes(v)) { e.equipement.push(v); touch(curManip()); save(); } },
+  'rm-eq': (id, t) => { stepOf(id).equipement.splice(Number(t.dataset.k), 1); touch(curManip()); save(); },
+  'add-autre': id => { const e = stepOf(id); (e.autres = e.autres || []).push({ nom: '', valeur: '' }); touch(curManip()); save(); },
+  'rm-autre': (id, t) => { stepOf(id).autres.splice(Number(t.dataset.k), 1); touch(curManip()); save(); },
+  'add-reac': id => { stepOf(id).reactifs.push({ nom: '', quantite: '', role: 'Réactif' }); touch(curManip()); save(); },
+  'rm-reac': (id, t) => { stepOf(id).reactifs.splice(Number(t.dataset.k), 1); touch(curManip()); save(); },
+  'add-s': id => { const m = curManip(), last = m.prelevements[m.prelevements.length - 1], labNom = last ? last.labo : (S.data.labos[0] || {}).nom, lab = S.data.labos.find(l => l.nom === labNom) || {},
+      over = { labo: labNom || '', volume: lab.volume != null ? lab.volume : 50, analyses: (lab.analyses && lab.analyses.length ? lab.analyses : (last ? last.analyses : [])).slice() };
+    m.prelevements.push(id ? mkSample(id, 'effluent', over) : mkSample(null, 'avant', over)); touch(m); save(); toast('Échantillon ajouté'); },
+  'del-s': id => { const m = curManip(); m.prelevements = m.prelevements.filter(p => p.id !== id); touch(m); save(); },
+  'set-moment': (id, t) => { const m = curManip(), p = m.prelevements.find(x => x.id === id); p.moment = t.dataset.k; if (p.moment !== 'pendant') p.temps = null; touch(m); save(); },
+  'tgl-an': (id, t) => { const m = curManip(), p = m.prelevements.find(x => x.id === id), a = t.dataset.k; p.analyses = p.analyses.includes(a) ? p.analyses.filter(x => x !== a) : p.analyses.concat(a); touch(m); save(); },
+  'add-lab': () => { const v = $('#n-lab').value.trim(); if (v && !S.data.labos.some(l => l.nom === v)) { S.data.labos.push(mkLab(v)); save(); } },
+  'add-an': () => { const v = $('#n-an').value.trim(); if (v && !S.data.analyses.includes(v)) { S.data.analyses.push(v); save(); } },
+  /* rapport */
+  'copy-md': () => { const m = curManip(); copyText(markdown(m), 'Texte copié').then(ok => { if (!ok) { S.ui.modal = { type: 'export', titre: 'Texte à copier', ids: [m.id], fmt: 'md' }; render(); } }); return 'skip'; },
+  'open-export': () => { S.ui.modal = { type: 'export', titre: 'Exporter', ids: [curManip().id], fmt: 'pdf' }; },
+  done: () => { const m = curManip(); m.statut = m.statut === 'terminee' ? 'brouillon' : 'terminee'; touch(m); toast(m.statut === 'terminee' ? 'Marquée comme terminée' : 'Remise en brouillon'); save(); },
+  'exp-copy': () => { const M = S.ui.modal; copyText(exportContent(M), 'Copié').then(ok => { if (!ok) { const t = $('#exp-txt'); t.removeAttribute('readonly'); t.focus(); t.select(); toast('Sélectionne puis copie'); } }); return 'skip'; },
+  'exp-save': () => { const M = S.ui.modal; if (M.fmt === 'pdf' || M.fmt === 'docx') { const mm = S.data.manips.find(x => x.id === M.ids[0]); if (mm) exportFileFor(M.fmt, mm); } else saveFile(exportFile(M), exportContent(M)); return 'skip'; },
+  'dl-pdf': () => { exportFileFor('pdf', curManip()); return 'skip'; },
+  'dl-docx': () => { exportFileFor('docx', curManip()); return 'skip'; },
+};
+function importManip(d) {
+  if (Array.isArray(d)) d = d[0];
+  if (!d || !Array.isArray(d.etapes)) throw new Error('il manque la liste « etapes ».');
+  const m = mkManip(d.titre || ('Import ' + new Date().toLocaleDateString('fr-FR')));
+  m.statut = firstStatut();
+  if (d.contexte) { Object.assign(m.contexte, d.contexte); if (Array.isArray(m.contexte.tags)) { m.tags = m.contexte.tags.slice(); } delete m.contexte.tags; }
+  m.etapes = d.etapes.map(x => { const p = x.parametres || {}; const rd = x.reactifs_detail || (x.reactifs || []).map(n => ({ nom: cap(n), quantite: '', role: 'Réactif' }));
+    rd.forEach(r => ensureInv(r.nom));
+    return mkStep(x.operation || 'étape libre', { temperature: p.temperature_c ?? null, duree: p.duree_min ?? null, agitation: p.agitation_trmin ?? null, filtre: p.filtre_um ?? null, vide: p.vide ? { mbar: p.vide_mbar ?? null } : null, equipement: x.equipement || [], reactifs: rd, remarque: x.remarque || '' }); });
+  (d.prelevements || []).forEach(p => { const e = p.apres_etape ? m.etapes[p.apres_etape - 1] : null;
+    m.prelevements.push(mkSample(e ? e.id : null, e ? (p.moment === 'pendant' ? 'pendant' : 'effluent') : 'avant', { temps: p.temps_min ?? null, volume: p.volume_ml ?? 50, scirius: p.scirius || '', aramis: p.aramis || '', labo: p.labo || 'Labo interne', analyses: p.analyses || [] })); });
+  (d.inventaire_reactifs || []).forEach(r => { const f = invFind(r.nom); if (f) { f.scirius = f.scirius || r.scirius || ''; f.emplacement = f.emplacement || r.emplacement || ''; f.fournisseur = f.fournisseur || r.fournisseur || ''; f.lot = f.lot || r.lot || ''; } });
+  return m;
+}
+
+function insertStep(m, e) { const ia = S.ui.insertAfter; if (ia == null) m.etapes.push(e); else { m.etapes.splice(ia + 1, 0, e); S.ui.insertAfter = ia + 1; } }
+function inheritCommunes(m, e) { const c = m.communes || {}; if (c.temperature != null && e.temperature == null) e.temperature = c.temperature; if (c.agitation != null && e.agitation == null && e.operation !== 'centrifugation') e.agitation = c.agitation; if (c.vide && !e.vide) e.vide = clone(c.vide); }
+/* ====================== exports PDF et Word (sans bibliothèque) ====================== */
+const HR = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015,
+  667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333,
+  556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
+const HB = [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975,
+  722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333,
+  556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584];
+const flat = s => String(s == null ? '' : s).replace(/[  ]/g, ' ');
+const WIN = { '’': 0x92, '‘': 0x91, '“': 0x93, '”': 0x94, '–': 0x96, '—': 0x97, '…': 0x85, '€': 0x80, 'œ': 0x9C, 'Œ': 0x8C, '•': 0x95 };
+function pdfStr(s) {
+  let o = '';
+  for (const ch of flat(s)) { let c = ch.codePointAt(0); if (WIN[ch] != null) c = WIN[ch]; else if (c > 255) c = 63;
+    o += (c === 40 || c === 41 || c === 92) ? '\\' + String.fromCharCode(c) : String.fromCharCode(c); }
+  return o;
+}
+function tw(s, size, bold) {
+  const T = bold ? HB : HR; let w = 0;
+  for (const ch of flat(s)) { const c = ch.codePointAt(0);
+    if (c >= 32 && c <= 126) w += T[c - 32];
+    else { const b = ch.normalize('NFD').codePointAt(0);
+      if (b >= 32 && b <= 126 && ch.normalize('NFD').length > 1) w += T[b - 32];
+      else if (ch === '·') w += 278; else if (ch === '°') w += 400; else if (ch === '’') w += bold ? 278 : 222; else if (ch === '…' || ch === '—') w += 1000; else w += 556; } }
+  return w * size / 1000;
+}
+const slug = s => norm(s).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'manip';
+const momentShort = p => p.moment === 'avant' ? 'avant traitement' : p.moment === 'pendant' ? 'pendant' + (p.temps != null ? ' · à ' + fmtDur(p.temps) : '') : 'effluent';
+
+function buildPdf(m) {
+  const r = report(m), L = labels(m), c = m.contexte;
+  const W = 595.28, H = 841.89, MX = 42, MT = 44, MB = 46, CW = W - 2 * MX;
+  const pages = []; let ops, y;
+  const col = hex => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => (v / 255).toFixed(3)).join(' '); };
+  const f2 = v => v.toFixed(2);
+  const newPage = () => { ops = []; pages.push(ops); y = MT; };
+  const ensure = h => { if (y + h > H - MB) newPage(); };
+  const text = (s, x, yy, size, o = {}) => { const font = o.b ? 'F2' : 'F1'; let t = `BT ${col(o.color || '#14201D')} rg ${f2(x)} ${f2(H - yy)} Td`; flat(s).split('µ').forEach((pt, i) => { if (i) t += ` /F3 ${size} Tf (m) Tj`; t += ` /${font} ${size} Tf (${pdfStr(pt)}) Tj`; }); ops.push(t + ' ET'); };
+  const rect = (x, yy, w, h, fill, stroke) => { ops.push(`${fill ? col(fill) + ' rg ' : ''}${stroke ? col(stroke) + ' RG 0.6 w ' : ''}${f2(x)} ${f2(H - yy - h)} ${f2(w)} ${f2(h)} re ${fill && stroke ? 'B' : fill ? 'f' : 'S'}`); };
+  const line = (x1, y1, x2, y2, color, w) => { ops.push(`${col(color)} RG ${w} w ${f2(x1)} ${f2(H - y1)} m ${f2(x2)} ${f2(H - y2)} l S`); };
+  const circle = (cx, cy, rad, fill) => { const k = 0.5523 * rad, X = cx, Y = H - cy;
+    ops.push(`${col(fill)} rg ${f2(X + rad)} ${f2(Y)} m ${f2(X + rad)} ${f2(Y + k)} ${f2(X + k)} ${f2(Y + rad)} ${f2(X)} ${f2(Y + rad)} c ${f2(X - k)} ${f2(Y + rad)} ${f2(X - rad)} ${f2(Y + k)} ${f2(X - rad)} ${f2(Y)} c ${f2(X - rad)} ${f2(Y - k)} ${f2(X - k)} ${f2(Y - rad)} ${f2(X)} ${f2(Y - rad)} c ${f2(X + k)} ${f2(Y - rad)} ${f2(X + rad)} ${f2(Y - k)} ${f2(X + rad)} ${f2(Y)} c f`); };
+  const tokens = s => { const out = []; let after = false; flat(s).split(/(\{\{\?[^}]*\}\})/).forEach(seg => { const q = seg.match(/^\{\{\?([^}]*)\}\}$/); if (q) { out.push({ t: `[${q[1]} à saisir]`, ph: true }); after = true; return; } const glue = after && seg && !/^\s/.test(seg); seg.split(/\s+/).filter(Boolean).forEach((w, k) => out.push({ t: w, g: glue && k === 0 })); after = false; }); return out; };
+  const layout = (s, size, w, bold) => { const lines = []; let cur = [], cw = 0; const sp = tw(' ', size, bold);
+    tokens(s).forEach(tk => { const wd = tw(tk.t, size, bold || tk.ph), gw = tk.g ? 0 : sp; if (cur.length && cw + gw + wd > w) { lines.push(cur); cur = []; cw = 0; } cw += (cur.length ? gw : 0) + wd; cur.push(tk); });
+    if (cur.length) lines.push(cur); return lines; };
+  const drawAt = (lines, x, top, size, lead, bold, color) => { let yy = top; lines.forEach(ln => { let xx = x; ln.forEach((tk, ti) => { text(tk.t, xx, yy + size, size, { b: bold || tk.ph, color: tk.ph ? '#8A4B00' : (color || '#14201D') }); xx += tw(tk.t, size, bold || tk.ph) + ((ln[ti + 1] && ln[ti + 1].g) ? 0 : tw(' ', size, bold)); }); yy += lead; }); return yy; };
+  const para = (s, size = 9, gap = 6, x = MX, w = CW, color) => { layout(s, size, w).forEach(ln => { ensure(size * 1.4); drawAt([ln], x, y, size, size * 1.4, false, color); y += size * 1.4; }); y += gap; };
+  const head = (s, size = 12, color = '#0F6B5C', before = 10) => { ensure(size + before + 24); y += before; text(s, MX, y + size, size, { b: true, color }); y += size + 6; };
+
+  const pill = (x, top, p) => { const l1 = `${L[p.id]} · ${fmtVol(p.volume)} mL`, l2 = momentShort(p), w = Math.max(tw(l1, 7, true), tw(l2, 6)) + 24, code = codeOf(L[p.id]);
+    rect(x, top, w, 20, '#FDF1DC', '#8A4B00'); circle(x + 9.5, top + 10, 5, '#8A4B00'); text(code, x + 9.5 - tw(code, 6, true) / 2, top + 12.2, 6, { b: true, color: '#FFFFFF' });
+    text(l1, x + 19, top + 8.6, 7, { b: true, color: '#8A4B00' }); text(l2, x + 19, top + 16.6, 6, { color: '#8A4B00' }); return w; };
+
+  function flow() {
+    const per = 5, gap = 9, cw = (CW - (per - 1) * gap) / per, S_ = sortedSamples(m);
+    ensure(60); text('ENTRÉE', MX, y + 8, 7, { b: true, color: '#566360' });
+    let px = MX + tw('ENTRÉE', 7, true) + 8; S_.filter(p => sampleStepNo(m, p) === 0).forEach(p => { px += pill(px, y - 2, p) + 5; }); y += 26;
+    for (let s = 0; s < m.etapes.length; s += per) {
+      const info = m.etapes.slice(s, s + per).map(e => {
+        const ls = [], wc = cw - 10;
+        e.reactifs.filter(q => q.nom).forEach(q => layout(q.nom + (q.quantite ? ' ' + q.quantite : ''), 7, wc, true).forEach(ln => ls.push({ ln, size: 7, b: true, color: '#14201D' })));
+        const par = condSummary(e); if (par) layout(par, 7, wc).forEach(ln => ls.push({ ln, size: 7, color: '#0F6B5C' }));
+        if (e.equipement.length) layout(e.equipement.join(', '), 6.5, wc).forEach(ln => ls.push({ ln, size: 6.5, color: '#566360' }));
+        const ps = S_.filter(p => p.etapeId === e.id), fr = !!(e.duree || ps.length);
+        const wt = cw - 26; let tsz = 8, tl = layout(cap(e.operation), tsz, wt, true);
+        while (tsz > 6 && tl.some(ln => ln.some(tk => tw(tk.t, tsz, true) > wt))) { tsz -= 0.5; tl = layout(cap(e.operation), tsz, wt, true); }
+        const extra = (tl.length - 1) * 9.5;
+        return { e, ls, ps, fr, tl, tsz, extra, h: 28 + extra + ls.length * 9 + (fr ? 30 : 6) };
+      });
+      const cardH = Math.max(...info.map(i => i.h)), pillH = Math.max(0, ...info.map(i => i.ps.length)) * 23;
+      ensure(cardH + pillH + 16); const top = y;
+      info.forEach((i, k) => {
+        const x = MX + k * (cw + gap), e = i.e;
+        rect(x, top, cw, cardH, '#FFFFFF', '#BFCBC7'); circle(x + 11, top + 12, 6.5, '#0F6B5C');
+        const nTxt = String(s + k + 1); text(nTxt, x + 11 - tw(nTxt, 7, true) / 2, top + 14.4, 7, { b: true, color: '#FFFFFF' });
+        drawAt(i.tl, x + 21, top + 14 - i.tsz, i.tsz, 9.5, true);
+        let ly = top + 22 + i.extra; i.ls.forEach(l => { drawAt([l.ln], x + 5, ly, l.size, 9, l.b, l.color); ly += 9; });
+        if (i.fr) { const fy = top + cardH - 24, x0 = x + 9, x1 = x + cw - 9, dl = e.duree ? fmtDur(e.duree) : 'fin';
+          line(x0, fy + 6, x1, fy + 6, '#C9D3CF', 2); text('0', x0, fy + 20, 5.5, { color: '#566360' }); text(dl, x1 - tw(dl, 5.5), fy + 20, 5.5, { color: '#566360' });
+          i.ps.forEach(p => { const pct = p.moment === 'pendant' && e.duree && p.temps != null ? Math.max(0, Math.min(1, p.temps / e.duree)) : p.moment === 'pendant' ? .5 : 1, bx = x0 + (x1 - x0) * pct, cd = codeOf(L[p.id]);
+            circle(bx, fy + 6, 5, '#8A4B00'); text(cd, bx - tw(cd, 6, true) / 2, fy + 8.2, 6, { b: true, color: '#FFFFFF' }); }); }
+        if (k < info.length - 1) { const ax = x + cw + gap - 1, ay = top + 12; line(x + cw + 1, ay, ax - 3, ay, '#566360', 1); ops.push(`${col('#566360')} rg ${f2(ax)} ${f2(H - ay)} m ${f2(ax - 4)} ${f2(H - ay + 2.5)} l ${f2(ax - 4)} ${f2(H - ay - 2.5)} l f`); }
+        i.ps.forEach((p, j) => pill(x, top + cardH + 4 + j * 23, p));
+      });
+      y = top + cardH + pillH + 14;
+    }
+    ensure(14); const so = 'SORTIE · produit prétraité'; text(so, MX + CW - tw(so, 7, true), y + 7, 7, { b: true, color: '#566360' }); y += 16;
+    const tot = m.etapes.reduce((a, e) => a + (e.duree || 0), 0), vd = c.volumeDepart || 0, pr = totalPreleve(m);
+    para(`Durée cumulée des étapes chronométrées : ${fmtDur(tot) || '0 min'}. Volume : ${fmtVol(vd)} mL au départ, ${fmtVol(pr)} mL prélevés, ${fmtVol(vd - pr)} mL restants. Chaque badge marque un prélèvement : sa place sur la frise donne le moment (bord droit = sortie de l’étape).`, 7.5, 4, MX, CW, '#566360');
+  }
+  function fiche(ph, i) {
+    const wl = 66, wr_ = CW - wl, size = 8, lead = 10.5, ps = t => t || '{{?n°}}';
+    const items = [];
+    items.push(i ? ['Conditions', [(ph.cond || 'à compléter') + (ph.materiel.length ? ' — ' + ph.materiel.join(', ') : '')]] : ['Matière', [`${c.matiere || '{{?matière}}'} (lot ${c.lot || '{{?n°}}'}) · ${c.volumeDepart != null ? fmtVol(c.volumeDepart) + ' mL' : '{{?volume}}'}`]]);
+    if (i) items.push(['Réactifs', ph.reactifs.length ? ph.reactifs.map(x => `${x.nom}${x.quantite ? ' · ' + x.quantite : ''} — n° Scirius ${ps(x.scirius)}, emplacement ${x.emplacement || '{{?emplacement}}'}, fournisseur ${x.fournisseur || '{{?nom}}'}, lot ${ps(x.lot)}`) : ['aucun']]);
+    items.push(['Échantillons', ph.echantillons.length ? ph.echantillons.map(x => `${x.id} · ${fmtVol(x.volume)} mL · ${x.moment} · ${x.labo} · ${x.analyses.join(', ') || 'aucune analyse'} — n° Scirius ${ps(x.scirius)}, n° Aramis ${ps(x.aramis)}`) : ['aucun']]);
+    const blocks = items.map(([lab, arr]) => ({ lab, lines: arr.map(t => layout(t, size, wr_ - 10)) }));
+    const hH = 18, hs = blocks.map(b => b.lines.reduce((a, l) => a + l.length, 0) * lead + 8 + (b.lines.length - 1) * 2);
+    ensure(hH + hs.reduce((a, b) => a + b, 0) + 8); let top = y;
+    rect(MX, top, CW, hH, '#E1F0EC', '#BFCBC7'); text(ph.titre, MX + 6, top + 12.5, 9, { b: true, color: '#0F6B5C' }); top += hH;
+    blocks.forEach((b, k) => { rect(MX, top, wl, hs[k], null, '#BFCBC7'); rect(MX + wl, top, wr_, hs[k], null, '#BFCBC7'); text(b.lab, MX + 6, top + 4 + size + 1, size, { b: true, color: '#566360' });
+      let yy = top + 4; b.lines.forEach(ls => { yy = drawAt(ls, MX + wl + 6, yy, size, lead); yy += 2; }); top += hs[k]; });
+    y = top + 8;
+  }
+  function table(widths, header, rows) {
+    const size = 7.5, lead = 9.5, cell = (txt, w) => layout(String(txt || '{{?n°}}'), size, w - 8);
+    const draw = (cells, hdr) => { const ls = cells.map((t, k) => cell(t, widths[k])), h = Math.max(...ls.map(l => l.length)) * lead + 6; ensure(h + 2); let x = MX;
+      cells.forEach((t, k) => { rect(x, y, widths[k], h, hdr ? '#E1F0EC' : null, '#BFCBC7'); drawAt(ls[k], x + 4, y + 3, size, lead, hdr); x += widths[k]; }); y += h; };
+    draw(header, true); rows.forEach(rw => draw(rw, false)); y += 6;
+  }
+  newPage();
+  text(m.nom, MX, y + 16, 16, { b: true }); y += 28;
+  { const tg = (m.tags || []).map(t => '#' + t).join('  '), hb = 45 + (tg ? 13 : 0); rect(MX, y, CW, hb, '#E1F0EC', '#BFCBC7');
+    const bl = (lab, val, x0, y0) => { text(lab, x0, y0, 8.5, { b: true }); const x1 = x0 + tw(lab, 8.5, true); text(val, x1, y0, 8.5); return x1 + tw(val, 8.5); };
+    let xx = bl('Donneur d’ordre : ', c.donneur || '', MX + 6, y + 13); if (c.type) { xx += 18; bl('Type : ', c.type, xx, y + 13); }
+    xx = bl('Réf. demande : ', c.ref || '', MX + 6, y + 26); xx += 18; bl('Date : ', c.date || '', xx, y + 26);
+    let ly = y + 39; if (tg) { bl('Tags : ', tg, MX + 6, ly); ly += 13; }
+    bl('Version : ', `${m.rev} · enregistrée le ${fmtDT(m.maj)}${m.lancee ? `   ·   Lancée le ${fmtDT(m.lancee.le)} par ${m.lancee.par}` : ''}`, MX + 6, ly);
+    if (m.lancee && m.journal.length) { const fl = `Modifiée après lancement (${m.journal.length})`; text(fl, W - MX - 6 - tw(fl, 8.5, true), y + 26, 8.5, { b: true, color: '#8A4B00' }); }
+    y += hb + 10; }
+  head('Flux de prétraitement'); flow();
+  head('Matériel et méthodes'); r.sections.forEach(s => { ensure(30); text(s.titre, MX, y + 9, 9.5, { b: true }); y += 14; para(s.texte, 9, 6); });
+  head('Détail par phase du flux'); r.phases.forEach(fiche);
+  if (r.reactifs.length) { head('Réactifs'); table([100, 62, 160, 90, 55, 44], ['Réactif', 'N° Scirius', 'Emplacement', 'Fournisseur', 'Lot', 'Étape'], r.reactifs.map(x => [x.nom, x.scirius || '{{?n°}}', x.emplacement || '{{?emplacement}}', x.fournisseur || '{{?nom}}', x.lot || '{{?n°}}', x.etapes.join(', ')])); }
+  if (r.echantillons.length) { head('Échantillons'); table([30, 78, 72, 40, 52, 52, 56, 131], ['Éch.', 'Étape', 'Moment', 'Volume', 'N° Scirius', 'N° Aramis', 'Laboratoire', 'Analyses'], r.echantillons.map(x => [x.id, x.etape, x.moment, fmtVol(x.volume) + ' mL', x.scirius || '{{?n°}}', x.aramis || '{{?n°}}', x.labo, x.analyses.join(', ')])); }
+  if (m.lancee) { head('Modifications après lancement'); if (m.journal.length) table([92, 64, 355], ['Date et heure', 'Par', 'Modification'], m.journal.map(j => [fmtDT(j.t), j.par, j.txt])); else para('Aucune modification depuis le lancement.', 9, 6); }
+  pages.forEach((pg, i) => { ops = pg; text('Document généré automatiquement - à relire avant diffusion', MX, H - 24, 7, { color: '#566360' }); const pn = `Page ${i + 1} / ${pages.length}`; text(pn, W - MX - tw(pn, 7), H - 24, 7, { color: '#566360' }); });
+  const objs = [], add = s => { objs.push(s); return objs.length; };
+  add('<< /Type /Catalog /Pages 2 0 R >>'); add('');
+  add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'); add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'); add('<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>');
+  const kids = [];
+  pages.forEach(pg => { const content = pg.join('\n'), cid = add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${cid} 0 R >>`) + ' 0 R'); });
+  objs[1] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`;
+  let out = '%PDF-1.4\n'; const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xr = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('') + `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R /Info << /Title (${pdfStr(m.nom)}) >> >>\nstartxref\n${xr}\n%%EOF`;
+  return Uint8Array.from(out, ch => ch.charCodeAt(0) & 255);
+}
+
+/* ---- Word (.docx) : archive ZIP écrite à la main ---- */
+const CRCT = (() => { const t = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRCT[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zipStore(files) {
+  const enc = new TextEncoder(), chunks = [], central = [];
+  const u16 = v => [v & 255, (v >> 8) & 255], u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255];
+  let offset = 0;
+  files.forEach(f => { const name = enc.encode(f.name), data = enc.encode(f.xml), crc = crc32(data), size = data.length;
+    const lh = Uint8Array.from([...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0)]);
+    chunks.push(lh, name, data);
+    central.push(Uint8Array.from([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(size), ...u32(size), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset)]), name);
+    offset += lh.length + name.length + size; });
+  const cd = central.reduce((a, b) => a + b.length, 0);
+  const end = Uint8Array.from([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cd), ...u32(offset), ...u16(0)]);
+  const all = [...chunks, ...central, end], out = new Uint8Array(all.reduce((a, b) => a + b.length, 0)); let p = 0; all.forEach(b => { out.set(b, p); p += b.length; }); return out;
+}
+function buildDocx(m) {
+  const r = report(m), L = labels(m), c = m.contexte;
+  const xe = s => flat(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const wr = (t, o = {}) => `<w:r><w:rPr>${o.b ? '<w:b/>' : ''}${o.i ? '<w:i/>' : ''}${o.color ? `<w:color w:val="${o.color}"/>` : ''}${o.size ? `<w:sz w:val="${Math.round(o.size * 2)}"/>` : ''}${o.hl ? `<w:highlight w:val="${o.hl}"/>` : ''}</w:rPr><w:t xml:space="preserve">${xe(t)}</w:t></w:r>`;
+  const runsOf = (text, o = {}) => flat(text).split(/(\{\{\?[^}]*\}\})/).filter(Boolean).map(seg => { const q = seg.match(/^\{\{\?([^}]*)\}\}$/); return q ? wr(`[${q[1]} à saisir]`, { ...o, hl: 'yellow', color: '7A4A00' }) : wr(seg, o); }).join('');
+  const P = (runs, o = {}) => `<w:p><w:pPr>${o.style ? `<w:pStyle w:val="${o.style}"/>` : ''}${o.keep ? '<w:keepNext/>' : ''}<w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? 80 : o.after}"/></w:pPr>${runs}</w:p>`;
+  const cell = (w, paras, fill) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : ''}</w:tcPr>${paras.join('') || P('')}</w:tc>`;
+  const row = cells => `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cells.join('')}</w:tr>`;
+  const bd = '<w:top w:val="single" w:sz="4" w:space="0" w:color="BFCBC7"/><w:left w:val="single" w:sz="4" w:space="0" w:color="BFCBC7"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="BFCBC7"/><w:right w:val="single" w:sz="4" w:space="0" w:color="BFCBC7"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="BFCBC7"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="BFCBC7"/>';
+  const tbl = (widths, rows) => `<w:tbl><w:tblPr><w:tblW w:w="${widths.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblBorders>${bd}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${rows.join('')}</w:tbl>` + P('', { after: 60 });
+  const body = [];
+  body.push(P(wr(m.nom), { style: 'Title' }));
+  body.push(tbl([9638], [row([cell(9638, [P(wr('Donneur d’ordre : ', { b: true, size: 10 }) + wr(c.donneur || '', { size: 10 }) + (c.type ? wr('     Type : ', { b: true, size: 10 }) + wr(c.type, { size: 10 }) : '') + wr('     Réf. demande : ', { b: true, size: 10 }) + wr(c.ref || '', { size: 10 }) + wr('     Date : ', { b: true, size: 10 }) + wr(c.date || '', { size: 10 }), { after: 0 })].concat(m.tags && m.tags.length ? [P(wr('Tags : ', { b: true, size: 10 }) + wr(m.tags.map(t => '#' + t).join('  '), { size: 10 }), { after: 0 })] : []).concat([P(wr('Version : ', { b: true, size: 10 }) + wr(`${m.rev} · enregistrée le ${fmtDT(m.maj)}${m.lancee ? ` · lancée le ${fmtDT(m.lancee.le)} par ${m.lancee.par}` : ''}`, { size: 10 }), { after: 0 })]).concat(m.lancee && m.journal.length ? [P(wr(`Modifiée après lancement (${m.journal.length})`, { b: true, size: 10, color: '8A4B00' }), { after: 0 })] : []), 'E1F0EC')])]));
+  body.push(P(wr('Flux de prétraitement'), { style: 'Heading1', keep: true }));
+  const S_ = sortedSamples(m), per = 4, cw = Math.floor(9638 / per), frows = [];
+  const ent = S_.filter(p => sampleStepNo(m, p) === 0);
+  if (ent.length) body.push(P(wr('Entrée : ', { b: true, size: 9 }) + ent.map(p => wr(`[${codeOf(L[p.id])}] ${L[p.id]} · ${fmtVol(p.volume)} mL · avant traitement   `, { size: 9, color: '8A4B00' })).join(''), { after: 60 }));
+  for (let s = 0; s < m.etapes.length; s += per) {
+    const cs = m.etapes.slice(s, s + per).map((e, k) => { const ps = S_.filter(p => p.etapeId === e.id), par = condSummary(e), paras = [P(wr(`${s + k + 1} · ${cap(e.operation)}`, { b: true, size: 10, color: '0F6B5C' }), { after: 40 })];
+      e.reactifs.filter(q => q.nom).forEach(q => paras.push(P(wr(q.nom + (q.quantite ? ' · ' + q.quantite : ''), { b: true, size: 8.5 }), { after: 20 })));
+      paras.push(P(wr(par || 'conditions à compléter', { size: 8.5, color: par ? '0F6B5C' : '8A4B00' }), { after: 20 }));
+      if (e.equipement.length) paras.push(P(wr(e.equipement.join(', '), { size: 8, color: '566360' }), { after: 40 }));
+      ps.forEach(p => paras.push(P(wr(`[${codeOf(L[p.id])}] ${L[p.id]} · ${fmtVol(p.volume)} mL · ${p.moment === 'pendant' ? (p.temps != null ? 'à ' + fmtDur(p.temps) : 'pendant') : 'effluent'}`, { size: 8, b: true, color: '8A4B00', hl: 'yellow' }), { after: 20 })));
+      return cell(cw, paras, 'F7FAF9'); });
+    while (cs.length < per) cs.push(cell(cw, [P('')]));
+    frows.push(row(cs));
+  }
+  if (frows.length) body.push(tbl(Array(per).fill(cw), frows));
+  const tot = m.etapes.reduce((a, e) => a + (e.duree || 0), 0), vd = c.volumeDepart || 0, pr = totalPreleve(m);
+  body.push(P(wr(`Durée cumulée des étapes chronométrées : ${fmtDur(tot) || '0 min'}. Volume : ${fmtVol(vd)} mL au départ, ${fmtVol(pr)} mL prélevés, ${fmtVol(vd - pr)} mL restants. Chaque repère [a] marque un prélèvement (pendant l’étape ou à la sortie).`, { size: 8.5, color: '566360' })));
+  body.push(P(wr('Matériel et méthodes'), { style: 'Heading1', keep: true }));
+  r.sections.forEach(s => { body.push(P(wr(s.titre), { style: 'Heading3', keep: true })); body.push(P(runsOf(s.texte), { after: 120 })); });
+  body.push(P(wr('Détail par phase du flux'), { style: 'Heading1', keep: true }));
+  r.phases.forEach((ph, i) => {
+    const rows = [row([cell(1700, [P(wr(ph.titre, { b: true, color: '0F6B5C' }), { after: 0 })], 'E1F0EC'), cell(7938, [P(runsOf(i ? (ph.cond || 'conditions à compléter') + (ph.materiel.length ? ' — ' + ph.materiel.join(', ') : '') : `${c.matiere || '{{?matière}}'} (lot ${c.lot || '{{?n°}}'}) · ${c.volumeDepart != null ? fmtVol(c.volumeDepart) + ' mL' : '{{?volume}}'}`, { size: 9.5 }), { after: 0 })], 'E1F0EC')])];
+    const ps = t => t || '{{?n°}}';
+    if (i) rows.push(row([cell(1700, [P(wr('Réactifs', { b: true, size: 9, color: '566360' }), { after: 0 })]), cell(7938, (ph.reactifs.length ? ph.reactifs.map(x => P(runsOf(`${x.nom}${x.quantite ? ' · ' + x.quantite : ''} — n° Scirius ${ps(x.scirius)}, emplacement ${x.emplacement || '{{?emplacement}}'}, fournisseur ${x.fournisseur || '{{?nom}}'}, lot ${ps(x.lot)}`, { size: 9 }), { after: 30 })) : [P(wr('aucun', { size: 9 }), { after: 0 })]))]));
+    rows.push(row([cell(1700, [P(wr('Échantillons', { b: true, size: 9, color: '566360' }), { after: 0 })]), cell(7938, (ph.echantillons.length ? ph.echantillons.map(x => P(runsOf(`${x.id} · ${fmtVol(x.volume)} mL · ${x.moment} · ${x.labo} · ${x.analyses.join(', ') || 'aucune analyse'} — n° Scirius ${ps(x.scirius)}, n° Aramis ${ps(x.aramis)}`, { size: 9 }), { after: 30 })) : [P(wr('aucun', { size: 9 }), { after: 0 })]))]));
+    body.push(tbl([1700, 7938], rows));
+  });
+  const hdr = (ws, labels_) => row(labels_.map((t, k) => cell(ws[k], [P(wr(t, { b: true, size: 8.5 }), { after: 0 })], 'E1F0EC')));
+  const dat = (ws, vals) => row(vals.map((t, k) => cell(ws[k], [P(runsOf(String(t == null || t === '' ? '{{?n°}}' : t), { size: 8.5 }), { after: 0 })])));
+  if (r.reactifs.length) { const ws = [1900, 1200, 2600, 1500, 900, 1538]; body.push(P(wr('Réactifs'), { style: 'Heading2', keep: true })); body.push(tbl(ws, [hdr(ws, ['Réactif', 'N° Scirius', 'Emplacement', 'Fournisseur', 'Lot', 'Étape'])].concat(r.reactifs.map(x => dat(ws, [x.nom, x.scirius, x.emplacement, x.fournisseur, x.lot, x.etapes.join(', ')]))))); }
+  if (r.echantillons.length) { const ws = [700, 1500, 1500, 800, 1100, 1100, 1300, 1638]; body.push(P(wr('Échantillons'), { style: 'Heading2', keep: true })); body.push(tbl(ws, [hdr(ws, ['Éch.', 'Étape', 'Moment', 'Volume', 'N° Scirius', 'N° Aramis', 'Laboratoire', 'Analyses'])].concat(r.echantillons.map(x => dat(ws, [x.id, x.etape, x.moment, fmtVol(x.volume) + ' mL', x.scirius, x.aramis, x.labo, x.analyses.join(', ')]))))); }
+  if (m.lancee) { body.push(P(wr('Modifications après lancement'), { style: 'Heading2', keep: true })); if (m.journal.length) { const ws = [2000, 1300, 6338]; body.push(tbl(ws, [hdr(ws, ['Date et heure', 'Par', 'Modification'])].concat(m.journal.map(j => dat(ws, [fmtDT(j.t), j.par, j.txt]))))); } else body.push(P(wr('Aucune modification depuis le lancement.', { size: 9 }))); }
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body.join('')}<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="567" w:footer="567" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const sty = (id, name, size, color, extra = '') => `<w:style w:type="paragraph" w:styleId="${id}"><w:name w:val="${name}"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr>${extra}</w:pPr><w:rPr><w:b/><w:color w:val="${color}"/><w:sz w:val="${size}"/></w:rPr></w:style>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${NS}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:cs="Segoe UI"/><w:sz w:val="20"/><w:lang w:val="fr-FR"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>${sty('Title', 'Title', 40, '14201D', '<w:spacing w:after="120"/>')}${sty('Heading1', 'heading 1', 28, '0F6B5C', '<w:keepNext/><w:spacing w:before="280" w:after="100"/><w:outlineLvl w:val="0"/>')}${sty('Heading2', 'heading 2', 24, '0F6B5C', '<w:keepNext/><w:spacing w:before="200" w:after="80"/><w:outlineLvl w:val="1"/>')}${sty('Heading3', 'heading 3', 21, '14201D', '<w:keepNext/><w:spacing w:before="160" w:after="60"/><w:outlineLvl w:val="2"/>')}</w:styles>`;
+  const footer = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}><w:p><w:pPr><w:jc w:val="right"/></w:pPr>${wr('Document généré automatiquement - à relire avant diffusion   —   Page ', { size: 8, color: '566360' })}<w:r><w:rPr><w:sz w:val="16"/><w:color w:val="566360"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`;
+  const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>`;
+  const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const drels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>`;
+  return zipStore([{ name: '[Content_Types].xml', xml: ct }, { name: '_rels/.rels', xml: rels }, { name: 'word/document.xml', xml: doc }, { name: 'word/styles.xml', xml: styles }, { name: 'word/footer1.xml', xml: footer }, { name: 'word/_rels/document.xml.rels', xml: drels }]);
+}
+async function exportFileFor(kind, m) {
+  try {
+    const data = kind === 'pdf' ? buildPdf(m) : buildDocx(m);
+    const mime = kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    await saveFile(`${slug(m.nom)}.${kind === 'pdf' ? 'pdf' : 'docx'}`, new Blob([data], { type: mime }));
+  } catch (e) { toast('Export impossible : ' + (e && e.message ? e.message : 'erreur')); }
+}
+
+/* ====================== événements ====================== */
+const app = document.body;
+app.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-act]'); if (!t) return;
+  const f = ACT[t.dataset.act]; if (!f) return;
+  const r = f(t.dataset.id, t, ev); if (r === 'skip') return;
+  render();
+});
+let invTimer = null;
+function applyBind(el) {
+  const m = curManip(), parts = el.dataset.bind.split(':'), kind = parts[0], v = el.value; let redraw = false;
+  const numeric = ['duree', 'temperature', 'agitation', 'filtre', 'volume', 'temps', 'volumeDepart'];
+  const conv = f => numeric.includes(f) ? num(v) : v;
+  if (kind === 'ui') { S.ui[parts[1]] = v; render(); const q = $('#q'); if (q) { q.focus(); q.setSelectionRange(v.length, v.length); } return; }
+  if (kind === 'm') m[parts[1]] = v;
+  else if (kind === 'c') { m.contexte[parts[1]] = conv(parts[1]); if (parts[1] === 'type') redraw = true; }
+  else if (kind === 's') { const x = S.data.statuts[Number(parts[1])]; x[parts[2]] = v; if (parts[2] === 'ton') redraw = true; save(); if (redraw) render(); return; }
+  else if (kind === 'e') { const e = stepOf(parts[1]), f = parts[2];
+    if (f === 'videMbar') { if (e.vide) e.vide.mbar = num(v); } else { e[f] = conv(f); if (f === 'operation') redraw = true; } }
+  else if (kind === 'a') { stepOf(parts[1]).autres[Number(parts[2])][parts[3]] = v; }
+  else if (kind === 'r') { const e = stepOf(parts[1]), k = Number(parts[2]), f = parts[3]; e.reactifs[k][f] = v;
+    if (f === 'nom') redraw = true; }
+  else if (kind === 'k') { m.communes = m.communes || {}; if (parts[1] === 'videMbar') { if (m.communes.vide) m.communes.vide.mbar = num(v); } else m.communes[parts[1]] = num(v); }
+  else if (kind === 'l') { const l = S.data.labos[Number(parts[1])], f = parts[2];
+    if (f === 'nom') { const old = l.nom; S.data.manips.forEach(mm => mm.prelevements.forEach(p => { if (p.labo === old) p.labo = v; })); l.nom = v; } else l[f] = num(v); }
+  touch(m); save();
+  if (redraw) render(); else refresh();
+}
+app.addEventListener('input', ev => { const el = ev.target; if (el.dataset && el.dataset.bind && el.tagName !== 'SELECT') applyBind(el); });
+app.addEventListener('change', ev => {
+  const el = ev.target;
+  if (el.dataset && el.dataset.actChange === 'f-type') { S.ui.fType = el.value; render(); return; }
+  if (el.dataset && el.dataset.actChange === 'exp-fmt') { S.ui.modal.fmt = el.value; paintModal(); return; }
+  if (el.dataset && el.dataset.bind && el.tagName === 'SELECT') applyBind(el);
+});
+app.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.id === 't-new') { ev.preventDefault(); ACT['add-tag'](); render(); return; }
+  if (ev.key === 'Escape' && S.ui.modal) { S.ui.modal = null; paintModal(); } });
+
+/* ====================== démarrage ====================== */
+render();
+initPersist();
+</script>
+</body>
+</html>

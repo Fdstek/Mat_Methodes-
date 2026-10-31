@@ -1,0 +1,121 @@
+{
+  "source": "rapport_exemple.pdf",
+  "alertes": [],
+  "titre": "2. Matériel et méthodes",
+  "pages": [
+    1,
+    2
+  ],
+  "sous_sections": [
+    {
+      "titre": "2. Matériel et méthodes",
+      "pages": [],
+      "texte": ""
+    },
+    {
+      "titre": "2.1 Échantillon",
+      "pages": [
+        1
+      ],
+      "texte": "La graisse animale étudiée (lot 000412) a été fournie par le service R&D. Un volume de 1 000 mL a été utilisé comme volume de départ, dont 50 mL ont été prélevés avant traitement (échantillon S0)."
+    },
+    {
+      "titre": "2.2 Matériel et réactifs",
+      "pages": [
+        2
+      ],
+      "texte": "Le chauffage et l'agitation ont été assurés par une plaque chauffante agitatrice. La filtration a été réalisée sous vide avec un entonnoir Büchner, une fiole à vide et une membrane de 5 µm. Une ampoule à décanter de 500 mL et une étuve ont complété le montage. L'éthanol à 96 % et l'eau distillée ont servi de solvants."
+    },
+    {
+      "titre": "2.3 Méthodes",
+      "pages": [
+        2
+      ],
+      "texte": "La graisse a été chauffée à 60 °C pendant 30 min sous agitation (300 tr/min), puis filtrée sous vide sur membrane de 5 µm. Elle a ensuite été désacidifiée à l'éthanol 96 % (ratio 1:1 v/v) additionné d'eau distillée (5 % v/v) pendant 15 min à 25 °C dans une ampoule à décanter de 500 mL. La phase grasse a été décantée pendant 2 h à 40 °C, puis séchée à l'étuve à 105 °C pendant 1 h."
+    }
+  ],
+  "materiel": [
+    "plaque chauffante agitatrice",
+    "entonnoir Büchner",
+    "fiole à vide",
+    "ampoule à décanter",
+    "étuve",
+    "membrane"
+  ],
+  "reactifs": [
+    "éthanol 96 %",
+    "eau distillée"
+  ],
+  "etapes": [
+    {
+      "n": 1,
+      "operation": "chauffage",
+      "phrase": "La graisse a été chauffée à 60 °C pendant 30 min sous agitation (300 tr/min)",
+      "parametres": {
+        "temperature_c": 60.0,
+        "agitation_trmin": 300,
+        "duree_min": 30.0
+      },
+      "equipement": [],
+      "reactifs": [],
+      "a_verifier": false
+    },
+    {
+      "n": 2,
+      "operation": "filtration",
+      "phrase": "filtrée sous vide sur membrane de 5 µm",
+      "parametres": {
+        "filtre_um": 5.0
+      },
+      "equipement": [
+        "membrane"
+      ],
+      "reactifs": [],
+      "a_verifier": false
+    },
+    {
+      "n": 3,
+      "operation": "désacidification",
+      "phrase": "Elle a ensuite été désacidifiée à l'éthanol 96 % (ratio 1:1 v/v) additionné d'eau distillée (5 % v/v) pendant 15 min à 25 °C dans une ampoule à décanter de 500 mL",
+      "parametres": {
+        "temperature_c": 25.0,
+        "duree_min": 15.0,
+        "ratio": "1:1"
+      },
+      "equipement": [
+        "ampoule à décanter"
+      ],
+      "reactifs": [
+        "éthanol 96 %",
+        "eau distillée"
+      ],
+      "a_verifier": false
+    },
+    {
+      "n": 4,
+      "operation": "décantation",
+      "phrase": "La phase grasse a été décantée pendant 2 h à 40 °C",
+      "parametres": {
+        "temperature_c": 40.0,
+        "duree_min": 120.0
+      },
+      "equipement": [],
+      "reactifs": [],
+      "a_verifier": false
+    },
+    {
+      "n": 5,
+      "operation": "séchage",
+      "phrase": "séchée à l'étuve à 105 °C pendant 1 h",
+      "parametres": {
+        "temperature_c": 105.0,
+        "duree_min": 60.0
+      },
+      "equipement": [
+        "étuve"
+      ],
+      "reactifs": [],
+      "a_verifier": false
+    }
+  ]
+}
