@@ -9,6 +9,7 @@ from datetime import date
 
 from mat_methode.domain.models import (
     Etape,
+    Groupe,
     Lancement,
     LigneJournal,
     Manip,
@@ -18,7 +19,7 @@ from mat_methode.domain.models import (
     Vide,
 )
 from mat_methode.domain.prototype import contexte_depuis
-from mat_methode.domain.regles import echantillons_tries, etiquettes, numero_etape
+from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, numero_etape
 from mat_methode.domain.texte import cap, minuscule_initiale
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
 
@@ -53,11 +54,13 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                        "reactifs": [minuscule_initiale(x.nom) for x in e.reactifs if x.nom],
                        "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite} for x in e.reactifs],
                        "autres": [a.model_dump() for a in e.autres if a.nom], "remarque": e.remarque})
+        if m.groupe(e.groupe_id):
+            etapes[-1]["groupe"] = m.groupe(e.groupe_id).nom
     materiel: list[str] = []
     for e in m.etapes:
         materiel += [x for x in e.equipements if x not in materiel]
     used = reactifs_utilises(m)
-    return {
+    d = {
         "titre": m.nom, "contexte": contexte_vers(m), "version": m.rev, "enregistree_le": m.maj,
         "lancee": m.lancee.model_dump() if m.lancee else None, "journal": [j.model_dump() for j in m.journal],
         "etapes": etapes,
@@ -77,6 +80,13 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                                                                  for k in ("scirius", "emplacement", "fournisseur", "lot")}}
                                 for n, _ in used],
     }
+    grands = [(g, idx) for g, idx in blocs(m) if g is not None]
+    if grands:  # clé absente sans grande étape : format identique à celui du prototype
+        d["grandes_etapes"] = [{"nom": g.nom, "etapes": [i + 1 for i in idx]} for g, idx in grands]
+        for ph, x in zip(r.phases[1:], d["phases"][1:]):
+            if ph.groupe:
+                x["groupe"] = ph.groupe
+    return d
 
 
 class ImportInvalide(ValueError):
@@ -124,6 +134,15 @@ def importer(d, reglages: Reglages) -> tuple[Manip, list[int]]:
                   remarque=x.get("remarque") or "")
         if p.get("ratio") and len(e.reactifs) >= 1 and not e.reactifs[0].quantite:
             e.reactifs[0].quantite = f"{p['ratio'].replace(':', ' : ')} (v/v)" if ":" in p["ratio"] else p["ratio"]
+        nom_groupe = (x.get("groupe") or "").strip()
+        if nom_groupe:  # étapes consécutives de même nom = une grande étape
+            prec = m.groupe(m.etapes[-1].groupe_id) if m.etapes else None
+            if prec is None or prec.nom != nom_groupe:
+                prec = Groupe(nom=nom_groupe)
+                m.groupes.append(prec)
+            e.groupe_id = prec.id
+            if nom_groupe not in reglages.grandes_etapes:
+                reglages.grandes_etapes.append(nom_groupe)
         m.etapes.append(e)
         if x.get("a_verifier"):
             a_verifier.append(i + 1)

@@ -26,7 +26,7 @@ def operateur(m: Manip) -> str:
 
 def photo(m: Manip) -> dict:
     """Contenu suivi : demande, tags, étapes, échantillons."""
-    d = m.model_dump(include={"contexte", "tags", "etapes", "prelevements"})
+    d = m.model_dump(include={"contexte", "tags", "etapes", "prelevements", "groupes"})
     return d
 
 
@@ -59,6 +59,11 @@ def differences(a: dict, b: dict, m: Manip) -> list[str]:
     out += [f"Tag ajouté : #{t}" for t in tb if not any(norm(x) == norm(t) for x in ta)]
     out += [f"Tag retiré : #{t}" for t in ta if not any(norm(x) == norm(t) for x in tb)]
 
+    ga = {g["id"]: g["nom"] for g in a.get("groupes", [])}
+    gb = {g["id"]: g["nom"] for g in b.get("groupes", [])}
+    for k, nom in gb.items():
+        if k in ga and ga[k] != nom:
+            out.append(f"Grande étape renommée : {ga[k]} → {nom}")
     ea, eb = a.get("etapes", []), b.get("etapes", [])
     ia = {e["id"]: (e, i) for i, e in enumerate(ea)}
     ids_b = {e["id"] for e in eb}
@@ -67,11 +72,13 @@ def differences(a: dict, b: dict, m: Manip) -> list[str]:
     for i, e in enumerate(eb):
         lb = f"Étape {i + 1} · {cap(e['operation'])}"
         if e["id"] not in ia:
-            out.append(f"Étape ajoutée : {lb}")
+            out.append(f"Étape ajoutée : {lb}" + (f" (dans {gb[e['groupe_id']]})" if e.get("groupe_id") in gb else ""))
             continue
         oe, oi = ia[e["id"]]
         if ordre_a.index(e["id"]) != ordre_b.index(e["id"]):
             out.append(f"{lb} : déplacée (étape {oi + 1} → {i + 1})")
+        if oe.get("groupe_id") != e.get("groupe_id"):
+            out.append(f"{lb} : grande étape {ga.get(oe.get('groupe_id'), 'aucune')} → {gb.get(e.get('groupe_id'), 'aucune')}")
         for k, nom, u in SUIVI_ETAPE:
             if not _eq(oe.get(k), e.get(k)):
                 out.append(f"{lb} : {nom} {_v(oe.get(k))} → {_v(e.get(k))}{u}")

@@ -55,6 +55,7 @@ ETATS_DEFAUT = [Etat(id="brouillon", nom="Brouillon", ton="warn"),
 TYPES_DEFAUT = ["Support", "R&D", "Technologique", "Test d’idée"]
 ANALYSES_DEFAUT = ["FFA / indice d’acide", "Teneur en eau", "Impuretés insolubles", "Métaux (ICP)", "Phosphore"]
 DONNEURS_DEFAUT = ["Interne · R&D", "Interne · Production", "Client externe"]
+GRANDES_ETAPES_DEFAUT = ["Degumming", "Neutralisation", "Blanchiment", "Désodorisation", "Winterisation"]
 
 
 class Reglages(_Modele):
@@ -70,6 +71,7 @@ class Reglages(_Modele):
     types_demande: list[str] = Field(default_factory=lambda: list(TYPES_DEFAUT))
     etats: list[Etat] = Field(default_factory=lambda: [e.model_copy() for e in ETATS_DEFAUT])
     reactifs: list[ReactifInventaire] = Field(default_factory=list)
+    grandes_etapes: list[str] = Field(default_factory=lambda: list(GRANDES_ETAPES_DEFAUT))
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
@@ -129,6 +131,7 @@ class Etape(_Modele):
     autres: list[Condition] = Field(default_factory=list)
     reactifs: list[ReactifEtape] = Field(default_factory=list)
     remarque: str = ""
+    groupe_id: Optional[str] = None  # grande étape (Degumming…) qui contient cette étape
 
 
 class Prelevement(_Modele):
@@ -174,6 +177,12 @@ class LigneJournal(_Modele):
     txt: str
 
 
+class Groupe(_Modele):
+    """Grande étape (ex. Degumming) : regroupe des étapes consécutives du flux."""
+    id: str = Field(default_factory=nouvel_id)
+    nom: str
+
+
 class Manip(_Modele):
     schema_: int = Field(default=SCHEMA_DONNEES, alias="schema")
     id: str = Field(default_factory=nouvel_id)
@@ -190,6 +199,7 @@ class Manip(_Modele):
     communes: Communes = Field(default_factory=Communes)
     etapes: list[Etape] = Field(default_factory=list)
     prelevements: list[Prelevement] = Field(default_factory=list)
+    groupes: list[Groupe] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
@@ -199,6 +209,9 @@ class Manip(_Modele):
 
     def etape(self, ident: str | None) -> Optional[Etape]:
         return next((e for e in self.etapes if e.id == ident), None)
+
+    def groupe(self, ident: str | None) -> Optional[Groupe]:
+        return next((g for g in self.groupes if g.id == ident), None)
 
     def prelevement(self, ident: str) -> Optional[Prelevement]:
         return next((p for p in self.prelevements if p.id == ident), None)

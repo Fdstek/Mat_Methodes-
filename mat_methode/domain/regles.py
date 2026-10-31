@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from mat_methode.domain.catalogue import DEFAUTS_CONDITIONS, est_centrifugation
 from mat_methode.domain.models import (
     Etape,
+    Groupe,
     Manip,
     Prelevement,
     Reglages,
@@ -149,15 +150,92 @@ def heriter_communes(m: Manip, e: Etape) -> None:
 
 
 # ------------------------------------------------------------------ flux
-def ajouter_etape(m: Manip, operation: str, apres: int | None = None) -> Etape:
-    """Ajoute une étape à la fin, ou après l'index « apres » (-1 = au début). Hérite des communes."""
-    e = Etape(operation=operation.strip())
+def ajouter_etape(m: Manip, operation: str, apres: int | None = None, groupe_id: str | None = None) -> Etape:
+    """Ajoute une étape à la fin, ou après l'index « apres » (-1 = au début). Hérite des communes.
+
+    Sans grande étape demandée, une étape insérée au milieu d'une grande étape en fait partie."""
+    e = Etape(operation=operation.strip(), groupe_id=groupe_id)
     heriter_communes(m, e)
     if apres is None:
         m.etapes.append(e)
     else:
+        if groupe_id is None and 0 <= apres < len(m.etapes) - 1:
+            g = m.etapes[apres].groupe_id
+            if g and m.etapes[apres + 1].groupe_id == g:
+                e.groupe_id = g
         m.etapes.insert(apres + 1, e)
     return e
+
+
+# ------------------------------------------------------------------ grandes étapes
+def plage(nums: list[int]) -> str:
+    """[2, 3, 4] -> « étapes 2 à 4 » ; [3] -> « étape 3 » ; [2, 5] -> « étapes 2, 5 »."""
+    if not nums:
+        return "aucune étape"
+    if len(nums) == 1:
+        return f"étape {nums[0]}"
+    if nums == list(range(nums[0], nums[-1] + 1)):
+        return f"étapes {nums[0]} à {nums[-1]}"
+    return "étapes " + ", ".join(map(str, nums))
+
+
+def numeros_groupe(m: Manip, groupe_id: str) -> list[int]:
+    return [i + 1 for i, e in enumerate(m.etapes) if e.groupe_id == groupe_id]
+
+
+def blocs(m: Manip) -> list[tuple[Groupe | None, list[int]]]:
+    """Le flux découpé en blocs consécutifs : (grande étape ou None, index des étapes)."""
+    out: list[tuple[Groupe | None, list[int]]] = []
+    for i, e in enumerate(m.etapes):
+        g = m.groupe(e.groupe_id)
+        if out and out[-1][0] is g and g is not None:
+            out[-1][1].append(i)
+        else:
+            out.append((g, [i]))
+    return out
+
+
+def creer_groupe(m: Manip, nom: str) -> Groupe:
+    g = Groupe(nom=nom.strip() or "Grande étape")
+    m.groupes.append(g)
+    return g
+
+
+def placer_dans_groupe(m: Manip, etape_id: str, groupe_id: str | None) -> None:
+    """Range une étape dans une grande étape (ou l'en sort). L'étape est déplacée juste après la
+    dernière étape de la grande étape pour que celle-ci reste d'un seul tenant."""
+    e = m.etape(etape_id)
+    if e is None or e.groupe_id == groupe_id:
+        return
+    e.groupe_id = groupe_id
+    if groupe_id is None:
+        return
+    i = m.etapes.index(e)
+    autres = [k for k, x in enumerate(m.etapes) if x.groupe_id == groupe_id and x is not e]
+    if not autres or (i - 1 in autres or i + 1 in autres):
+        return  # déjà à côté de la grande étape : on ne bouge rien
+    m.etapes.remove(e)
+    dernier = max(k for k, x in enumerate(m.etapes) if x.groupe_id == groupe_id and x is not e)
+    m.etapes.insert(dernier + 1, e)
+
+
+def defaire_groupe(m: Manip, groupe_id: str) -> None:
+    """Supprime la grande étape ; ses étapes restent dans le flux."""
+    for e in m.etapes:
+        if e.groupe_id == groupe_id:
+            e.groupe_id = None
+    m.groupes = [g for g in m.groupes if g.id != groupe_id]
+
+
+def deplacer_groupe(m: Manip, groupe_id: str, sens: int) -> bool:
+    """Monte ou descend toute la grande étape d'un bloc."""
+    bl = blocs(m)
+    k = next((j for j, (g, _) in enumerate(bl) if g is not None and g.id == groupe_id), None)
+    if k is None or not 0 <= k + sens < len(bl):
+        return False
+    bl[k], bl[k + sens] = bl[k + sens], bl[k]
+    m.etapes = [m.etapes[i] for _, idx in bl for i in idx]
+    return True
 
 
 def dupliquer_etape(m: Manip, etape_id: str) -> Etape:
@@ -228,9 +306,13 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     c.maj = maintenant_iso()
     c.contexte.ref = ""
     c.contexte.lot = ""
-    corresp = {}
+    corresp, groupes = {}, {}
+    for g in c.groupes:
+        groupes[g.id] = g.id = nouvel_id()
     for e in c.etapes:
         corresp[e.id] = e.id = nouvel_id()
+        if e.groupe_id:
+            e.groupe_id = groupes.get(e.groupe_id)
     for p in c.prelevements:
         p.id = nouvel_id()
         if p.etape_id:

@@ -15,6 +15,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 from PIL import Image, ImageDraw, ImageFont
 
+from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_vol
 from mat_methode.exports.pdf import code_badge, conditions, moment_texte
 from mat_methode.exports.polices import trouver
@@ -91,7 +92,8 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
         tl, tfont, pas = _titre(tmp, e["operation"][:1].upper() + e["operation"][1:], cw - 72)
         extra = pas * (len(tl) - 1)
         ps = par_apres.get(e["n"], [])
-        cartes.append({"e": e, "ls": ls, "ps": ps, "tl": tl, "tfont": tfont, "pas": pas, "extra": extra, "h": 70 + extra + 30 * len(ls) + 90})
+        cartes.append({"e": e, "ls": ls, "ps": ps, "tl": tl, "tfont": tfont, "pas": pas, "extra": extra, "bande": 30 if e.get("groupe") else 0,
+                       "h": (30 if e.get("groupe") else 0) + 70 + extra + 30 * len(ls) + 90})
     nb = max(1, -(-len(etapes) // par_ligne))
     hauteurs = []
     for r in range(nb):
@@ -126,11 +128,18 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
             x = k * (cw + gap)
             e = c["e"]
             d.rounded_rectangle([x, y, x + cw, y + hc], 12, fill="white", outline="#BFCBC7", width=3)
-            d.ellipse([x + 12, y + 12, x + 48, y + 48], fill="#0F6B5C")
-            d.text((x + 30, y + 30), str(e["n"]), font=f_bs, fill="white", anchor="mm")
+            yt = y + c["bande"]
+            if c["bande"]:  # bandeau de la grande étape (ex. DEGUMMING)
+                d.rounded_rectangle([x + 2, y + 2, x + cw - 2, y + 30], 10, fill="#E1F0EC")
+                nom = e["groupe"].upper()
+                while len(nom) > 3 and d.textlength(nom, font=f_bs) > cw - 30:
+                    nom = nom[:-2] + "…"
+                d.text((x + 14, y + 16), nom, font=f_bs, fill="#0F6B5C", anchor="lm")
+            d.ellipse([x + 12, yt + 12, x + 48, yt + 48], fill="#0F6B5C")
+            d.text((x + 30, yt + 30), str(e["n"]), font=f_bs, fill="white", anchor="mm")
             for k_l, lg in enumerate(c["tl"]):
-                d.text((x + 60, y + 14 + k_l * c["pas"]), lg, font=c["tfont"], fill="#14201D")
-            ly = y + 62 + c["extra"]
+                d.text((x + 60, yt + 14 + k_l * c["pas"]), lg, font=c["tfont"], fill="#14201D")
+            ly = yt + 62 + c["extra"]
             for t, font, coul in c["ls"]:
                 d.text((x + 14, ly), t, font=font, fill=coul)
                 ly += 30
@@ -241,6 +250,9 @@ def ecrire_docx(data: dict, chemin) -> None:
     buf.seek(0)
     doc.add_picture(buf, width=Cm(17))
     doc.inline_shapes[-1]._inline.docPr.set("descr", "Schéma du flux : une carte par étape, badges des échantillons sur la frise du temps")
+    if data.get("grandes_etapes"):
+        ecrire(doc.add_paragraph(), "Grandes étapes : " + " ; ".join(f"{g['nom']} ({plage(g['etapes'])})" for g in data["grandes_etapes"]) + ".",
+               8.5, couleur=MUTED)
     vd = ctx.get("volumeDepart")
     if vd is not None:
         pris = sum(p["volume_ml"] or 0 for p in pre)
@@ -261,7 +273,7 @@ def ecrire_docx(data: dict, chemin) -> None:
             entete = f"{ctx.get('matiere') or ''} (lot {manque(ctx.get('lot'))})" + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
         else:
             entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "")
-        lignes = [(ph["titre"], entete)]
+        lignes = [((ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"], entete)]
         if i:
             lignes.append(("Réactifs", "\n".join(
                 f"{r['nom']}{' · ' + r['quantite'] if r.get('quantite') else ''} — n° Scirius {manque(r.get('scirius'))}, "

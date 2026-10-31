@@ -19,6 +19,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Flowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_num, fmt_vol
 from mat_methode.exports.polices import trouver
 
@@ -140,7 +141,7 @@ class Flux(Flowable):
                 if texte:
                     lignes += [(ln, police, taille, couleur) for ln in simpleSplit(texte, police, taille, w - 6 * mm)]
             frise = bool(e["parametres"].get("duree_min") or self.par_apres.get(e["n"]))
-            h = 12 * mm + (len(titre) - 1) * (taille_t + 1.2) + sum(t + 1.6 for _, _, t, _ in lignes) + (11 * mm if frise else 3 * mm)
+            h = (4.5 * mm if e.get("groupe") else 0) + 12 * mm + (len(titre) - 1) * (taille_t + 1.2) + sum(t + 1.6 for _, _, t, _ in lignes) + (11 * mm if frise else 3 * mm)
             if h <= 75 * mm:
                 break
         return {"titre": titre, "taille_t": taille_t, "lignes": lignes, "h": h}
@@ -214,16 +215,27 @@ class Flux(Flowable):
             c.setStrokeColor(LINE)
             c.setLineWidth(1)
             c.roundRect(cx, cy, w, h, 2.5 * mm, stroke=1, fill=1)
+            haut = cy + h
+            if e.get("groupe"):  # bandeau de la grande étape (ex. DEGUMMING)
+                c.setFillColor(TEAL_L)
+                c.roundRect(cx + 0.5, cy + h - 4.5 * mm, w - 1, 4.5 * mm - 0.5, 2.2 * mm, stroke=0, fill=1)
+                c.setFillColor(TEAL)
+                c.setFont(self.fontb, 6)
+                nom = e["groupe"].upper()
+                while len(nom) > 3 and stringWidth(nom, self.fontb, 6) > w - 5 * mm:
+                    nom = nom[:-2] + "…"
+                c.drawString(cx + 2.5 * mm, cy + h - 3.1 * mm, nom)
+                haut = cy + h - 4.5 * mm
             c.setFillColor(TEAL)
-            c.circle(cx + 4.6 * mm, cy + h - 5 * mm, 3 * mm, stroke=0, fill=1)
+            c.circle(cx + 4.6 * mm, haut - 5 * mm, 3 * mm, stroke=0, fill=1)
             c.setFillColor(colors.white)
             c.setFont(self.fontb, 7.5)
-            c.drawCentredString(cx + 4.6 * mm, cy + h - 6.2 * mm, str(e["n"]))
+            c.drawCentredString(cx + 4.6 * mm, haut - 6.2 * mm, str(e["n"]))
             c.setFillColor(INK)
             for k_l, ligne in enumerate(ct["titre"]):
                 c.setFont(self.fontb, ct["taille_t"])
-                c.drawString(cx + 9 * mm, cy + h - 6 * mm - k_l * (ct["taille_t"] + 1.2), ligne)
-            y = cy + h - 12 * mm - (len(ct["titre"]) - 1) * (ct["taille_t"] + 1.2)
+                c.drawString(cx + 9 * mm, haut - 6 * mm - k_l * (ct["taille_t"] + 1.2), ligne)
+            y = haut - 12 * mm - (len(ct["titre"]) - 1) * (ct["taille_t"] + 1.2)
             for ligne, police, taille, couleur in ct["lignes"]:
                 c.setFont(police, taille)
                 c.setFillColor(couleur)
@@ -284,7 +296,8 @@ def blocs_phases(data: dict, corps) -> list:
         else:
             sous = escape(ph.get("conditions") or "conditions à compléter") + (
                 f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "")
-        lignes = [[Paragraph(f"<b>{escape(ph['titre'])}</b>", petit), Paragraph(sous, petit)]]
+        tete = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
+        lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
         if i:
             txt = "<br/>".join(
                 f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
@@ -352,6 +365,9 @@ def ecrire_pdf(data: dict, chemin) -> None:
     total = sum(e["parametres"].get("duree_min") or 0 for e in etapes)
     legende = (f"Durée cumulée des étapes chronométrées : {fmt_dur(total)}. Chaque prélèvement a un badge : dans la carte de l’étape, "
                "posé à son moment sur la frise (à l’extrémité droite pour un prélèvement à l’effluent), et sous la carte avec son nom, son volume et son moment.")
+    if data.get("grandes_etapes"):
+        legende += " Grandes étapes (bandeau en haut des cartes) : " + " ; ".join(
+            f"{g['nom']} ({plage(g['etapes'])})" for g in data["grandes_etapes"]) + "."
     vd = ctx.get("volumeDepart")
     if vd is not None:
         pris = sum(p["volume_ml"] or 0 for p in pre)

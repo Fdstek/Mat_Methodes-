@@ -132,6 +132,7 @@ class PageFlux(QWidget):
         self.mode = "def"
         self.etape_id = DEPART
         self.inserer_apres: int | None = None
+        self.groupe_cible: str | None = None  # grande étape où vont les étapes ajoutées
         self.remplacer = False
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
@@ -148,6 +149,7 @@ class PageFlux(QWidget):
         self.mode = mode
         self.etape_id = DEPART
         self.inserer_apres = None
+        self.groupe_cible = None
 
     # ------------------------------------------------------------ rendu
     def rafraichir(self, structure: bool = True):
@@ -357,31 +359,31 @@ class PageFlux(QWidget):
         else:
             cl.addWidget(etiquette("Aucune étape pour l’instant.", secondaire=True))
         catalogue = list(OPERATIONS)
-        for i, e in enumerate(m.etapes):
-            sf = QFrame()
-            sf.setObjectName("sousCarte")
-            h = QHBoxLayout(sf)
-            h.setContentsMargins(10, 6, 10, 6)
-            h.addWidget(numero(i + 1))
-            op = Liste(catalogue, e.operation, vide=None, libelles={o: cap(o) for o in catalogue + [e.operation]})
-            op.setAccessibleName(f"Opération de l’étape {i + 1}")
-            op.choisi.connect(lambda v, e=e: (setattr(e, "operation", v), self._toucher(True)))
-            h.addWidget(op, 1)
-            haut = icone("↑", f"Monter l’étape {i + 1}", lambda e=e: self._deplacer(e, -1))
-            haut.setEnabled(i > 0)
-            bas = icone("↓", f"Descendre l’étape {i + 1}", lambda e=e: self._deplacer(e, 1))
-            bas.setEnabled(i < len(m.etapes) - 1)
-            h.addWidget(haut)
-            h.addWidget(bas)
-            h.addWidget(icone("⧉", f"Dupliquer l’étape {i + 1}", lambda e=e: self._dupliquer_etape(e)))
-            h.addWidget(bouton("+ Insérer après", lambda i=i: self._inserer(i)))
-            h.addWidget(icone("✕", f"Supprimer l’étape {i + 1}", lambda e=e: self._supprimer_etape(e), danger=True))
-            cl.addWidget(sf)
-        ia = self.inserer_apres
-        q = (f"Insérer {'au début' if ia < 0 else f'après l’étape {ia + 1}'} : que fais-tu ?" if ia is not None
-             else f"Étape {len(m.etapes) + 1} : que fais-tu {'ensuite' if m.etapes else 'en premier'} ?")
+        groupes_vus = set()
+        for g, idx in R.blocs(m):
+            if g is None:
+                for i in idx:
+                    cl.addWidget(self._ligne_etape(i, catalogue))
+                continue
+            groupes_vus.add(g.id)
+            cl.addWidget(self._bloc_groupe(g, idx, catalogue))
+        for g in m.groupes:  # grande étape encore vide
+            if g.id not in groupes_vus:
+                cl.addWidget(self._bloc_groupe(g, [], catalogue))
+        ia, gc = self.inserer_apres, m.groupe(self.groupe_cible)
+        if gc is None:
+            self.groupe_cible = None
+        if gc is not None:
+            nums = R.numeros_groupe(m, gc.id)
+            q = f"{gc.nom} · étape {(nums[-1] + 1) if nums else len(m.etapes) + 1} : que fais-tu dans cette grande étape ?"
+        elif ia is not None:
+            q = f"Insérer {'au début' if ia < 0 else f'après l’étape {ia + 1}'} : que fais-tu ?"
+        else:
+            q = f"Étape {len(m.etapes) + 1} : que fais-tu {'ensuite' if m.etapes else 'en premier'} ?"
         cl.addWidget(etiquette(q, "titreCarte"))
-        if ia is not None:
+        if gc is not None:
+            cl.addWidget(ligne(bouton(f"Terminer « {gc.nom} »", self._finir_groupe), "stretch"))
+        elif ia is not None:
             cl.addWidget(ligne(bouton("Annuler l’insertion", lambda: self._inserer(None)), "stretch"))
         grille = QGridLayout()
         for k, o in enumerate(catalogue):
@@ -390,12 +392,105 @@ class PageFlux(QWidget):
         autre = ChampTexte("", "Ex. neutralisation")
         autre.returnPressed.connect(lambda: self._ajouter_etape(autre.text()))
         cl.addWidget(ligne(champ("Autre étape", autre), bouton("Ajouter", lambda: self._ajouter_etape(autre.text())), "stretch"))
+        # grandes étapes (Degumming…)
+        grand = Liste(self.ctrl.reglages.grandes_etapes, "", vide="Choisir…")
+        grand.setAccessibleName("Grande étape à commencer")
+        autre_g = ChampTexte("", "ou un autre nom")
+        autre_g.setMaximumWidth(200)
+        commencer = lambda: self._commencer_groupe(autre_g.text().strip() or grand.currentData() or "")
+        autre_g.returnPressed.connect(commencer)
+        cl.addWidget(ligne(champ("Grande étape (regroupe plusieurs étapes, ex. Degumming)", grand), autre_g,
+                           bouton("+ Commencer une grande étape", commencer), "stretch"))
         lay.addWidget(f)
         lay.addWidget(self._communes())
         b = bouton("Mon flux est prêt : compléter les étapes  →", self._vers_completer, accent=True)
         b.setEnabled(bool(m.etapes))
         lay.addWidget(ligne(b, "stretch"))
         return w
+
+    def _ligne_etape(self, i: int, catalogue: list[str], dans_groupe: bool = False) -> QWidget:
+        m, e = self.m, self.m.etapes[i]
+        sf = QFrame()
+        sf.setObjectName("sousCarte")
+        h = QHBoxLayout(sf)
+        h.setContentsMargins(10, 6, 10, 6)
+        h.addWidget(numero(i + 1))
+        op = Liste(catalogue, e.operation, vide=None, libelles={o: cap(o) for o in catalogue + [e.operation]})
+        op.setAccessibleName(f"Opération de l’étape {i + 1}")
+        op.choisi.connect(lambda v, e=e: (setattr(e, "operation", v), self._toucher(True)))
+        h.addWidget(op, 1)
+        if m.groupes:  # ranger l'étape dans une grande étape
+            choix = {g.id: f"{g.nom} ({R.plage(R.numeros_groupe(m, g.id))})" for g in m.groupes}
+            gr = Liste(list(choix), e.groupe_id or "", vide="Hors grande étape", libelles=choix)
+            gr.setAccessibleName(f"Grande étape de l’étape {i + 1}")
+            gr.setMaximumWidth(230)
+            gr.choisi.connect(lambda v, e=e: (R.placer_dans_groupe(m, e.id, v or None), self._toucher(True)))
+            h.addWidget(gr)
+        haut = icone("↑", f"Monter l’étape {i + 1}", lambda e=e: self._deplacer(e, -1))
+        haut.setEnabled(i > 0)
+        bas = icone("↓", f"Descendre l’étape {i + 1}", lambda e=e: self._deplacer(e, 1))
+        bas.setEnabled(i < len(m.etapes) - 1)
+        h.addWidget(haut)
+        h.addWidget(bas)
+        h.addWidget(icone("⧉", f"Dupliquer l’étape {i + 1}", lambda e=e: self._dupliquer_etape(e)))
+        h.addWidget(bouton("+ Insérer après", lambda i=i: self._inserer(i)))
+        h.addWidget(icone("✕", f"Supprimer l’étape {i + 1}", lambda e=e: self._supprimer_etape(e), danger=True))
+        return sf
+
+    def _bloc_groupe(self, g, idx: list[int], catalogue: list[str]) -> QWidget:
+        """Cadre d'une grande étape : nom, ses étapes, ajout d'une sous-étape."""
+        m, p = self.m, theme.P
+        f = QFrame()
+        f.setObjectName("groupe")
+        f.setStyleSheet(f"QFrame#groupe{{border:1px solid {p.accent};border-left:4px solid {p.accent};border-radius:8px;background:{p.info_fond};}}")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(10, 8, 10, 10)
+        v.setSpacing(6)
+        nom = Liste(self.ctrl.reglages.grandes_etapes, g.nom, vide=None)
+        nom.setAccessibleName("Nom de la grande étape")
+        nom.choisi.connect(lambda val, g=g: (setattr(g, "nom", val), self._toucher(True)))
+        titre = etiquette(f"GRANDE ÉTAPE · {R.plage([i + 1 for i in idx])}" if idx else "GRANDE ÉTAPE · vide", "etiquetteChamp")
+        titre.setStyleSheet(f"color:{p.accent};font-weight:700;")
+        haut = icone("↑", f"Monter la grande étape {g.nom}", lambda: (R.deplacer_groupe(m, g.id, -1), self._toucher(True)))
+        bas = icone("↓", f"Descendre la grande étape {g.nom}", lambda: (R.deplacer_groupe(m, g.id, 1), self._toucher(True)))
+        haut.setEnabled(bool(idx) and idx[0] > 0)
+        bas.setEnabled(bool(idx) and idx[-1] < len(m.etapes) - 1)
+        v.addWidget(ligne(titre, nom, "stretch", haut, bas,
+                          bouton("+ Ajouter une sous-étape", lambda: self._viser_groupe(g.id)),
+                          bouton("Défaire", lambda: self._defaire_groupe(g), tip=f"Défaire la grande étape {g.nom} (ses étapes restent dans le flux)")))
+        for i in idx:
+            v.addWidget(self._ligne_etape(i, catalogue, dans_groupe=True))
+        if not idx:
+            v.addWidget(etiquette("Aucune sous-étape : choisis une opération ci-dessous.", secondaire=True))
+        return f
+
+    def _commencer_groupe(self, nom: str):
+        if not nom:
+            self.ctrl.toast.emit("Choisis le nom de la grande étape")
+            return
+        if nom not in self.ctrl.reglages.grandes_etapes:
+            self.ctrl.reglages.grandes_etapes.append(nom)
+            self.ctrl.toucher_reglages()
+        g = R.creer_groupe(self.m, nom)
+        self.groupe_cible, self.inserer_apres = g.id, None
+        self._toucher(True)
+        self.ctrl.toast.emit(f"Grande étape « {nom} » : ajoute ses sous-étapes")
+
+    def _viser_groupe(self, gid):
+        self.groupe_cible, self.inserer_apres = gid, None
+        self.rafraichir()
+
+    def _finir_groupe(self):
+        self.groupe_cible = None
+        self.rafraichir()
+
+    def _defaire_groupe(self, g):
+        self.ctrl.memoriser_manip()
+        R.defaire_groupe(self.m, g.id)
+        if self.groupe_cible == g.id:
+            self.groupe_cible = None
+        self._toucher(True)
+        self.ctrl.toast.emit(f"Grande étape « {g.nom} » défaite : ses étapes restent (Ctrl+Z pour annuler)")
 
     def _communes(self) -> QWidget:
         m, c = self.m, self.m.communes
@@ -455,13 +550,19 @@ class PageFlux(QWidget):
         if not op:
             self.ctrl.toast.emit("Écris le nom de l’étape")
             return
-        R.ajouter_etape(self.m, op, self.inserer_apres)
-        if self.inserer_apres is not None:
-            self.inserer_apres += 1
+        gc = self.m.groupe(self.groupe_cible)
+        if gc is not None:  # ajout dans la grande étape en cours, après sa dernière sous-étape
+            nums = R.numeros_groupe(self.m, gc.id)
+            R.ajouter_etape(self.m, op, nums[-1] - 1 if nums else None, groupe_id=gc.id)
+        else:
+            R.ajouter_etape(self.m, op, self.inserer_apres)
+            if self.inserer_apres is not None:
+                self.inserer_apres += 1
         self._toucher(True)
 
     def _inserer(self, i):
         self.inserer_apres = i
+        self.groupe_cible = None
         self.rafraichir()
 
     def _deplacer(self, e, sens):
@@ -526,7 +627,28 @@ class PageFlux(QWidget):
         for p in dep:
             c.layout().addWidget(pill(p))
         lay.addWidget(c)
+        cible, cadre = lay, None
         for i, e in enumerate(m.etapes):
+            g = m.groupe(e.groupe_id)
+            debut = g is not None and (i == 0 or m.etapes[i - 1].groupe_id != g.id)
+            if g is None:
+                cible = lay
+            elif debut:  # cadre de la grande étape (ex. DEGUMMING · étapes 2 à 4)
+                fin = i
+                while fin + 1 < len(m.etapes) and m.etapes[fin + 1].groupe_id == g.id:
+                    fin += 1
+                cadre = QFrame()
+                cadre.setObjectName("groupe")
+                cadre.setStyleSheet(f"QFrame#groupe{{border:1px solid {theme.P.accent};border-left:4px solid {theme.P.accent};"
+                                    f"border-radius:8px;background:{theme.P.info_fond};}}")
+                cv = QVBoxLayout(cadre)
+                cv.setContentsMargins(6, 6, 6, 6)
+                cv.setSpacing(6)
+                t = etiquette(f"{g.nom.upper()} · {R.plage(list(range(i + 1, fin + 2)))}", "etiquetteChamp")
+                t.setStyleSheet(f"color:{theme.P.accent};font-weight:700;padding-left:4px;")
+                cv.addWidget(t)
+                lay.addWidget(cadre)
+                cible = cv
             c = self._carte_flux(e.id, i + 1, cap(e.operation))
             cl = c.layout()
             for r in e.reactifs:
@@ -541,7 +663,7 @@ class PageFlux(QWidget):
                 cl.addWidget(Frise(e.duree_min, [(position(p, e), code_badge(lab[p.id])) for p in ps]))
             for p in ps:
                 cl.addWidget(pill(p))
-            lay.addWidget(c)
+            cible.addWidget(c)
 
     def _carte_flux(self, ident, n, titre) -> QFrame:
         f = QFrame()
@@ -608,6 +730,11 @@ class PageFlux(QWidget):
             lay.addWidget(f)
         else:
             i = m.etapes.index(e)
+            g = m.groupe(e.groupe_id)
+            if g is not None:
+                gl = etiquette(f"{g.nom} · {R.plage(R.numeros_groupe(m, g.id))}", "etiquetteChamp")
+                gl.setStyleSheet(f"color:{theme.P.accent};font-weight:700;")
+                lay.addWidget(gl)
             lay.addWidget(ligne(numero(i + 1, 28), etiquette(cap(e.operation), "sousTitre"), "stretch"))
             lay.addWidget(self._conditions(e))
             lay.addWidget(self._reactifs(e))
