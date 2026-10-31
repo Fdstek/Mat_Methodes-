@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
-from mat_methode.domain.models import ARCHIVEE, Manip, Reglages, maintenant_iso
+from mat_methode.domain.models import ARCHIVEE, NON_REALISEE, Manip, Reglages, maintenant_iso
 from mat_methode.domain.prototype import exemples
 from mat_methode.domain.texte import fmt_dt
 from mat_methode.storage.stockage import Liste, Stockage, Verrou
@@ -305,7 +305,7 @@ class Controleur(QObject):
         for m in ms:
             if m.id in ids:
                 self.manips = [x for x in self.manips if x.id != m.id]
-            if m.etat != ARCHIVEE and not self.reglages.etat(m.etat):
+            if m.etat not in (ARCHIVEE, NON_REALISEE) and not self.reglages.etat(m.etat):
                 m.etat = self.reglages.etat_initial()
             self.manips.append(m)
             if not self.st.lecture_seule:

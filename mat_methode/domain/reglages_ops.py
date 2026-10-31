@@ -2,8 +2,8 @@
 (à enregistrer) et, si utile, un message court."""
 from __future__ import annotations
 
-from mat_methode.domain.models import ARCHIVEE, Etat, Laboratoire, Manip, Reglages, nouvel_id
-from mat_methode.domain.texte import norm
+from mat_methode.domain.models import ARCHIVEE, NON_REALISEE, Etat, Laboratoire, Manip, Operation, Reglages, nouvel_id
+from mat_methode.domain.texte import minuscule_initiale, norm
 
 
 def ajouter_laboratoire(r: Reglages, nom: str) -> bool:
@@ -116,6 +116,167 @@ def retirer_tag_partout(manips: list[Manip], tag: str) -> list[Manip]:
         if len(m.tags) != avant:
             changees.append(m)
     return changees
+
+
+# ------------------------------------------------------------------ renommer (met à jour les manips)
+def _renommer_liste(liste: list[str], ancien: str, nouveau: str) -> bool:
+    """Renomme dans une liste de chaînes ; refuse un nom vide ou déjà pris par une autre entrée."""
+    nouveau = nouveau.strip()
+    if not nouveau or ancien not in liste or nouveau == ancien:
+        return False
+    if any(norm(x) == norm(nouveau) and x != ancien for x in liste):
+        return False
+    liste[liste.index(ancien)] = nouveau
+    return True
+
+
+def renommer_donneur(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    if not _renommer_liste(r.donneurs_ordre, ancien, nouveau):
+        return []
+    ch = [m for m in manips if m.contexte.donneur == ancien]
+    for m in ch:
+        m.contexte.donneur = nouveau.strip()
+    return ch
+
+
+def renommer_type(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    if not _renommer_liste(r.types_demande, ancien, nouveau):
+        return []
+    ch = [m for m in manips if m.contexte.type == ancien]
+    for m in ch:
+        m.contexte.type = nouveau.strip()
+    return ch
+
+
+def renommer_analyse(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    if not _renommer_liste(r.analyses, ancien, nouveau):
+        return []
+    nouveau = nouveau.strip()
+    for lab in r.laboratoires:
+        lab.analyses = [nouveau if a == ancien else a for a in lab.analyses]
+    ch = []
+    for m in manips:
+        if any(ancien in p.analyses for p in m.prelevements):
+            for p in m.prelevements:
+                p.analyses = [nouveau if a == ancien else a for a in p.analyses]
+            ch.append(m)
+    return ch
+
+
+def renommer_grande_etape(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    if not _renommer_liste(r.grandes_etapes, ancien, nouveau):
+        return []
+    ch = []
+    for m in manips:
+        gs = [g for g in m.groupes if g.nom == ancien]
+        for g in gs:
+            g.nom = nouveau.strip()
+        if gs:
+            ch.append(m)
+    return ch
+
+
+def renommer_reactif(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    """Le n° Scirius, l'emplacement, le fournisseur et le lot mémorisés suivent le nouveau nom."""
+    nouveau = nouveau.strip()
+    x = r.reactif(ancien)
+    if x is None or not nouveau or nouveau == x.nom or (r.reactif(nouveau) and norm(nouveau) != norm(ancien)):
+        return []
+    x.nom = nouveau
+    ch = []
+    for m in manips:
+        touche = False
+        for e in m.etapes:
+            for re_ in e.reactifs:
+                if norm(re_.nom) == norm(ancien):
+                    re_.nom, touche = nouveau, True
+        if touche:
+            ch.append(m)
+    return ch
+
+
+def renommer_tag(manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    """Renomme un tag dans toutes les manips (sans créer de doublon)."""
+    nouveau = nouveau.strip().lstrip("#").strip()
+    if not nouveau:
+        return []
+    ch = []
+    for m in manips:
+        if not any(norm(t) == norm(ancien) for t in m.tags):
+            continue
+        tags: list[str] = []
+        for t in m.tags:
+            v = nouveau if norm(t) == norm(ancien) else t
+            if not any(norm(v) == norm(x) for x in tags):
+                tags.append(v)
+        if tags != m.tags:
+            m.tags = tags
+            ch.append(m)
+    return ch
+
+
+# ------------------------------------------------------------------ opérations (sous-étapes)
+def ajouter_operation(r: Reglages, nom: str, participe: str = "") -> bool:
+    nom = minuscule_initiale(nom.strip())
+    if not nom or r.operation(nom):
+        return False
+    r.operations.append(Operation(nom=nom, participe=participe.strip()))
+    return True
+
+
+def renommer_operation(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    """Renomme l'opération dans la liste et dans les étapes de toutes les manips."""
+    nouveau = minuscule_initiale(nouveau.strip())
+    o = r.operation(ancien)
+    if o is None or not nouveau or nouveau == o.nom or (r.operation(nouveau) and norm(nouveau) != norm(ancien)):
+        return []
+    ancien_nom, o.nom = o.nom, nouveau
+    ch = []
+    for m in manips:
+        es = [e for e in m.etapes if norm(e.operation) == norm(ancien_nom)]
+        for e in es:
+            e.operation = nouveau
+        if es:
+            ch.append(m)
+    return ch
+
+
+def supprimer_operation(r: Reglages, nom: str) -> None:
+    """Retire l'opération de la liste ; les étapes existantes gardent leur nom."""
+    r.operations = [o for o in r.operations if o.nom != nom]
+
+
+def deplacer_operation(r: Reglages, index: int, sens: int) -> bool:
+    j = index + sens
+    if not (0 <= index < len(r.operations) and 0 <= j < len(r.operations)):
+        return False
+    r.operations[index], r.operations[j] = r.operations[j], r.operations[index]
+    return True
+
+
+# ------------------------------------------------------------------ non réalisée
+def basculer_non_realisee(r: Reglages, m: Manip) -> bool:
+    """Marque la manip « non réalisée » (ou revient au premier état). Retourne True si elle vient d'être marquée."""
+    if m.etat == NON_REALISEE:
+        m.etat = r.etat_initial()
+        return False
+    m.etat = NON_REALISEE
+    return True
+
+
+def peut_supprimer(m: Manip) -> bool:
+    """Seules les manips archivées ou non réalisées peuvent être supprimées."""
+    return m.etat in (ARCHIVEE, NON_REALISEE)
+
+
+def nom_etat(r: Reglages, ident: str) -> tuple[str, str]:
+    """(libellé, ton) d'un état, y compris les états fixes."""
+    if ident == ARCHIVEE:
+        return "Archivée", "neutre"
+    if ident == NON_REALISEE:
+        return "Non réalisée", "danger"
+    e = r.etat(ident)
+    return (e.nom, e.ton) if e else ("—", "neutre")
 
 
 def archiver_ou_restaurer(r: Reglages, m: Manip) -> bool:

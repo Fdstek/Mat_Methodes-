@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import regles as R
-from mat_methode.domain.models import ARCHIVEE
+from mat_methode.domain.models import ARCHIVEE, NON_REALISEE
 from mat_methode.domain.texte import fmt_dt, fmt_vol
 from mat_methode.report.rapport import REPERE, construire, markdown, mention_modifiee
 from mat_methode.ui import theme
@@ -81,8 +81,8 @@ class PageRapport(QWidget):
             return
         vider(self.lay)
         rap = construire(m, r)
-        etats = [e.id for e in r.etats] + ([ARCHIVEE] if m.etat == ARCHIVEE else [])
-        etat = Liste(etats, m.etat, vide=None, libelles={**{e.id: e.nom for e in r.etats}, ARCHIVEE: "Archivée"})
+        etats = [e.id for e in r.etats] + [NON_REALISEE] + ([ARCHIVEE] if m.etat == ARCHIVEE else [])
+        etat = Liste(etats, m.etat, vide=None, libelles={**{e.id: e.nom for e in r.etats}, ARCHIVEE: "Archivée", NON_REALISEE: "Non réalisée"})
         etat.setAccessibleName("État de la manip")
         etat.choisi.connect(lambda v: (setattr(m, "etat", v), self.ctrl.toucher(m)))
         etat.setEnabled(not self.ctrl.lecture_seule)

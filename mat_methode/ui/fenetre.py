@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode import NOM_APPLICATION
+from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.models import ARCHIVEE
 from mat_methode.domain.texte import nom_fichier
 from mat_methode.exports.echange import ImportInvalide, importer
@@ -207,8 +208,7 @@ class Fenetre(QMainWindow):
             self.p_reglages.rafraichir()
         elif m is not None:
             self.titre.setText(m.nom if self.page == "flux" else f"Rapport · {m.nom}")
-            e = ctrl.reglages.etat(m.etat)
-            sous.addWidget(etiquette("Archivée" if m.etat == ARCHIVEE else (e.nom if e else ""), secondaire=True))
+            sous.addWidget(etiquette(O.nom_etat(ctrl.reglages, m.etat)[0], secondaire=True))
             if ctrl.lecture_seule:
                 sous.addWidget(pastille("Lecture seule", "info"))
             sous.addStretch(1)
@@ -221,10 +221,9 @@ class Fenetre(QMainWindow):
         self.carte_manip.setVisible(m is not None)
         if m is None:
             return
-        e = self.ctrl.reglages.etat(m.etat)
         self.cm_nom.setText(m.nom)
         ne = len(m.etapes)
-        self.cm_info.setText(f"{'Archivée' if m.etat == ARCHIVEE else (e.nom if e else '')} · {ne} étape{'s' if ne > 1 else ''} · "
+        self.cm_info.setText(f"{O.nom_etat(self.ctrl.reglages, m.etat)[0]} · {ne} étape{'s' if ne > 1 else ''} · "
                              f"{len(m.prelevements)} éch.")
 
     def _texte_statut(self) -> str:

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
-from mat_methode.domain.catalogue import OPERATIONS, est_centrifugation
+from mat_methode.domain.catalogue import est_centrifugation
 from mat_methode.domain.models import Condition, ReactifEtape
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol
@@ -358,7 +358,7 @@ class PageFlux(QWidget):
             cl.addWidget(ligne(bouton("+  Insérer une étape au début", lambda: self._inserer(-1)), "stretch"))
         else:
             cl.addWidget(etiquette("Aucune étape pour l’instant.", secondaire=True))
-        catalogue = list(OPERATIONS)
+        catalogue = [o.nom for o in self.ctrl.reglages.operations]
         groupes_vus = set()
         for g, idx in R.blocs(m):
             if g is None:

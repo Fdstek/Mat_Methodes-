@@ -93,6 +93,25 @@ def informer(parent, titre: str, message: str) -> None:
     d.exec()
 
 
+def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str = "") -> str | None:
+    """Petite fenêtre de saisie (renommer). Retourne le texte, ou None si annulé."""
+    d = Dialogue(parent, titre)
+    if aide:
+        d.lay.addWidget(etiquette(aide, secondaire=True, wrap=True))
+    champ_ = ChampTexte(valeur)
+    champ_.selectAll()
+    d.lay.addWidget(champ(libelle, champ_))
+    d.boutons.addWidget(bouton("Annuler", d.reject))
+    ok = bouton("Renommer", d.accept, accent=True)
+    ok.setDefault(True)
+    d.boutons.addWidget(ok)
+    d.finir()
+    champ_.setFocus()
+    if d.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return champ_.text().strip()
+
+
 def nouvelle_manip(parent, manips: list[tuple[str, str]]) -> tuple[str, str] | None:
     """Retourne (nom, id de la manip de départ ou "")."""
     d = Dialogue(parent, "Nouvelle manip")

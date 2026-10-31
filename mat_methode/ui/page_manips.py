@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
-from mat_methode.domain.models import ARCHIVEE
+from mat_methode.domain.models import ARCHIVEE, NON_REALISEE
 from mat_methode.domain.regles import tous_les_tags
 from mat_methode.domain.texte import fmt_dt, norm
 from mat_methode.ui import theme
@@ -48,7 +48,7 @@ class PageManips(QWidget):
         self.recherche.setPlaceholderText("Rechercher une manip, un tag, un objectif…")
         self.recherche.setAccessibleName("Rechercher une manip (Ctrl+F)")
         self.recherche.setClearButtonEnabled(True)
-        self.recherche.setMinimumWidth(300)
+        self.recherche.setMinimumWidth(260)
         self.recherche.textChanged.connect(lambda *_: self.rafraichir())
         barre.addWidget(self.recherche)
         lay.addLayout(barre)
@@ -178,7 +178,7 @@ class PageManips(QWidget):
         w.setObjectName("ligneManip")
         g = QGridLayout(w)
         g.setContentsMargins(14, 12, 14, 12)
-        g.setHorizontalSpacing(16)
+        g.setHorizontalSpacing(12)
         gauche = QVBoxLayout()
         gauche.setSpacing(4)
         nom = etiquette(m.nom, "titreCarte")
@@ -202,33 +202,37 @@ class PageManips(QWidget):
         if m.contexte.objectif:
             o = etiquette("", secondaire=True)
             o.setStyleSheet("font-style:italic;")
-            o.setText(o.fontMetrics().elidedText(m.contexte.objectif, Qt.TextElideMode.ElideRight, 360))
+            o.setText(o.fontMetrics().elidedText(m.contexte.objectif, Qt.TextElideMode.ElideRight, 330))
             o.setToolTip(m.contexte.objectif)
             gauche.addWidget(o)
         cg = QWidget()
         cg.setLayout(gauche)
-        cg.setMaximumWidth(420)
+        cg.setMaximumWidth(380)
         g.addWidget(cg, 0, 0)
         g.setColumnStretch(0, 1)
         ne = len(m.etapes)
-        g.addWidget(etiquette(f"{ne} étape{'s' if ne > 1 else ''}", secondaire=True), 0, 1)
-        g.addWidget(etiquette(f"{len(m.prelevements)} éch.", secondaire=True), 0, 2)
-        g.addWidget(etiquette(f"{fmt_dt(m.maj)} · v{m.rev}", secondaire=True), 0, 3)
-        etat = r.etat(m.etat)
-        g.addWidget(pastille("Archivée" if m.etat == ARCHIVEE else (etat.nom if etat else "—"), etat.ton if etat else "neutre"), 0, 4)
-        g.addWidget(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True, tip=f"Ouvrir {m.nom}"), 0, 5)
-        g.addWidget(bouton("Modifier le flux", lambda: self.ouvrir.emit(m.id, "def")), 0, 6)
+        g.addWidget(etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch.<br>{fmt_dt(m.maj)} · v{m.rev}",
+                              secondaire=True), 0, 1)
+        g.addWidget(pastille(*O.nom_etat(r, m.etat)), 0, 2)
+        g.addWidget(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True, tip=f"Ouvrir {m.nom}"), 0, 3)
+        g.addWidget(bouton("Modifier le flux", lambda: self.ouvrir.emit(m.id, "def")), 0, 4)
         plus = bouton("…", tip=f"Autres actions pour {m.nom}")
         menu = QMenu(plus)
         menu.addAction("Dupliquer", lambda: self._dupliquer(m.id))
         menu.addAction("Exporter", lambda: self.exporter.emit(m.id))
+        if m.etat != ARCHIVEE:
+            menu.addAction("Remettre comme réalisée" if m.etat == NON_REALISEE else "Marquer comme non réalisée",
+                           lambda: self._non_realisee(m))
         menu.addAction("Restaurer" if m.etat == ARCHIVEE else "Archiver", lambda: self._archiver(m))
-        if m.etat == ARCHIVEE:
+        if O.peut_supprimer(m):
             menu.addAction("Supprimer", lambda: self._supprimer(m))
         plus.setMenu(menu)
         plus.setStyleSheet("QPushButton::menu-indicator{width:0;}")
-        g.addWidget(plus, 0, 7)
-        for k in range(1, 8):
+        plus.setFixedWidth(40)
+        g.addWidget(plus, 0, 5)
+        g.setColumnMinimumWidth(1, 175)
+        g.setColumnMinimumWidth(2, 105)
+        for k in range(1, 6):
             g.setAlignment(g.itemAtPosition(0, k).widget(), Qt.AlignmentFlag.AlignVCenter)
         return w
 
@@ -241,10 +245,30 @@ class PageManips(QWidget):
         if self.ctrl.st.verrou_autre(m.id):
             self.ctrl.toast.emit("Impossible : la manip est modifiée en ce moment par quelqu’un d’autre")
             return
+        from mat_methode.ui.dialogues import confirmer
+        if m.etat != ARCHIVEE and not confirmer(
+                self, "Archiver cette manip ?", f"« {m.nom} » passera dans l’onglet Archivées. Elle reste consultable et peut être restaurée.",
+                "Archiver", danger=False):
+            return
         a = O.archiver_ou_restaurer(self.ctrl.reglages, m)
         self.ctrl.toucher(m)
         self.ctrl.enregistrer_tout()
         self.ctrl.toast.emit("Archivée" if a else "Restaurée")
+        self.rafraichir()
+
+    def _non_realisee(self, m):
+        if self.ctrl.st.verrou_autre(m.id):
+            self.ctrl.toast.emit("Impossible : la manip est modifiée en ce moment par quelqu’un d’autre")
+            return
+        from mat_methode.ui.dialogues import confirmer
+        if m.etat != NON_REALISEE and not confirmer(
+                self, "Marquer comme non réalisée ?", f"« {m.nom} » sera marquée « Non réalisée ». Tu pourras ensuite l’archiver "
+                "ou la supprimer (menu « … »), ou la remettre comme réalisée.", "Marquer non réalisée", danger=False):
+            return
+        marquee = O.basculer_non_realisee(self.ctrl.reglages, m)
+        self.ctrl.toucher(m)
+        self.ctrl.enregistrer_tout()
+        self.ctrl.toast.emit("Marquée non réalisée : archive-la ou supprime-la avec le menu « … »" if marquee else "Remise comme réalisée")
         self.rafraichir()
 
     def _supprimer(self, m):

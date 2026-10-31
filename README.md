@@ -43,6 +43,14 @@ sous-étapes (chauffage, ajout d'acide, centrifugation…). Les numéros restent
 échantillon S4…) ; la grande étape apparaît comme un cadre à l'écran, un bandeau sur les cartes du PDF et du Word, et une
 phrase « Degumming (étapes 2 à 4). » dans le texte. La liste des noms se règle dans Réglages.
 
+**Réglages modifiables** : les opérations proposées dans « Définir le flux » (chauffage, filtration…) s'ajoutent, se
+renomment, se suppriment et s'ordonnent dans Réglages, avec le participe passé utilisé dans le texte (« filtré »).
+Les donneurs d'ordre, types de demande, analyses, réactifs, grandes étapes et tags se renomment avec ✎ : toutes les manips
+qui les utilisent sont mises à jour.
+
+**Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
+ou supprimée (confirmation à chaque fois), ou remise comme réalisée.
+
 Raccourcis : `Ctrl+N` nouvelle manip · `Ctrl+F` recherche · `Ctrl+E` exporter · `Ctrl+Z` annuler la dernière
 suppression · `Alt+←/→` étape précédente/suivante · `F5` actualiser.
 
