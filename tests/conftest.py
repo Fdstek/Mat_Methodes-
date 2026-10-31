@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 os.environ["TZ"] = "Europe/Paris"  # les références sont en heure de Paris (§10)
-time.tzset()
+if hasattr(time, "tzset"):  # absent sous Windows : on y suppose un PC réglé sur l'heure de Paris
+    time.tzset()
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 EXEMPLES = Path(__file__).resolve().parents[1] / "docs" / "cahier_des_charges" / "exemples"
