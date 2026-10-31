@@ -192,6 +192,9 @@ class PageManips(QWidget):
             b = bouton(f"#{t}", lambda t=t: (setattr(self, "f_tag", t), self.rafraichir()), tip=f"Filtrer sur le tag {t}")
             b.setStyleSheet(f"QPushButton{{background:{p.selection};border:none;border-radius:4px;padding:2px 8px;font-size:9pt;}}")
             tags.append(b)
+        reste = sum(1 for t in m.a_faire if not t.fait)
+        if reste:
+            tags.append(pastille(f"{reste} à faire", "warn", " ; ".join(t.texte for t in m.a_faire if not t.fait)))
         if m.lancee:
             n = len(m.journal)
             tags.append(pastille(f"Lancée · modifiée après lancement ({n})" if n else "Lancée", "warn" if n else "ok"))

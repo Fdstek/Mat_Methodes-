@@ -97,6 +97,10 @@ class PageRapport(QWidget):
         if mention_modifiee(m):
             self.lay.addWidget(InfoBar("Détail en bas du rapport.", titre=mention_modifiee(m),
                                        actions=[bouton("Voir le journal", self.journal.emit)]))
+        reste = [t for t in m.a_faire if not t.fait]
+        if reste:
+            self.lay.addWidget(InfoBar(" ; ".join(f"{t.categorie} : {t.texte}" for t in reste[:5]) + (" …" if len(reste) > 5 else ""),
+                                       niveau="info", titre=f"{len(reste)} point{'s' if len(reste) > 1 else ''} à faire (non repris dans le rapport)"))
         n = R.numeros_a_saisir(m)
         manque = sum(len(REPERE.findall(s.texte)) for s in rap.sections)
         if n or manque:

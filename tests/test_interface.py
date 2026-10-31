@@ -273,3 +273,32 @@ def test_reglages_en_cartes_et_reference(fen):
     m.contexte.ref = ""
     fen.p_flux._choisir_donneur(fen.ctrl.reglages.personnes[0].nom)
     assert m.contexte.ref.startswith("PB-2026-10-30-")
+
+
+def test_a_faire_grande_etape_en_premier_et_copie(fen, monkeypatch):
+    from mat_methode.domain import regles as R
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fl = fen.p_flux
+    fl._choisir_cible("n:Degumming")  # choisir la grande étape d'abord
+    fl._ajouter_etape("chauffage")
+    g = m.groupes[0]
+    assert R.numeros_groupe(m, g.id) == [6]
+    fl._choisir_cible("")
+    fl._ajouter_etape("lavage")
+    assert m.etapes[-1].groupe_id is None
+    fl._choisir_cible(f"g:{g.id}")
+    fl._ajouter_etape("centrifugation")
+    assert R.numeros_groupe(m, g.id) == [6, 7]
+    fl._vers_completer()
+    fl.aller(m.etapes[6].id)
+    fl._copier_conditions(m.etapes[6])
+    assert m.etapes[6].duree_min == m.etapes[5].duree_min
+    n = len(m.a_faire)
+    fl.rafraichir()
+    from mat_methode.domain.models import Tache
+    m.a_faire.append(Tache(categorie="Matériel manquant", texte="Ampoule 1 L"))
+    fen.ctrl.toucher(m, True)
+    assert len(m.a_faire) == n + 1
+    fen.aller("manips")
+    fen.aller("rapport")

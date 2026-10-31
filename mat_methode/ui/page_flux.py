@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
-from mat_methode.domain.models import Condition, ReactifEtape
+from mat_methode.domain.models import Condition, ReactifEtape, Tache, maintenant_iso
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -176,6 +176,8 @@ class PageFlux(QWidget):
         self._remplir_lancement()
         demande = self._demande()
         self.lay.addWidget(demande)
+        a_faire = self._a_faire()
+        self.lay.addWidget(a_faire)
         piv = QHBoxLayout()
         for k, t in (("def", "1 · Définir le flux"), ("comp", "2 · Compléter les étapes")):
             b = bouton(t, lambda k=k: self._mode(k))
@@ -190,7 +192,7 @@ class PageFlux(QWidget):
         corps = self._definir() if self.mode == "def" else self._completer()
         self.lay.addWidget(corps)
         self.lay.addStretch(1)
-        for x in (demande, corps):
+        for x in (demande, a_faire, corps):
             x.setEnabled(not self.ctrl.lecture_seule)
 
     def _maj_legere(self):
@@ -322,6 +324,50 @@ class PageFlux(QWidget):
         self._remplir_bilan()
         return f
 
+    # ------------------------------------------------------------ à faire
+    def _a_faire(self) -> QWidget:
+        """Liste de points à régler : réflexion, matériel manquant, réactif manquant… (pas dans le rapport)."""
+        from PySide6.QtWidgets import QCheckBox
+        m, p = self.m, theme.P
+        reste = [t for t in m.a_faire if not t.fait]
+        x = Expander("À faire", f"{len(reste)} en cours · {len(m.a_faire) - len(reste)} fait{'s' if len(m.a_faire) - len(reste) > 1 else ''}"
+                     if m.a_faire else "rien pour l’instant", ouvert=bool(reste) or getattr(self, "_a_faire_ouvert", False))
+        x.tete.clicked.connect(lambda *_: setattr(self, "_a_faire_ouvert", x.ouvert))
+        x.ajouter(etiquette("Points à régler avant ou pendant la manip. Cette liste n’apparaît pas dans le rapport.", secondaire=True))
+        for t in sorted(m.a_faire, key=lambda t: t.fait):
+            case = QCheckBox()
+            case.setChecked(t.fait)
+            case.setAccessibleName(f"Fait : {t.texte}")
+            case.toggled.connect(lambda v, t=t: (setattr(t, "fait", v), self._toucher(True)))
+            cat = pastille(t.categorie or "Autre", "warn" if not t.fait else "ok")
+            txt = ChampTexte(t.texte)
+            if t.fait:
+                txt.setStyleSheet(f"color:{p.texte2};text-decoration:line-through;")
+            txt.modifie.connect(lambda v, t=t: (setattr(t, "texte", v), self._toucher()))
+            qui = etiquette(f"{t.par} · {fmt_dt(t.le)[:10]}" if t.par else "", secondaire=True)
+            x.ajouter(ligne(case, cat, txt, qui, icone("✕", f"Supprimer : {t.texte}", lambda t=t: self._suppr_tache(t), danger=True)))
+        cats = self.ctrl.reglages.categories_a_faire
+        cat = Liste(cats, cats[0] if cats else "", vide=None if cats else "Autre")
+        cat.setAccessibleName("Catégorie")
+        nouveau = ChampTexte("", "ex. commander une ampoule à décanter de 1 L")
+
+        def ajout():
+            texte = nouveau.text().strip()
+            if not texte:
+                return
+            m.a_faire.append(Tache(categorie=cat.currentData() or "Autre", texte=texte, par=self.ctrl.nom_utilisateur(), le=maintenant_iso()))
+            self._a_faire_ouvert = True
+            self._toucher(True)
+
+        nouveau.returnPressed.connect(ajout)
+        x.ajouter(ligne(champ("Catégorie", cat), champ("Nouveau point", nouveau), bouton("Ajouter", ajout)))
+        return x
+
+    def _suppr_tache(self, t):
+        self.ctrl.memoriser_manip()
+        self.m.a_faire = [x for x in self.m.a_faire if x is not t]
+        self._toucher(True)
+
     def _ajouter_tag(self):
         if R.ajouter_tags(self.m, self._tag.text(), R.tous_les_tags(self.ctrl.manips)):
             self._toucher(True)
@@ -382,7 +428,17 @@ class PageFlux(QWidget):
             q = f"Insérer {'au début' if ia < 0 else f'après l’étape {ia + 1}'} : que fais-tu ?"
         else:
             q = f"Étape {len(m.etapes) + 1} : que fais-tu {'ensuite' if m.etapes else 'en premier'} ?"
-        cl.addWidget(etiquette(q, "titreCarte"))
+        if ia is None:  # choix de la grande étape AVANT l'opération
+            choix = {"": "Hors grande étape"}
+            choix.update({f"g:{g.id}": f"Dans {g.nom} ({R.plage(R.numeros_groupe(m, g.id))})" for g in m.groupes})
+            choix.update({f"n:{n}": f"Nouvelle grande étape : {n}" for n in self.ctrl.reglages.grandes_etapes})
+            choix["n:*"] = "Nouvelle grande étape (autre nom)…"
+            ou = Liste(list(choix), f"g:{gc.id}" if gc else "", vide=None, libelles=choix)
+            ou.setAccessibleName("Où ajouter l’étape")
+            ou.setMinimumWidth(320)
+            ou.choisi.connect(self._choisir_cible)
+            cl.addWidget(ligne(champ("1. Où ajouter l’étape ? (grande étape)", ou), "stretch"))
+        cl.addWidget(etiquette(("2. " if ia is None else "") + q, "titreCarte"))
         if gc is not None:
             cl.addWidget(ligne(bouton(f"Terminer « {gc.nom} »", self._finir_groupe), "stretch"))
         elif ia is not None:
@@ -394,15 +450,6 @@ class PageFlux(QWidget):
         autre = ChampTexte("", "Ex. neutralisation")
         autre.returnPressed.connect(lambda: self._ajouter_etape(autre.text()))
         cl.addWidget(ligne(champ("Autre étape", autre), bouton("Ajouter", lambda: self._ajouter_etape(autre.text())), "stretch"))
-        # grandes étapes (Degumming…)
-        grand = Liste(self.ctrl.reglages.grandes_etapes, "", vide="Choisir…")
-        grand.setAccessibleName("Grande étape à commencer")
-        autre_g = ChampTexte("", "ou un autre nom")
-        autre_g.setMaximumWidth(200)
-        commencer = lambda: self._commencer_groupe(autre_g.text().strip() or grand.currentData() or "")
-        autre_g.returnPressed.connect(commencer)
-        cl.addWidget(ligne(champ("Grande étape (regroupe plusieurs étapes, ex. Degumming)", grand), autre_g,
-                           bouton("+ Commencer une grande étape", commencer), "stretch"))
         lay.addWidget(f)
         lay.addWidget(self._communes())
         b = bouton("Mon flux est prêt : compléter les étapes  →", self._vers_completer, accent=True)
@@ -465,6 +512,23 @@ class PageFlux(QWidget):
         if not idx:
             v.addWidget(etiquette("Aucune sous-étape : choisis une opération ci-dessous.", secondaire=True))
         return f
+
+    def _choisir_cible(self, v: str):
+        """Liste « Où ajouter l'étape ? » : hors grande étape, dans une existante, ou en commencer une."""
+        if not v:
+            self._finir_groupe()
+        elif v.startswith("g:"):
+            self._viser_groupe(v[2:])
+        elif v == "n:*":
+            from mat_methode.ui.dialogues import demander_texte
+            nom = demander_texte(self, "Nouvelle grande étape", "Nom", "", "Le nom est aussi ajouté à la liste des Réglages.",
+                                 bouton_ok="Commencer")
+            if nom:
+                self._commencer_groupe(nom)
+            else:
+                self.rafraichir()
+        else:
+            self._commencer_groupe(v[2:])
 
     def _commencer_groupe(self, nom: str):
         if not nom:
@@ -606,7 +670,7 @@ class PageFlux(QWidget):
         gl.addWidget(etiquette("Badge : la place sur la frise donne le moment du prélèvement ; le bord droit est la sortie de l’étape.",
                                secondaire=True, wrap=True))
         gl.addStretch(1)
-        gauche.setFixedWidth(340)
+        gauche.setFixedWidth(320)
         self._remplir_colonne()
         h.addWidget(gauche, 0, Qt.AlignmentFlag.AlignTop)
         h.addWidget(self._editeur(), 1, Qt.AlignmentFlag.AlignTop)
@@ -762,6 +826,12 @@ class PageFlux(QWidget):
 
     def _conditions(self, e) -> QWidget:
         x = Expander("1 · Conditions opératoires")
+        i = self.m.etapes.index(e)
+        if i > 0:
+            prec = self.m.etapes[i - 1]
+            x.ajouter(ligne(bouton(f"⧉  Reprendre les conditions de l’étape {i} · {cap(prec.operation)}", lambda: self._copier_conditions(e),
+                                   tip="Copie température, durée, agitation, membrane, sous vide et autres conditions de l’étape précédente"),
+                            "stretch"))
         g = QGridLayout()
         defs = [("temperature_c", "Chauffage", "Température", "°C"),
                 ("agitation_trmin", "Vitesse de centrifugation" if est_centrifugation(e.operation) else "Agitation", "Vitesse", "tr/min"),
@@ -797,6 +867,13 @@ class PageFlux(QWidget):
         rem.modifie.connect(lambda v: (setattr(e, "remarque", v), self._toucher()))
         x.ajouter(champ("Remarque (facultatif)", rem))
         return x
+
+    def _copier_conditions(self, e):
+        self.ctrl.memoriser_manip()
+        src = R.copier_conditions_precedentes(self.m, e.id)
+        if src is not None:
+            self._toucher(True)
+            self.ctrl.toast.emit(f"Conditions reprises de « {cap(src.operation)} » (Ctrl+Z pour annuler)")
 
     def _set_cond(self, e, cle, v):
         if cle == "vide":
@@ -840,9 +917,8 @@ class PageFlux(QWidget):
             nouveau = bouton("+ Nouveau réactif…", lambda re_=re_: self._nouveau_reactif(re_), lien=True,
                              tip="Ajouter un réactif à la liste des Réglages et le choisir ici")
             v.addWidget(champ("Réactif", nom))
-            v.addWidget(ligne(nouveau, bouton("Chercher dans Scirius…", lambda re_=re_: self._scirius_reactif(re_), lien=True,
-                                              tip="Remplit le n° Scirius, l’emplacement, le fournisseur et le lot depuis le fichier Scirius"),
-                              "stretch"))
+            v.addWidget(flux_widgets([nouveau, bouton("Chercher dans Scirius…", lambda re_=re_: self._scirius_reactif(re_), lien=True,
+                                                      tip="Remplit le n° Scirius, l’emplacement, le fournisseur et le lot depuis le fichier Scirius")]))
             q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
             v.addWidget(champ("Quantité ou ratio", q))

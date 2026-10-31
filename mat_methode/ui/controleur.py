@@ -361,7 +361,7 @@ class Controleur(QObject):
             return f"« {m.nom} » restaurée"
         if actuelle is None:
             return ""
-        for champ in ("tags", "contexte", "communes", "etapes", "prelevements"):
+        for champ in ("tags", "contexte", "communes", "etapes", "prelevements", "groupes", "a_faire"):
             setattr(actuelle, champ, getattr(m, champ))
         self.toucher(actuelle, structure=True)
         return "Suppression annulée"
