@@ -1,4 +1,4 @@
-# Construction reproductible de Mat & Méthode (Windows 11 64 bits, Python 3.12 64 bits).
+﻿# Construction reproductible de Mat & Méthode (Windows 11 64 bits, Python 3.12 64 bits).
 #   powershell -ExecutionPolicy Bypass -File build\build.ps1
 # Résultat : build\dist\MatMethode_1.0\  (MatMethode.exe + _internal\), à déposer tel quel sur SharePoint.
 $ErrorActionPreference = "Stop"
