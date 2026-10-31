@@ -68,6 +68,9 @@ class PageReglages(QWidget):
         self._liste_simple("Types de demande", self.r.types_demande, lambda v: self.r.types_demande.remove(v),
                            lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
                            "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».")
+        self._liste_simple("Grandes étapes", self.r.grandes_etapes, lambda v: self.r.grandes_etapes.remove(v),
+                           lambda v: O.ajouter_simple(self.r.grandes_etapes, v), "Nouvelle grande étape",
+                           "Noms proposés pour regrouper des étapes du flux (ex. Degumming : chauffage, ajout d’acide, centrifugation…).")
         self._etats()
         self._tags()
         a = etiquette(f"{NOM_APPLICATION} · version {VERSION} · données : {self.ctrl.st.donnees}", secondaire=True, wrap=True)

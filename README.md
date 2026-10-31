@@ -38,6 +38,11 @@ Plusieurs personnes : une manip ouverte par quelqu'un d'autre s'ouvre en **lectu
 la même manip, rien n'est écrasé : on choisit « Recharger la version de … » ou « Enregistrer ma version comme copie ».
 Les réglages modifiés en même temps sont fusionnés.
 
+**Grandes étapes** : dans « Définir le flux », « + Commencer une grande étape » (ex. Degumming), puis on ajoute ses
+sous-étapes (chauffage, ajout d'acide, centrifugation…). Les numéros restent continus sur tout le flux (étapes 2 à 4,
+échantillon S4…) ; la grande étape apparaît comme un cadre à l'écran, un bandeau sur les cartes du PDF et du Word, et une
+phrase « Degumming (étapes 2 à 4). » dans le texte. La liste des noms se règle dans Réglages.
+
 Raccourcis : `Ctrl+N` nouvelle manip · `Ctrl+F` recherche · `Ctrl+E` exporter · `Ctrl+Z` annuler la dernière
 suppression · `Alt+←/→` étape précédente/suivante · `F5` actualiser.
 

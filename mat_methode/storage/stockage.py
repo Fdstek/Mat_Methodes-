@@ -62,7 +62,7 @@ def migrer(d: dict, chemin: Path) -> dict:
         raise DonneesTropRecentes(f"{chemin.name} a été écrit par une version plus récente de Mat & Méthode. Mets à jour l’application.")
     if s < SCHEMA_DONNEES:
         shutil.copy2(chemin, chemin.with_name(chemin.name + f".schema{s}.bak"))
-        # aucune migration nécessaire pour l'instant (schéma 1)
+        # 1 -> 2 : grandes étapes (champs nouveaux avec valeurs par défaut, rien à convertir)
         d["schema"] = SCHEMA_DONNEES
     return d
 
@@ -208,7 +208,7 @@ class Stockage:
             disque = Reglages.model_validate(lire_json(self.f_reglages))
             if disque.rev != r.rev:
                 fusion = fusionner(base, r, disque)
-                for k in ("laboratoires", "analyses", "donneurs_ordre", "types_demande", "etats", "reactifs"):
+                for k in ("laboratoires", "analyses", "donneurs_ordre", "types_demande", "etats", "reactifs", "grandes_etapes"):
                     setattr(r, k, getattr(fusion, k))
                 r.rev = disque.rev
                 info = f"Réglages fusionnés avec les modifications de {disque.modifie_par or 'un autre utilisateur'}."

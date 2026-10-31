@@ -10,7 +10,7 @@ from __future__ import annotations
 from mat_methode.domain.models import Reglages
 
 LISTES = {  # liste -> clé d'identité (None = chaîne)
-    "laboratoires": "nom", "analyses": None, "donneurs_ordre": None, "types_demande": None, "etats": "id", "reactifs": "nom",
+    "laboratoires": "nom", "analyses": None, "donneurs_ordre": None, "types_demande": None, "etats": "id", "reactifs": "nom", "grandes_etapes": None,
 }
 
 

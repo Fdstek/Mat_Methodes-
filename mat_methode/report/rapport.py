@@ -11,12 +11,14 @@ from dataclasses import dataclass, field
 from mat_methode.domain.catalogue import est_centrifugation, participe
 from mat_methode.domain.models import Etape, Manip, Prelevement, Reglages
 from mat_methode.domain.regles import (
+    blocs,
     echantillons_tries,
     est_entree,
     est_test,
     etiquettes,
     moment_court,
     numero_etape,
+    plage,
     total_preleve,
 )
 from mat_methode.domain.texte import (
@@ -81,6 +83,9 @@ class Phase:
     materiel: list[str]
     reactifs: list[LigneReactif]
     echantillons: list[LigneEchantillon]
+    groupe: str = ""  # grande étape (ex. « Degumming »)
+    groupe_plage: str = ""  # « étapes 2 à 4 »
+    debut_groupe: bool = False  # première phase de sa grande étape
 
 
 @dataclass
@@ -188,6 +193,7 @@ def _inv(reglages: Reglages, nom: str):
 def construire(m: Manip, reglages: Reglages) -> Rapport:
     c, lab, ech = m.contexte, etiquettes(m), echantillons_tries(m)
     ns, ne = len(m.prelevements), len(m.etapes)
+    grands = [(g, idx) for g, idx in blocs(m) if g is not None]
     sections = []
 
     t21 = (f"Demande : {c.donneur or ph('donneur d’ordre')}{', type ' + c.type if c.type else ''} (réf. {c.ref or ph('n°')}). "
@@ -197,7 +203,8 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
            + "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
            + (f", dont {fmt_vol(total_preleve(m))} mL prélevés sous forme de {ns} échantillon{'s' if ns > 1 else ''}" if ns else "")
            + "."
-           + (f" Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else ""))
+           + (f" Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else "")
+           + (" Grandes étapes : " + " ; ".join(f"{g.nom} ({plage([i + 1 for i in idx])})" for g, idx in grands) + "." if grands else ""))
     sections.append(Section("2.1 Échantillon", t21))
 
     materiel: list[str] = []
@@ -219,7 +226,12 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
            + "." + (f" Réactifs : {' ; '.join(reac_txt)}." if reac_txt else ""))
     sections.append(Section("2.2 Matériel et réactifs", t22))
 
-    t23 = " ".join(f"Étape {i + 1} : {sujet(i, ne)} {clause_etape(e)}." for i, e in enumerate(m.etapes)) if ne else ph("protocole")
+    morceaux23 = []
+    for g, idx in blocs(m):
+        if g is not None:
+            morceaux23.append(f"{g.nom} ({plage([i + 1 for i in idx])}).")
+        morceaux23 += [f"Étape {i + 1} : {sujet(i, ne)} {clause_etape(m.etapes[i])}." for i in idx]
+    t23 = " ".join(morceaux23) if ne else ph("protocole")
     sections.append(Section("2.3 Méthodes", t23))
 
     if ns:
@@ -252,8 +264,11 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
                 f = _inv(reglages, r.nom)
                 rs.append(LigneReactif(nom=r.nom, quantite=r.quantite, scirius=f.get("scirius", ""), emplacement=f.get("emplacement", ""),
                                        fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
+        g = m.groupe(e.groupe_id)
+        nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
         phases.append(Phase(i + 1, f"{i + 1} · {cap(e.operation)}", conditions_phase(e), list(e.equipements), rs,
-                            [ligne_ech(p) for p in ech if p.etape_id == e.id]))
+                            [ligne_ech(p) for p in ech if p.etape_id == e.id], groupe=g.nom if g else "",
+                            groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1))
     return Rapport(sections, tab_reac, tab_ech, phases)
 
 
@@ -293,6 +308,8 @@ def markdown(m: Manip, reglages: Reglages) -> str:
         ln += [f"### {s.titre}", "", vers_markdown(s.texte), ""]
     ln += ["### Détail par phase du flux", ""]
     for p in r.phases:
+        if p.debut_groupe:
+            ln += [f"**Grande étape : {p.groupe} ({p.groupe_plage})**", ""]
         ln += [f"#### {p.titre}", ""]
         if p.conditions:
             ln.append(f"- Conditions : {p.conditions}")

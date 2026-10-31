@@ -121,6 +121,10 @@ class PageRapport(QWidget):
 
         self.lay.addWidget(etiquette("Détail par phase du flux", "sousTitre"))
         for ph in rap.phases:
+            if ph.debut_groupe:
+                gt = etiquette(f"Grande étape : {ph.groupe} ({ph.groupe_plage})", "titreCarte")
+                gt.setStyleSheet(f"color:{theme.P.accent};")
+                self.lay.addWidget(gt)
             f, cl = carte()
             tete = [numero(ph.n)] if ph.n else []
             tete += [etiquette(ph.titre.split(" · ", 1)[-1], "titreCarte")]

@@ -12,7 +12,7 @@ STYLE = """body{font:14px/1.6 system-ui,sans-serif;color:#14201D;max-width:860px
 .meta{background:#E1F0EC;padding:8px 12px;border-radius:6px;margin-bottom:6px}.flow{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .c{border:1px solid #BFCBC7;border-radius:8px;padding:8px;font-size:12.5px;break-inside:avoid}.r{font-weight:600}.p{color:#0F6B5C}.e{color:#566360;font-size:11.5px}.s{margin-top:6px;background:#FDF1DC;border:1px solid #8A4B00;color:#8A4B00;border-radius:6px;padding:3px 6px;font-size:11.5px}
 table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{border:1px solid #BFCBC7;padding:4px 6px;text-align:left}th{background:#E1F0EC}i,.ph{color:#8A4B00}
-@media print{body{margin:0}}"""
+@media print{body{margin:0}}.g{color:#0F6B5C;background:#E1F0EC;border-radius:4px;padding:1px 6px;font-size:10.5px;font-weight:700;margin-bottom:4px}"""
 
 
 def e(s) -> str:
@@ -41,7 +41,9 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
     for i, et in enumerate(m.etapes):
         ps = [p for p in ech if numero_etape(m, p) == i + 1]
         cartes.append(
-            f'<div class="c"><b>{i + 1}. {e(cap(et.operation))}</b>'
+            '<div class="c">'
+            + (f'<div class="g">{e(m.groupe(et.groupe_id).nom.upper())}</div>' if m.groupe(et.groupe_id) else "")
+            + f'<b>{i + 1}. {e(cap(et.operation))}</b>'
             + "".join(f'<div class="r">{e(x.nom)}{" (" + e(quantite_texte(x.quantite)) + ")" if x.quantite else ""}</div>' for x in et.reactifs if x.nom)
             + f'<div class="p">{e(resume_conditions(et))}</div><div class="e">{e(", ".join(et.equipements))}</div>'
             + "".join(f'<div class="s"><b>{e(lab[p.id])}</b> · {fmt_vol(p.volume_ml or 0)} mL<br><small>{e(moment_court(m, p))}</small></div>' for p in ps)
@@ -63,7 +65,8 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
             + "".join(f"<tr><td>{fmt_dt(j.t)}</td><td>{e(j.par)}</td><td>{e(j.txt)}</td></tr>" for j in m.journal) + "</table>"
             if m.journal else "<p>Aucune modification depuis le lancement.</p>")
     phases = "<h3>Détail par phase du flux</h3>" + "".join(
-        f'<div class="c" style="margin:6px 0"><b>{e(ph.titre)}</b> <span class="p">{e(ph.conditions)}</span>'
+        (f'<h4 style="margin:12px 0 2px;color:#0F6B5C">Grande étape : {e(ph.groupe)} ({e(ph.groupe_plage)})</h4>' if ph.debut_groupe else "")
+        + f'<div class="c" style="margin:6px 0"><b>{e(ph.titre)}</b> <span class="p">{e(ph.conditions)}</span>'
         + (f'<div class="e">{e(", ".join(ph.materiel))}</div>' if ph.materiel else "")
         + (("<div><b>Réactifs</b> " + ("".join(
             f"<div>{e(x.nom)}{' · ' + e(x.quantite) if x.quantite else ''} — n° Scirius {td(x.scirius)}, emplacement {td(x.emplacement)}, "

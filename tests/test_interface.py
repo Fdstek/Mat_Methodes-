@@ -8,6 +8,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QFrame  # noqa: E402
 
 from mat_methode.storage.stockage import Stockage  # noqa: E402
 from mat_methode.ui import dialogues as D  # noqa: E402
@@ -172,3 +173,28 @@ def test_pages_sans_erreur_en_sombre(fen, qapp):
     fen.setMinimumSize(600, 400)
     fen.resize(900, 700)  # volet replié en icônes
     assert fen.volet.width() == 64
+
+
+def test_grande_etape_dans_definir_et_completer(fen):
+    from mat_methode.domain import regles as R
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fl = fen.p_flux
+    fl._commencer_groupe("Degumming")
+    g = m.groupes[0]
+    assert fl.groupe_cible == g.id
+    fl._ajouter_etape("chauffage")
+    fl._ajouter_etape("centrifugation")
+    assert R.numeros_groupe(m, g.id) == [6, 7]
+    fl._finir_groupe()
+    fl._ajouter_etape("lavage")
+    assert m.etapes[-1].groupe_id is None
+    fl._viser_groupe(g.id)
+    fl._ajouter_etape("agitation")  # ajoutée après la dernière sous-étape
+    assert R.numeros_groupe(m, g.id) == [6, 7, 8] and m.etapes[7].operation == "agitation"
+    fl._vers_completer()
+    fl.aller(m.etapes[6].id)
+    cadres = [w for w in fl.findChildren(QFrame) if w.objectName() == "groupe"]
+    assert cadres
+    fl._defaire_groupe(g)
+    assert m.groupes == []
