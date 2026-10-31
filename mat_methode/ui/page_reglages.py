@@ -68,6 +68,8 @@ class PageReglages(QWidget):
             ("types", "Types de demande", "Support, R&D, Test d’idée…", f"{len(r.types_demande)}", self._types),
             ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
             ("etats", "États des manips", "Brouillon, En cours, Terminée… et leurs couleurs", f"{len(r.etats)}", self._etats),
+            ("a_faire", "Catégories « À faire »", "Réflexion, Matériel manquant, Réactif manquant…",
+             f"{len(r.categories_a_faire)}", self._categories),
             ("tags", "Tags", "Renommer ou retirer un tag partout", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
             ("scirius", "Fichier Scirius", "Lien avec le suivi des enregistrements Scirius (SharePoint)",
              "choisi" if r.scirius_fichier else "auto", self._scirius),
@@ -138,6 +140,11 @@ class PageReglages(QWidget):
                            lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
                            "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».",
                            renommer=self._ren(O.renommer_type, lambda: self.r.types_demande))
+
+    def _categories(self):
+        self._liste_simple("Catégories « À faire »", self.r.categories_a_faire, lambda v: self.r.categories_a_faire.remove(v),
+                           lambda v: O.ajouter_simple(self.r.categories_a_faire, v), "Nouvelle catégorie",
+                           "Catégories proposées pour la liste « À faire » de chaque manip (carte sous « Ma demande »).")
 
     def _grandes(self):
         self._liste_simple("Grandes étapes", self.r.grandes_etapes, lambda v: self.r.grandes_etapes.remove(v),

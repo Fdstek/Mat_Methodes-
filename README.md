@@ -68,6 +68,13 @@ se saisit à la main.
 **Réglages** : dans le menu principal ; la page affiche une carte par sujet (Personnes, Laboratoires, Opérations,
 Réactifs, Volumes, Analyses, Types, Grandes étapes, États, Tags, Fichier Scirius).
 
+**À faire** : chaque manip a une liste « À faire » (carte sous « Ma demande ») : réflexion, matériel manquant, réactif
+manquant… avec case à cocher. Le nombre de points restants s'affiche dans Mes manips et le Rapport ; la liste n'apparaît
+pas dans les documents exportés. Catégories modifiables dans Réglages.
+
+**Conditions de l'étape précédente** : dans une étape, « ⧉ Reprendre les conditions de l'étape précédente » copie
+température, durée, agitation, membrane, sous vide et autres conditions (Ctrl+Z pour annuler).
+
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.
 

@@ -101,3 +101,26 @@ def test_volumes_echantillon():
     r.laboratoires = []
     p = R.nouvel_echantillon(Manip(), r, None)
     assert p.volume_ml == 60  # sans laboratoire : premier volume de la liste
+
+
+def test_copier_conditions_precedentes():
+    m = Manip()
+    a = R.ajouter_etape(m, "chauffage")
+    a.temperature_c, a.duree_min, a.agitation_trmin = 80, 20, 600
+    a.autres = [{"nom": "pH", "valeur": "4"}]
+    b = R.ajouter_etape(m, "agitation")
+    b.equipements = ["Agitateur"]
+    assert R.copier_conditions_precedentes(m, a.id) is None  # première étape : rien à copier
+    assert R.copier_conditions_precedentes(m, b.id) is a
+    assert (b.temperature_c, b.duree_min, b.agitation_trmin, b.autres[0].nom) == (80, 20, 600, "pH")
+    assert b.equipements == ["Agitateur"] and b.autres[0] is not a.autres[0]
+
+
+def test_a_faire():
+    from mat_methode.domain.models import Tache
+    r = Reglages()
+    assert r.categories_a_faire[:3] == ["Réflexion", "Matériel manquant", "Réactif manquant"]
+    m = Manip()
+    m.a_faire = [Tache(categorie="Réactif manquant", texte="Commander acide phosphorique")]
+    assert Manip.model_validate(m.to_json()).a_faire[0].texte == "Commander acide phosphorique"
+    assert R.dupliquer(m, r).a_faire == []

@@ -161,6 +161,8 @@ class Liste(QComboBox):
     def __init__(self, options: list[str], valeur: str = "", vide: str | None = "Choisir…", libelles: dict | None = None):
         super().__init__()
         self.setMinimumWidth(140)
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.setMinimumContentsLength(10)
         if vide is not None:
             self.addItem(vide, "")
         opts = list(options) + ([valeur] if valeur and valeur not in options else [])
@@ -188,6 +190,8 @@ class ChoixVolume(QComboBox):
         else:
             self.setCurrentIndex(self.findData(float(valeur)))
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i)))
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.setMinimumContentsLength(7)
 
 
 # ------------------------------------------------------------------ ToggleSwitch

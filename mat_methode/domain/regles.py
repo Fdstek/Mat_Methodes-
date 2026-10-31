@@ -139,6 +139,20 @@ def appliquer_communes(m: Manip, remplacer: bool = False) -> int:
     return n
 
 
+def copier_conditions_precedentes(m: Manip, etape_id: str) -> Etape | None:
+    """Reprend les conditions opératoires de l'étape précédente (température, durée, agitation, membrane,
+    sous vide, autres conditions). Ni les réactifs, ni le matériel, ni les échantillons. Retourne l'étape source."""
+    ids = [e.id for e in m.etapes]
+    if etape_id not in ids or ids.index(etape_id) == 0:
+        return None
+    src, e = m.etapes[ids.index(etape_id) - 1], m.etape(etape_id)
+    e.temperature_c, e.duree_min, e.filtre_um = src.temperature_c, src.duree_min, src.filtre_um
+    e.agitation_trmin = src.agitation_trmin
+    e.vide = src.vide.model_copy() if src.vide else None
+    e.autres = [a.model_copy() for a in src.autres]
+    return src
+
+
 def heriter_communes(m: Manip, e: Etape) -> None:
     c = m.communes
     if c.temperature_c is not None and e.temperature_c is None:
@@ -338,6 +352,7 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     c.nom = nom or f"{m.nom} (copie)"
     c.etat = reglages.etat_initial()
     c.rev, c.lancee, c.journal, c.base = 1, None, [], None
+    c.a_faire = []  # la liste « à faire » est propre à chaque manip
     c.maj = maintenant_iso()
     c.contexte.ref = ""
     c.contexte.lot = ""

@@ -189,11 +189,13 @@ QComboBox::drop-down {{ border: none; width: 28px; subcontrol-origin: padding; s
 QComboBox::down-arrow {{ image: url("{fleche(p)}"); width: 12px; height: 12px; }}
 QComboBox {{ padding-right: 28px; }}
 QComboBox QAbstractItemView {{ background: {p.carte}; border: 1px solid {p.trait}; selection-background-color: {p.selection}; selection-color: {p.texte}; }}
-QScrollBar:vertical {{ background: transparent; width: 10px; }}
-QScrollBar::handle:vertical {{ background: {"#C2C2C2" if not p.sombre else "#5A5A5A"}; border-radius: 4px; min-height: 30px; }}
-QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
-QScrollBar:horizontal {{ height: 10px; background: transparent; }}
-QScrollBar::handle:horizontal {{ background: {"#C2C2C2" if not p.sombre else "#5A5A5A"}; border-radius: 4px; }}
+QScrollBar:vertical {{ background: {"#E6E6E6" if not p.sombre else "#2E2E2E"}; width: 16px; margin: 0; border-left: 1px solid {p.trait}; }}
+QScrollBar::handle:vertical {{ background: {"#8A8A8A" if not p.sombre else "#9A9A9A"}; border-radius: 5px; min-height: 48px; margin: 2px 3px; }}
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {{ background: {p.accent}; }}
+QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
+QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
+QScrollBar:horizontal {{ height: 16px; background: {"#E6E6E6" if not p.sombre else "#2E2E2E"}; border-top: 1px solid {p.trait}; }}
+QScrollBar::handle:horizontal {{ background: {"#8A8A8A" if not p.sombre else "#9A9A9A"}; border-radius: 5px; min-width: 48px; margin: 3px 2px; }}
 QFrame#infobar {{ border-radius: 6px; border: 1px solid {p.trait}; }}
 QFrame#infobar[niveau="warn"] {{ background: {p.ambre_fond}; border-color: {p.ambre_trait}; }}
 QFrame#infobar[niveau="info"] {{ background: {p.info_fond}; }}
