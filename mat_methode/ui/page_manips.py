@@ -147,7 +147,7 @@ class PageManips(QWidget):
         types.setAccessibleName("Filtrer par type de demande")
         types.choisi.connect(lambda v: (setattr(self, "f_type", v), self.rafraichir()))
         self.filtres.addWidget(types)
-        tags = Liste(tous_les_tags(ctrl.manips), self.f_tag, vide="Tous les tags")
+        tags = Liste(tous_les_tags(ctrl.manips, ctrl.reglages.ordre_tags), self.f_tag, vide="Tous les tags")
         tags.setAccessibleName("Filtrer par tag")
         tags.choisi.connect(lambda v: (setattr(self, "f_tag", v), self.rafraichir()))
         self.filtres.addWidget(tags)
@@ -304,7 +304,7 @@ class PageManips(QWidget):
             self.rafraichir()
 
     def tous_tags(self):
-        return tous_les_tags(self.ctrl.manips)
+        return tous_les_tags(self.ctrl.manips, self.ctrl.reglages.ordre_tags)
 
     def focus_recherche(self):
         self.recherche.setFocus()

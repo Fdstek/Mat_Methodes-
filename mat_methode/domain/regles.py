@@ -346,7 +346,8 @@ def analyses_possibles(reglages: Reglages, p: Prelevement) -> list[str]:
     """Analyses proposées pour un échantillon : celles de son laboratoire (Réglages), plus celles déjà cochées ;
     toutes les analyses si le laboratoire n'en a pas de définies."""
     labo = reglages.laboratoire(p.labo)
-    base = list(labo.analyses) if labo and labo.analyses else list(reglages.analyses)
+    base = [a for a in reglages.analyses if a in labo.analyses] + [a for a in labo.analyses if a not in reglages.analyses] \
+        if labo and labo.analyses else list(reglages.analyses)  # dans l'ordre des Réglages
     return base + [a for a in p.analyses if a not in base]
 
 
@@ -456,13 +457,26 @@ def rapports_clotures(manips: list[Manip]) -> list[Manip]:
 
 
 # ------------------------------------------------------------------ tags (§8.7 bis)
-def tous_les_tags(manips: list[Manip]) -> list[str]:
+def tous_les_tags(manips: list[Manip], ordre: list[str] | None = None) -> list[str]:
+    """Tags utilisés, dans l'ordre choisi dans les Réglages (`ordre`), puis les autres par ordre alphabétique."""
     out: list[str] = []
     for m in manips:
         for t in m.tags:
             if not any(norm(x) == norm(t) for x in out):
                 out.append(t)
-    return sorted(out, key=norm)
+    rang = {norm(t): k for k, t in enumerate(ordre or [])}
+    return sorted(out, key=lambda t: (rang.get(norm(t), len(rang)), norm(t)))
+
+
+def deplacer_tag(manips: list[Manip], reglages: Reglages, tag: str, sens: int) -> bool:
+    """Avance (-1) ou recule (+1) un tag dans l'ordre des Réglages."""
+    ts = tous_les_tags(manips, reglages.ordre_tags)
+    i = next((k for k, t in enumerate(ts) if norm(t) == norm(tag)), None)
+    if i is None or not 0 <= i + sens < len(ts):
+        return False
+    ts[i], ts[i + sens] = ts[i + sens], ts[i]
+    reglages.ordre_tags = ts
+    return True
 
 
 def ajouter_tags(m: Manip, saisie: str, existants: list[str]) -> list[str]:

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from mat_methode import NOM_APPLICATION
 from mat_methode.domain import reglages_ops as O
-from mat_methode.domain.models import ARCHIVEE
+from mat_methode.domain.models import ARCHIVEE, REALISEE
 from mat_methode.domain.texte import nom_fichier
 from mat_methode.exports.echange import ImportInvalide, importer
 from mat_methode.exports.echange import exporter as exporter_json
@@ -157,11 +157,11 @@ class Fenetre(QMainWindow):
         self.p_manips.nouvelle.connect(self.nouvelle)
         self.p_manips.importer.connect(self.importer)
         self.p_manips.exporter.connect(lambda i: self.autres_formats(i))
-        self.p_flux.voir_rapport.connect(lambda: self.aller("rapport"))
+        self.p_flux.voir_rapport.connect(self._apres_flux)
         self.p_flux.voir_reglages.connect(lambda section: self.aller("reglages", section))
         self.p_flux.dupliquer.connect(self._dupliquer_ouvrir)
         f2 = self.p_protocole.flux  # éditeur du flux dans Protocole › Édition
-        f2.voir_rapport.connect(lambda: self.aller("rapport"))
+        f2.voir_rapport.connect(self._apres_flux)
         f2.voir_reglages.connect(lambda section: self.aller("reglages", section))
         f2.dupliquer.connect(self._dupliquer_ouvrir)
         self.p_protocoles.ouvrir.connect(self.ouvrir_protocole)
@@ -201,6 +201,9 @@ class Fenetre(QMainWindow):
     def aller(self, page: str, section: str | None = None):
         if page in PAGES_MANIP and self.ctrl.courante is None:
             return
+        if page == "rapport" and self.ctrl.courante.etat != REALISEE:
+            self.toast.montrer("Le rapport est disponible quand le protocole est « Réalisée » (Protocole)")
+            return
         if page == "reglages":
             self.p_reglages.section = section  # le menu ramène aux cartes ; un lien ouvre directement la bonne carte
         self.ctrl.journaliser()
@@ -215,6 +218,16 @@ class Fenetre(QMainWindow):
         self.p_flux.ouvrir(mode if m and m.etapes else "def")
         self.aller("flux")
         self._memoriser(ident)
+
+    def _apres_flux(self):
+        """« Étape suivante » sur la dernière étape : le rapport si la manip est réalisée, sinon l'aperçu du protocole."""
+        m = self.ctrl.courante
+        if m is None:
+            return
+        if m.etat == REALISEE:
+            self.aller("rapport")
+        else:
+            self.ouvrir_protocole(m.id)
 
     def ouvrir_protocole(self, ident: str, mode: str = "apercu"):
         """Protocole › Édition de cette manip."""
@@ -235,9 +248,14 @@ class Fenetre(QMainWindow):
 
     def rafraichir(self):
         m, ctrl = self.ctrl.courante, self.ctrl
+        if self.page == "rapport" and (m is None or m.etat != REALISEE):
+            self.page = "rapports"  # plus de rapport tant que le protocole n'est pas réalisé
+            self.pile.setCurrentIndex(list(self.pages).index("rapports"))
         for k, b in self.nav.items():
             b.setProperty("actif", k == self.page)
-            b.setEnabled(k not in PAGES_MANIP or m is not None)
+            b.setEnabled(k not in PAGES_MANIP or (m is not None and (k != "rapport" or m.etat == REALISEE)))
+            if k == "rapport":
+                b.setToolTip("Rapport de la manip ouverte" if b.isEnabled() else "Disponible quand le protocole de la manip est « Réalisée »")
             b.style().unpolish(b)
             b.style().polish(b)
         self._carte()

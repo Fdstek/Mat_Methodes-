@@ -16,7 +16,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   `pip install --break-system-packages -r requirements.txt PySide6 pytest-qt ruff pyinstaller openpyxl`
   puis `apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3`.
 - Pour les captures Qt hors écran : appeler `QTest.qWait(...)` avant `grab()`. Pour vérifier qu'il n'y a pas de débordement horizontal, comparer `minimumSizeHint().width()` à la largeur disponible.
-- Dans le texte d'un QPushButton, écrire `&&` pour afficher un `&`. Dans le QSS, cibler les widgets par `#objectName` pour éviter les fuites de style.
+- `widgets.bouton()` double déjà les `&` : y écrire `&` ; seul un `setText` direct sur un QPushButton (ex. le menu) demande `&&`. Dans le QSS, cibler les widgets par `#objectName` pour éviter les fuites de style.
 - Après une PR : s'abonner (`subscribe_pr_activity`) et programmer une vérification avec `send_later` (environ 50 min) ; l'annuler une fois la PR fusionnée.
 
 ## Pile technique
@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\<Prénom NOM>\` : un dossier par personne éditrice. On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 7` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 8` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -62,10 +62,9 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 14 (+ correctif de test Windows sur la branche).
-- Lot du 02/11 19h47 (menu Définition / Protocole / Rapport avec sous-sections, statuts fixes, ordre des protocoles,
-  Protocole › Édition avec aperçu ou modification, rapport = manips réalisées, PDF sans heure réelle ni observations,
-  tags en liste déroulante dans Définition) : poussé sur la branche, PR à ouvrir quand l'utilisateur le demande.
+- Lots livrés et fusionnés jusqu'à la PR n° 16 ; la construction de l'exe sous Windows réussit (02/11).
+- Lot du 02/11 soir (rapport seulement pour une manip réalisée, ordre ◂ ▸ / ↑ ↓ des listes des Réglages et des tags,
+  bouton « Valider le Mat & Méthode » à la place de « Lancer la manip ») : poussé sur la branche, PR à ouvrir sur demande.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

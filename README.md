@@ -105,6 +105,14 @@ gardé dans les Réglages partagés (`ordre_protocoles`) : le changer ne modifie
 automatiquement : À faire → Validée, Lancée / En cours → En cours, Terminée / Réalisée → Réalisée, Non réalisée → Annulée.
 Seules les manips annulées ou archivées peuvent être supprimées (menu « … »).
 
+Dans Flux, le bandeau du haut propose « ✔ Valider le Mat & Méthode » (Brouillon → Validée : la manip passe dans
+Protocole) ; la manip est lancée en passant son statut à « En cours » dans Protocole. « Rapport de la manip » n'est
+accessible que pour une manip réalisée ; sinon « Étape suivante » sur la dernière étape mène à l'aperçu du protocole.
+
+**Ordre des listes** : dans Réglages, ◂ ▸ sur chaque pastille (types, analyses, matériel, réactifs, grandes étapes,
+catégories « À faire », tags) et ↑ ↓ sur chaque ligne (personnes, laboratoires, opérations) changent l'ordre ; c'est
+l'ordre des listes déroulantes.
+
 **Protocole (PDF)** : « Protocole : <nom> », le même cartouche que le rapport, le contexte (2.1), le flux, les réactifs,
 puis le détail par phase avec, dans chaque phase, le tableau de ses échantillons (commentaire compris) et des cases vides
 pour noter à la main les n° Scirius / Aramis.

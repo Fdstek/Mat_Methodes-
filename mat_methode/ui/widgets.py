@@ -375,18 +375,35 @@ def numero(n: int, taille=22) -> QLabel:
 
 
 class ChipSupprimable(QFrame):
-    """Pastille avec ✕ (retirer) et, si `renommer` est donné, ✎ (renommer)."""
+    """Pastille avec ✕ (retirer) ; ✎ (renommer) si `renommer` est donné ; ◂ ▸ (changer l'ordre) si `deplacer` est donné
+    (`deplacer(-1)` : avant, `deplacer(1)` : après ; `bornes` = (premier, dernier) pour griser la flèche inutile)."""
 
-    def __init__(self, texte: str, retirer: Callable, tip: str = "", renommer: Callable | None = None, tip_renommer: str = ""):
+    def __init__(self, texte: str, retirer: Callable, tip: str = "", renommer: Callable | None = None, tip_renommer: str = "",
+                 deplacer: Callable | None = None, bornes: tuple[bool, bool] = (False, False)):
         super().__init__()
         self.setObjectName("chip")
         self.setStyleSheet(f"QFrame#chip{{background:{theme.P.bouton};border:1px solid {theme.P.trait};border-radius:4px;}}")
         lay = QHBoxLayout(self)
         lay.setContentsMargins(8, 2, 2, 2)
         lay.setSpacing(4)
+        def petit(symbole, tip_, clic, actif=True):
+            b = QPushButton(symbole)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setAccessibleName(tip_)
+            b.setToolTip(tip_)
+            b.setStyleSheet("QPushButton{border:none;background:transparent;padding:2px 3px;font-size:9pt;}"
+                            "QPushButton:disabled{color:transparent;}")
+            b.clicked.connect(lambda *_: clic())
+            b.setEnabled(actif)
+            return b
+
+        if deplacer is not None:
+            lay.addWidget(petit("◂", f"Placer « {texte} » avant", lambda: deplacer(-1), not bornes[0]))
         l = QLabel(texte)
         l.setStyleSheet("border:none;")
         lay.addWidget(l)
+        if deplacer is not None:
+            lay.addWidget(petit("▸", f"Placer « {texte} » après", lambda: deplacer(1), not bornes[1]))
         if renommer is not None:
             r = QPushButton("✎")
             r.setCursor(Qt.CursorShape.PointingHandCursor)

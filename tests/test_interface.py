@@ -90,7 +90,14 @@ def test_parcours_nouvelle_manip(fen, qtbot, monkeypatch):
     assert m.prelevements[0].labo == "Labo interne" and m.prelevements[0].moment == "effluent"
     fen.p_flux.suivante()
     fen.p_flux.suivante()
-    assert fen.page == "rapport"
+    assert fen.page == "protocole"  # brouillon : la dernière étape mène à l'aperçu du protocole, pas au rapport
+    assert not fen.nav["rapport"].isEnabled()
+    fen.aller("rapport")
+    assert fen.page == "protocole"
+    monkeypatch.setattr(D, "confirmer", lambda *a, **k: True)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux._valider()
+    assert m.etat == "validee" and m.id in fen.ctrl.reglages.ordre_protocoles
     qtbot.waitUntil(lambda: (fen.ctrl.st.d_manips / f"{m.id}.json").exists(), timeout=2000)
 
 
@@ -433,3 +440,25 @@ def test_tags_en_liste_et_section_volumes(fen):
     assert "1\u202f000 mL engagés · 325 mL prélevés · 675 mL restants" in x.tete.text()
     textes = [w.text() for w in fen.p_flux._volumes.findChildren(type(fen.titre))]
     assert "ENGAGÉ" in textes and "RESTANT" in textes and "S5b" in " ".join(textes)
+
+
+def test_ordre_dans_les_reglages(fen):
+    from mat_methode.domain.regles import tous_les_tags
+    from mat_methode.ui.widgets import Liste
+    r = fen.ctrl.reglages
+    fen.aller("reglages")
+    p = fen.p_reglages
+    t0 = list(r.types_demande)
+    p._deplacer(r.types_demande, 1, -1)
+    assert r.types_demande == [t0[1], t0[0]] + t0[2:]
+    p0 = [x.nom for x in r.personnes]
+    r.personnes.append(type(r.personnes[0])(nom="Claire LACOUX"))
+    p._deplacer(r.personnes, len(r.personnes) - 1, -1)
+    assert [x.nom for x in r.personnes][-2:] == ["Claire LACOUX", p0[-1]]
+    ts = tous_les_tags(fen.ctrl.manips, r.ordre_tags)
+    p._deplacer_tag(ts[-1], -1)
+    assert tous_les_tags(fen.ctrl.manips, r.ordre_tags)[-2] == ts[-1]
+    m = next(x for x in fen.ctrl.manips if x.nom == "Désacidification éthanol")
+    fen.ouvrir(m.id, "def")
+    typ = next(x for x in fen.p_flux.findChildren(Liste) if r.types_demande[0] in [x.itemText(i) for i in range(x.count())])
+    assert [typ.itemText(i) for i in range(typ.count())][1:3] == r.types_demande[:2]
