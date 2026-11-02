@@ -73,6 +73,7 @@ class LigneEchantillon:
     aramis: str
     labo: str
     analyses: list[str]
+    commentaire: str = ""
 
 
 @dataclass
@@ -256,7 +257,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         n = numero_etape(m, p)
         return LigneEchantillon(id=lab[p.id], etape=f"{n} · {m.etapes[n - 1].operation}" if n else "entrée", n_etape=n,
                                 moment=moment_court(m, p), volume=p.volume_ml, scirius=p.scirius, aramis=p.aramis,
-                                labo=p.labo, analyses=list(p.analyses))
+                                labo=p.labo, analyses=list(p.analyses), commentaire=p.commentaire.strip())
 
     tab_ech = [ligne_ech(p) for p in ech]
     phases = [Phase(0, "Départ", "", [], [], [x for x in tab_ech if x.n_etape == 0])]

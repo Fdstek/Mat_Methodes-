@@ -19,15 +19,26 @@ def test_crit3_etiquettes(ethanol):
     assert R.etiquettes(ethanol)[s3[1].id] == "S3"
 
 
-def test_ordre_avant_pendant_effluent():
+def test_echantillon_ajoute_a_la_suite():
+    """Un échantillon ajouté prend la lettre suivante, même s'il est prélevé plus tôt : les étiquettes notées ne bougent pas."""
     m = Manip()
     e = R.ajouter_etape(m, "chauffage")
     p_eff = Prelevement(etape_id=e.id, moment="effluent")
     p_20 = Prelevement(etape_id=e.id, moment="pendant", temps_min=20)
+    m.prelevements = [p_eff, p_20]
+    assert (R.etiquettes(m)[p_eff.id], R.etiquettes(m)[p_20.id]) == ("S1a", "S1b")
     p_5 = Prelevement(etape_id=e.id, moment="pendant", temps_min=5)
-    m.prelevements = [p_eff, p_20, p_5]
+    m.prelevements.append(p_5)
     lab = R.etiquettes(m)
-    assert (lab[p_5.id], lab[p_20.id], lab[p_eff.id]) == ("S1a", "S1b", "S1c")
+    assert (lab[p_eff.id], lab[p_20.id], lab[p_5.id]) == ("S1a", "S1b", "S1c")
+
+
+def test_suivi_des_volumes():
+    m = Manip()
+    m.contexte.volume_depart_ml = 500
+    e = R.ajouter_etape(m, "chauffage")
+    m.prelevements = [Prelevement(volume_ml=50), Prelevement(etape_id=e.id, moment="pendant", temps_min=10, volume_ml=120)]
+    assert R.suivi_volumes(m) == [("S0", "avant traitement", 50, 450), ("S1", "étape 1 (chauffage) · pendant · à 10 min", 120, 330)]
 
 
 def test_code_badge():

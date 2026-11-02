@@ -81,10 +81,19 @@ température, durée, agitation, membrane, sous vide et autres conditions (Ctrl+
 **Matériel** : liste dans Réglages › Matériel, proposée en liste déroulante dans « Matériel utilisé » de chaque étape ;
 un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans les étapes.
 
+**Volumes** : section « Volumes » sous « Ma demande » : volume engagé (départ), prélevé (total des échantillons), restant,
+la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (en rouge en cas de dépassement).
+
+**Échantillons** : un échantillon ajouté prend la lettre suivante de son étape (S3a, S3b, puis S3c), quel que soit son
+moment : les étiquettes déjà notées ne changent pas. Chaque échantillon a une ligne « Commentaire », reprise dans le
+protocole et le détail du Rapport.
+
+**Tags** : liste déroulante des tags déjà utilisés (on peut aussi en taper un nouveau, Entrée).
+
 **Listes déroulantes** : la molette de la souris ne change jamais une liste fermée (elle fait défiler la page).
 
 **État de la manip** : liste déroulante « État » dans « Ma demande » (et dans le Rapport) : Brouillon, À faire, Lancée,
-En cours, Terminée, Non réalisée. « Modifier la liste » ouvre Réglages › États (ajouter, renommer, couleur, ordre ↑ ↓).
+En cours, Réalisée, Terminée, Non réalisée. « Modifier la liste » ouvre Réglages › États (ajouter, renommer, couleur, ordre ↑ ↓).
 « Lancer la manip » passe l'état à « Lancée ».
 
 **Protocole** : onglet « Protocole » (entre Flux et Rapport) avec l'aperçu du PDF, « Exporter le protocole (PDF) »,
@@ -109,6 +118,9 @@ Prérequis : Python 3.12 64 bits (`py -3.12`).
 ```powershell
 powershell -ExecutionPolicy Bypass -File build\build.ps1
 ```
+
+ou double-clic sur `build\Construire.bat`. La fenêtre reste ouverte à la fin (Entrée pour fermer) et affiche
+« Construction réussie » ou l'erreur ; tout le déroulé est aussi écrit dans `build\build.log`.
 
 Le script crée un environnement virtuel propre, installe `requirements.txt`, lance les tests, construit avec
 PyInstaller (`build\MatMethode.spec`, mode **--onedir --windowed**, jamais --onefile qui passe par `%TEMP%`)

@@ -22,14 +22,14 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 ## Pile technique
 - Python 3.12 ou 3.13, PySide6 avec une feuille de style Fluent maison (`ui/theme.py`, aucune bibliothèque GPL), pydantic v2.
 - reportlab (PDF), python-docx et Pillow (Word, image du flux), pdfplumber (extraction), openpyxl (Scirius), pywin32 (Excel COM, Windows seulement).
-- Construction : `build/build.ps1`, enregistré en **UTF-8 avec BOM et en CRLF**. Il cherche `py -3.12`, puis `py -3.13`, puis `python`, crée un venv, lance pytest, puis PyInstaller avec `build/MatMethode.spec` (`--onedir --windowed`).
+- Construction : `build/build.ps1`, enregistré en **UTF-8 avec BOM et en CRLF**. Il garde la fenêtre ouverte à la fin et écrit `build\build.log` ; `build\Construire.bat` le lance par double-clic. Il cherche `py -3.12`, puis `py -3.13`, puis `python`, crée un venv, lance pytest, puis PyInstaller avec `build/MatMethode.spec` (`--onedir --windowed`).
   Le résultat est `build\dist\MatMethode_1.0\`. Tout nouveau fichier de `mat_methode/data/` doit être ajouté au `.spec`.
 
 ## Données (à côté de l'exe, sans base SQLite)
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\<Prénom NOM>\` : un dossier par personne éditrice. On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 5` (5 : états « À faire » et « Lancée » ajoutés aux Réglages) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 6` (5 : états « À faire » et « Lancée » ; 6 : état « Réalisée » et commentaire d'échantillon) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -57,9 +57,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 11.
-- Lot du 02/11 14h57 (duplication de grande étape, états À faire / Lancée choisis dans Ma demande, ordre des « À faire »,
-  Protocole et onglet Protocole) : poussé sur la branche, PR à ouvrir quand l'utilisateur le demande.
+- Lots livrés et fusionnés jusqu'à la PR n° 12.
+- Lot du 02/11 17h48 (échantillons numérotés à la suite, commentaire d'échantillon, tags en liste déroulante, état
+  « Réalisée », fenêtre PowerShell qui reste ouverte + build.log + Construire.bat, section « Volumes ») : poussé sur la
+  branche, PR à ouvrir quand l'utilisateur le demande.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

@@ -69,6 +69,16 @@ def etats_v5(etats: list) -> list:
     return etats
 
 
+def etats_v6(etats: list) -> list:
+    """Ajoute « Réalisée » (après « En cours », sinon à la fin) s'il manque."""
+    etats = list(etats)
+    if any(isinstance(e, dict) and (e.get("id") == "realisee" or norm(e.get("nom", "")) == "realisee") for e in etats):
+        return etats
+    pos = next((k + 1 for k, e in enumerate(etats) if isinstance(e, dict) and e.get("id") == "encours"), len(etats))
+    etats.insert(pos, {"id": "realisee", "nom": "Réalisée", "ton": "ok"})
+    return etats
+
+
 def migrer(d: dict, chemin: Path) -> dict:
     """Vérifie le numéro de schéma ; sauvegarde puis migre les données anciennes."""
     s = d.get("schema", 1)
@@ -79,6 +89,8 @@ def migrer(d: dict, chemin: Path) -> dict:
         # 1 -> 2 : grandes étapes (champs nouveaux avec valeurs par défaut, rien à convertir)
         if s < 5 and isinstance(d.get("etats"), list):  # Réglages, 4 -> 5 : états « À faire » et « Lancée » proposés
             d["etats"] = etats_v5(d["etats"])
+        if s < 6 and isinstance(d.get("etats"), list):  # Réglages, 5 -> 6 : état « Réalisée » ; manips : commentaire d'échantillon
+            d["etats"] = etats_v6(d["etats"])
         d["schema"] = SCHEMA_DONNEES
     return d
 

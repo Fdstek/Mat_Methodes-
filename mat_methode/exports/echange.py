@@ -74,7 +74,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
         "prelevements": [{"id": lab[p.id], "apres_etape": numero_etape(m, p),
                           "moment": p.moment if numero_etape(m, p) else "avant", "temps_min": _nombre(p.temps_min),
                           "volume_ml": _nombre(p.volume_ml), "scirius": p.scirius or None, "aramis": p.aramis or None,
-                          "labo": p.labo, "analyses": list(p.analyses)} for p in echantillons_tries(m)],
+                          "labo": p.labo, "analyses": list(p.analyses),
+                          **({"commentaire": p.commentaire.strip()} if p.commentaire.strip() else {})} for p in echantillons_tries(m)],
         "phases": [{"titre": ph.titre, "conditions": ph.conditions, "materiel": ph.materiel,
                     "reactifs": [{"nom": x.nom, "quantite": x.quantite, "scirius": x.scirius, "emplacement": x.emplacement,
                                   "fournisseur": x.fournisseur, "lot": x.lot} for x in ph.reactifs],
@@ -157,7 +158,7 @@ def importer(d, reglages: Reglages) -> tuple[Manip, list[int]]:
             etape_id=e.id if e else None, moment=("pendant" if p.get("moment") == "pendant" else "effluent") if e else "avant",
             temps_min=p.get("temps_min"), volume_ml=p.get("volume_ml") if p.get("volume_ml") is not None else 50,
             scirius=p.get("scirius") or "", aramis=p.get("aramis") or "", labo=p.get("labo") or "",
-            analyses=list(p.get("analyses") or [])))
+            analyses=list(p.get("analyses") or []), commentaire=p.get("commentaire") or ""))
     for r in d.get("inventaire_reactifs") or []:
         f = reglages.assurer_reactif(cap(r.get("nom") or ""))
         if f:

@@ -141,6 +141,7 @@ class PageFlux(QWidget):
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
         self._bilan = None
+        self._volumes = None
         self._lancement = None
         self._colonne = None
 
@@ -178,6 +179,14 @@ class PageFlux(QWidget):
         self._remplir_lancement()
         demande = self._demande()
         self.lay.addWidget(demande)
+        x_vol = Expander("Volumes", "", ouvert=getattr(self, "_volumes_ouvert", True))
+        x_vol.tete.clicked.connect(lambda *_: setattr(self, "_volumes_ouvert", x_vol.ouvert))
+        self._volumes = QWidget()
+        QVBoxLayout(self._volumes).setContentsMargins(0, 0, 0, 0)
+        self._volumes_x = x_vol
+        x_vol.ajouter(self._volumes)
+        self._remplir_volumes()
+        self.lay.addWidget(x_vol)
         a_faire = self._a_faire()
         self.lay.addWidget(a_faire)
         piv = QHBoxLayout()
@@ -201,6 +210,8 @@ class PageFlux(QWidget):
         """Après une frappe : bilan, lancement, cartes du flux ; jamais les champs en cours de saisie."""
         if self._bilan is not None:
             self._remplir_bilan()
+        if self._volumes is not None:
+            self._remplir_volumes()
         if self._lancement is not None:
             self._remplir_lancement()
         if self._colonne is not None and self.mode == "comp":
@@ -323,10 +334,12 @@ class PageFlux(QWidget):
         # tags
         tags = [ChipSupprimable(f"#{t}", lambda t=t: self._retirer_tag(t), f"Retirer le tag {t}") for t in m.tags]
         sugg = [t for t in R.tous_les_tags(self.ctrl.manips) if not any(t.lower() == x.lower() for x in m.tags)]
-        self._tag = ChampTexte("", "Ajouter un tag (Entrée)", suggestions=sugg)
-        self._tag.setMaximumWidth(260)
-        self._tag.returnPressed.connect(self._ajouter_tag)
-        tags += [self._tag, bouton("Ajouter", self._ajouter_tag)]
+        self._tag = ListeSaisie(sugg, "Choisir ou taper un tag")
+        self._tag.setAccessibleName("Ajouter un tag")
+        self._tag.setToolTip("Liste des tags déjà utilisés ; on peut aussi en taper un nouveau (Entrée)")
+        self._tag.setMaximumWidth(280)
+        self._tag.valide.connect(lambda v: self._ajouter_tag(v))
+        tags += [self._tag, bouton("Ajouter", lambda: self._ajouter_tag(self._tag.currentText()))]
         lay.addWidget(champ("Tags", flux_widgets(tags)))
         self._bilan = QWidget()
         QHBoxLayout(self._bilan).setContentsMargins(0, 0, 0, 0)
@@ -385,8 +398,8 @@ class PageFlux(QWidget):
         self.m.a_faire = [x for x in self.m.a_faire if x is not t]
         self._toucher(True)
 
-    def _ajouter_tag(self):
-        if R.ajouter_tags(self.m, self._tag.text(), R.tous_les_tags(self.ctrl.manips)):
+    def _ajouter_tag(self, texte: str = ""):
+        if texte.strip() and R.ajouter_tags(self.m, texte, R.tous_les_tags(self.ctrl.manips)):
             self._toucher(True)
         from PySide6.QtCore import QTimer
         QTimer.singleShot(0, lambda: getattr(self, "_tag", None) and self._tag.setFocus())
@@ -400,13 +413,71 @@ class PageFlux(QWidget):
         lay = self._bilan.layout()
         vider(lay)
         b = R.bilan(self.m)
-        lay.addWidget(pastille(f"{fmt_vol(b.depart)} mL au départ"))
-        lay.addWidget(pastille(f"{fmt_vol(b.preleve)} mL prélevés ({b.n} éch.)"))
-        lay.addWidget(pastille(f"dépassement de {fmt_vol(-b.restant)} mL" if b.depassement else f"{fmt_vol(b.restant)} mL restants",
-                               "warn" if b.depassement else "ok"))
+        if b.depassement:
+            lay.addWidget(pastille(f"Volumes : dépassement de {fmt_vol(-b.restant)} mL", "warn"))
         if b.numeros_a_saisir:
             lay.addWidget(pastille(f"{b.numeros_a_saisir} numéro{'s' if b.numeros_a_saisir > 1 else ''} à saisir", "warn"))
         lay.addStretch(1)
+
+    def _remplir_volumes(self):
+        """Section « Volumes » : engagé (départ), prélevé (échantillons), restant ; puis le détail échantillon par échantillon."""
+        from PySide6.QtWidgets import QProgressBar
+        lay = self._volumes.layout()
+        vider(lay)
+        m, p = self.m, theme.P
+        b = R.bilan(m)
+        self._volumes_x.changer_note(f"{fmt_vol(b.depart)} mL engagés · {fmt_vol(b.preleve)} mL prélevés · "
+                                     + (f"dépassement de {fmt_vol(-b.restant)} mL" if b.depassement else f"{fmt_vol(b.restant)} mL restants"))
+
+        def tuile(titre, valeur, detail, couleur=None):
+            f = QFrame()
+            f.setObjectName("sousCarte")
+            v = QVBoxLayout(f)
+            v.setContentsMargins(14, 10, 14, 10)
+            v.setSpacing(2)
+            v.addWidget(etiquette(titre, "etiquetteChamp"))
+            val = etiquette(valeur, "titrePage")
+            if couleur:
+                val.setStyleSheet(f"color:{couleur};")
+            v.addWidget(val)
+            v.addWidget(etiquette(detail, secondaire=True, wrap=True))
+            return f
+
+        depart = m.contexte.volume_depart_ml
+        lay.addWidget(ligne(
+            tuile("ENGAGÉ", f"{fmt_vol(b.depart)} mL" if depart else "—", "volume de départ (Ma demande)" if depart else "volume de départ à saisir dans Ma demande"),
+            tuile("PRÉLEVÉ", f"{fmt_vol(b.preleve)} mL", f"{b.n} échantillon{'s' if b.n > 1 else ''}"),
+            tuile("RESTANT", f"{fmt_vol(b.restant)} mL", "dépassement : plus prélevé qu’engagé" if b.depassement else "à la fin du flux",
+                  p.danger if b.depassement else p.succes)))
+        if b.depart:
+            barre = QProgressBar()
+            barre.setRange(0, 100)
+            barre.setValue(min(100, round(100 * b.preleve / b.depart)))
+            barre.setFormat(f"{min(999, round(100 * b.preleve / b.depart))} % du volume engagé est prélevé")
+            barre.setTextVisible(True)
+            barre.setAccessibleName("Part du volume engagé prélevée")
+            lay.addWidget(barre)
+        suivi = R.suivi_volumes(m)
+        if suivi:
+            g = QGridLayout()
+            g.setHorizontalSpacing(18)
+            g.setVerticalSpacing(4)
+            for k, t in enumerate(("Éch.", "Où et quand", "Prélevé", "Reste ensuite")):
+                g.addWidget(etiquette(t, "etiquetteChamp"), 0, k)
+            for i, (lab, ou, vol, reste) in enumerate(suivi, start=1):
+                g.addWidget(etiquette(f"<b style='color:{p.ambre_texte}'>{lab}</b>"), i, 0)
+                g.addWidget(etiquette(ou, wrap=True), i, 1)
+                g.addWidget(etiquette(f"{fmt_vol(vol)} mL"), i, 2)
+                r = etiquette(f"{fmt_vol(reste)} mL" if b.depart else "—")
+                if b.depart and reste < 0:
+                    r.setStyleSheet(f"color:{p.danger};font-weight:600;")
+                g.addWidget(r, i, 3)
+            g.setColumnStretch(1, 1)
+            w = QWidget()
+            w.setLayout(g)
+            lay.addWidget(w)
+        else:
+            lay.addWidget(etiquette("Aucun échantillon prévu : tout le volume engagé reste disponible.", secondaire=True))
 
     # ------------------------------------------------------------ 1 · Définir le flux
     def _definir(self) -> QWidget:
@@ -1122,6 +1193,9 @@ class PageFlux(QWidget):
             ar = ChampTexte(p.aramis, "à saisir", mono=True)
             ar.modifie.connect(lambda val, p=p: (setattr(p, "aramis", val.strip()), self._toucher()))
             v.addWidget(ligne(champ("N° Scirius", sc), champ("N° Aramis", ar)))
+            com = ChampTexte(p.commentaire, "ex. prélever sous agitation, flacon ambré…")
+            com.modifie.connect(lambda val, p=p: (setattr(p, "commentaire", val), self._toucher()))
+            v.addWidget(champ("Commentaire", com))
             g.addWidget(sf, k // 2, k % 2, Qt.AlignmentFlag.AlignTop)
         wg = QWidget()
         wg.setLayout(g)
