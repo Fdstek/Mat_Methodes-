@@ -124,3 +124,13 @@ def test_a_faire():
     m.a_faire = [Tache(categorie="Réactif manquant", texte="Commander acide phosphorique")]
     assert Manip.model_validate(m.to_json()).a_faire[0].texte == "Commander acide phosphorique"
     assert R.dupliquer(m, r).a_faire == []
+
+
+def test_materiel_dans_les_reglages(exemples):
+    r, manips = exemples
+    r2 = Reglages()
+    assert "Étuve" in r2.materiels and "Plaque chauffante agitatrice" in r2.materiels
+    r.materiels = list(r2.materiels)
+    ch = O.renommer_materiel(r, manips, "Étuve", "Étuve ventilée 105 °C")
+    assert ch and "Étuve ventilée 105 °C" in r.materiels
+    assert all("Étuve" not in e.equipements for m in manips for e in m.etapes)

@@ -27,8 +27,15 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(NOM_APPLICATION)
     app.setApplicationVersion(VERSION)
-    ico = racine / "_internal" / "MatMethode.ico"
-    if ico.exists():
+    if sys.platform == "win32":  # la barre des tâches de Windows affiche alors l'icône de l'application
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MatMethode.MatMethode")
+        except Exception:
+            pass
+    from importlib import resources
+    ico = resources.files("mat_methode.data").joinpath("MatMethode.ico")
+    if ico.is_file():
         app.setWindowIcon(QIcon(str(ico)))
 
     st = Stockage(racine, utilisateur(), poste())

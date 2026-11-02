@@ -181,7 +181,7 @@ class PageManips(QWidget):
         g.setHorizontalSpacing(12)
         gauche = QVBoxLayout()
         gauche.setSpacing(4)
-        nom = etiquette(m.nom, "titreCarte")
+        nom = etiquette(m.nom, "titreCarte", wrap=True)  # titre complet, sur plusieurs lignes si besoin
         gauche.addWidget(nom)
         tags = []
         if m.contexte.donneur:

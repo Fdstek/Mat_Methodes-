@@ -154,7 +154,17 @@ class NumberBox(QLineEdit):
         self._unite.setGeometry(self.width() - s.width() - 10, (self.height() - s.height()) // 2, s.width(), s.height())
 
 
-class Liste(QComboBox):
+class SansMolette:
+    """La molette ne change pas une liste déroulante fermée : elle fait défiler la page."""
+
+    def wheelEvent(self, e):
+        if not self.view().isVisible():
+            e.ignore()
+            return
+        super().wheelEvent(e)
+
+
+class Liste(SansMolette, QComboBox):
     """ComboBox fermée ; une valeur absente de la liste reste affichée comme option (§8.7)."""
     choisi = Signal(str)
 
@@ -173,7 +183,7 @@ class Liste(QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i) or ""))
 
 
-class ChoixVolume(QComboBox):
+class ChoixVolume(SansMolette, QComboBox):
     """Volume d'échantillon choisi dans la liste des Réglages (30 mL … 1 L).
     Un volume existant hors liste reste affiché comme option."""
     choisi = Signal(object)
@@ -192,6 +202,27 @@ class ChoixVolume(QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i)))
         self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.setMinimumContentsLength(7)
+
+
+class ListeSaisie(SansMolette, QComboBox):
+    """Liste déroulante où l'on peut aussi taper une valeur absente de la liste (matériel…)."""
+    valide = Signal(str)
+
+    def __init__(self, options: list[str], placeholder: str = ""):
+        super().__init__()
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.addItems(options)
+        self.setCurrentIndex(-1)
+        self.lineEdit().setPlaceholderText(placeholder)
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.setMinimumContentsLength(18)
+        c = self.completer()
+        if c is not None:
+            c.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            c.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.lineEdit().returnPressed.connect(lambda: self.valide.emit(self.currentText().strip()))
+        self.activated.connect(lambda i: self.valide.emit(self.itemText(i).strip()))
 
 
 # ------------------------------------------------------------------ ToggleSwitch

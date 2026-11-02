@@ -62,6 +62,7 @@ class PageReglages(QWidget):
             ("personnes", "Personnes", "Donneurs d’ordre : nom, initiales (références), IGG", f"{len(r.personnes)}", self._personnes),
             ("laboratoires", "Laboratoires", "Volume par défaut et analyses de chaque labo", f"{len(r.laboratoires)}", self._laboratoires),
             ("operations", "Opérations", "Sous-étapes du flux (chauffage, filtration…) et texte", f"{len(r.operations)}", self._operations),
+            ("materiel", "Matériel", "Matériel proposé dans les étapes (plaque chauffante, étuve…)", f"{len(r.materiels)}", self._materiel),
             ("reactifs", "Réactifs", "Noms des réactifs proposés dans les étapes", f"{len(r.reactifs)}", self._reactifs),
             ("volumes", "Volumes d’échantillon", "30 mL … 1 L", f"{len(r.volumes_ml)}", self._volumes),
             ("analyses", "Analyses", "Analyses disponibles pour les laboratoires", f"{len(r.analyses)}", self._analyses),
@@ -140,6 +141,13 @@ class PageReglages(QWidget):
                            lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
                            "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».",
                            renommer=self._ren(O.renommer_type, lambda: self.r.types_demande))
+
+    def _materiel(self):
+        self._liste_simple("Matériel", self.r.materiels, lambda v: self.r.materiels.remove(v),
+                           lambda v: O.ajouter_simple(self.r.materiels, v), "Nouveau matériel",
+                           "Proposé dans « Matériel utilisé » de chaque étape. Un matériel tapé à la main dans une étape est ajouté ici. "
+                           "✎ renomme aussi dans les étapes de toutes les manips ; ✕ ne touche pas les étapes existantes.",
+                           renommer=self._ren(O.renommer_materiel, lambda: self.r.materiels))
 
     def _categories(self):
         self._liste_simple("Catégories « À faire »", self.r.categories_a_faire, lambda v: self.r.categories_a_faire.remove(v),
@@ -245,6 +253,22 @@ class PageReglages(QWidget):
         x.ajouter(ligne(champ("Fichier choisi", chemin), bouton("Parcourir…", parcourir), bouton("Automatique", auto),
                         bouton("Tester la lecture", tester, accent=True), "stretch"))
         x.ajouter(resultat)
+        x.ajouter(etiquette("Noms des destinataires affichés par défaut dans la recherche (format Scirius, ex. P.BURGUN). "
+                            "Une case dans la fenêtre de recherche permet de tout afficher.", secondaire=True, wrap=True))
+        x.ajouter(flux_widgets([ChipSupprimable(n, lambda n=n: (self.r.scirius_noms.remove(n), self._changer(), self.rafraichir()),
+                                                f"Retirer {n}") for n in self.r.scirius_noms]) if self.r.scirius_noms
+                  else etiquette("Aucun : toutes les lignes sont affichées", secondaire=True))
+        nom = ChampTexte("", "ex. P.BURGUN")
+
+        def ajout_nom():
+            v = nom.text().strip().upper().replace(" ", "")
+            if v and v not in self.r.scirius_noms:
+                self.r.scirius_noms.append(v)
+                self._changer()
+                self.rafraichir()
+
+        nom.returnPressed.connect(ajout_nom)
+        x.ajouter(ligne(champ("Nouveau nom", nom), bouton("Ajouter", ajout_nom), "stretch"))
 
     # ------------------------------------------------------------ opérations (sous-étapes)
     def _operations(self):

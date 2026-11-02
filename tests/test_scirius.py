@@ -85,3 +85,16 @@ def test_fichier_choisi(tmp_path):
 def test_initiales(nom, ini):
     from mat_methode.domain.models import initiales_de
     assert initiales_de(nom) == ini
+
+
+def test_filtre_noms_et_product_name_souhaite():
+    lignes = [
+        {"date": "01/10/2026", "dest": "P.BURGUN", "desired": "Graisse de porc filtrée", "product": "GRAISSE ANIMALE", "stock_item": "1"},
+        {"date": "02/10/2026", "dest": "C. LACOUX", "desired": "", "product": "Acétone", "stock_item": "2"},
+        {"date": "03/10/2026", "dest": "J.DUPONT", "desired": "", "product": "Hexane", "stock_item": "3"},
+    ]
+    assert S.nom_produit(lignes[0]) == "Graisse de porc filtrée" and S.nom_produit(lignes[1]) == "Acétone"
+    assert [x["stock_item"] for x in S.chercher(lignes, "", noms=["C.LACOUX", "P.BURGUN"])] == ["2", "1"]
+    assert len(S.chercher(lignes, "")) == 3
+    assert [x["stock_item"] for x in S.chercher(lignes, "graisse animale")] == ["1"]  # « Nom du produit » reste cherchable
+    assert S.chercher(lignes, "porc")[0]["nom"] == "Graisse de porc filtrée"
