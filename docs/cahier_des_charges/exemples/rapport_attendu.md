@@ -12,19 +12,49 @@ Version 4 · enregistrée le 30/10/2026 à 22:10 · lancée le 30/10/2026 à 20:
 
 ### 2.1 Échantillon
 
-Demande : Interne · R&D, type R&D (réf. DA-2026-0158). Objectif : Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %. Contexte : Essai de référence avant le passage à l’échelle pilote. Matière étudiée : Graisse animale (lot [n° à saisir]). Volume de départ : 1 000 mL, dont 325 mL prélevés sous forme de 6 échantillons. Le flux comporte 5 étapes (étapes 1 à 5), décrites en 2.3.
+Demande : Interne · R&D, type R&D (réf. DA-2026-0158).
+
+Objectif : Réduire le taux de FFA de la graisse animale par désacidification à l’éthanol 96 %.
+
+Contexte : Essai de référence avant le passage à l’échelle pilote.
+
+Matière étudiée : Graisse animale (lot [n° à saisir]).
+
+Volume de départ : 1 000 mL, dont 325 mL prélevés sous forme de 6 échantillons.
+
+Le flux comporte 5 étapes (étapes 1 à 5), décrites en 2.3.
 
 ### 2.2 Matériel et réactifs
 
-Matériel : plaque chauffante agitatrice (étape 1), entonnoir Büchner (étape 2), fiole à vide (étape 2), membrane 5 µm (étape 2), ampoule à décanter 500 mL (étapes 3, 4), étuve (étape 5). Réactifs : éthanol 96 % (étape 3, fournisseur [nom à saisir], lot [n° à saisir]) ; eau distillée (étape 3, fournisseur production interne, lot [n° à saisir]).
+Matériel : plaque chauffante agitatrice (étape 1), entonnoir Büchner (étape 2), fiole à vide (étape 2), membrane 5 µm (étape 2), ampoule à décanter 500 mL (étapes 3, 4), étuve (étape 5).
+
+Réactifs : éthanol 96 % (étape 3, fournisseur [nom à saisir], lot [n° à saisir]) ; eau distillée (étape 3, fournisseur production interne, lot [n° à saisir]).
 
 ### 2.3 Méthodes
 
-Étape 1 : le produit a été chauffé à 60 °C pendant 30 min sous agitation à 300 tr/min. Étape 2 : il a ensuite été filtré sous vide sur membrane de 5 µm pendant 10 min. Étape 3 : il a été désacidifié en présence d’éthanol 96 % (1 : 1, v/v) et d’eau distillée (5 %, v/v) à 25 °C pendant 15 min sous agitation à 300 tr/min. Étape 4 : il a ensuite été décanté à 40 °C pendant 2 h. Étape 5 : il a enfin été séché à 105 °C pendant 1 h.
+Étape 1 : le produit a été chauffé à 60 °C pendant 30 min sous agitation à 300 tr/min.
+
+Étape 2 : il a ensuite été filtré sous vide sur membrane de 5 µm pendant 10 min.
+
+Étape 3 : il a été désacidifié en présence d’éthanol 96 % (1 : 1, v/v) et d’eau distillée (5 %, v/v) à 25 °C pendant 15 min sous agitation à 300 tr/min.
+
+Étape 4 : il a ensuite été décanté à 40 °C pendant 2 h.
+
+Étape 5 : il a enfin été séché à 105 °C pendant 1 h.
 
 ### 2.4 Prélèvements
 
-Un échantillon de 50 mL (S0) a été prélevé avant traitement (entrée du flux), puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau, Impuretés insolubles) [n° Scirius 000412, n° Aramis 000873]. Un échantillon de 50 mL (S2) a été prélevé à l’effluent de l’étape 2 (filtration), puis analysé au Labo interne (FFA / indice d’acide, Impuretés insolubles) [n° Scirius 000413]. Un échantillon de 50 mL (S3a) a été prélevé pendant l’étape 3 (désacidification), à 10 min, puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau, Impuretés insolubles) [n° Scirius 000414]. Un échantillon de 25 mL (S3b) a été prélevé à l’effluent de l’étape 3 (désacidification), puis analysé au Labo externe (Métaux (ICP), Phosphore). Un échantillon de 50 mL (S5a) a été prélevé pendant l’étape 5 (séchage), à 30 min, puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau). Un échantillon de 100 mL (S5b) a été prélevé à l’effluent de l’étape 5 (séchage), puis analysé au Labo externe (FFA / indice d’acide, Teneur en eau, Métaux (ICP), Phosphore).
+Un échantillon de 50 mL (S0) a été prélevé avant traitement (entrée du flux), puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau, Impuretés insolubles) [n° Scirius 000412, n° Aramis 000873].
+
+Un échantillon de 50 mL (S2) a été prélevé à l’effluent de l’étape 2 (filtration), puis analysé au Labo interne (FFA / indice d’acide, Impuretés insolubles) [n° Scirius 000413].
+
+Un échantillon de 50 mL (S3a) a été prélevé pendant l’étape 3 (désacidification), à 10 min, puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau, Impuretés insolubles) [n° Scirius 000414].
+
+Un échantillon de 25 mL (S3b) a été prélevé à l’effluent de l’étape 3 (désacidification), puis analysé au Labo externe (Métaux (ICP), Phosphore).
+
+Un échantillon de 50 mL (S5a) a été prélevé pendant l’étape 5 (séchage), à 30 min, puis analysé au Labo interne (FFA / indice d’acide, Teneur en eau).
+
+Un échantillon de 100 mL (S5b) a été prélevé à l’effluent de l’étape 5 (séchage), puis analysé au Labo externe (FFA / indice d’acide, Teneur en eau, Métaux (ICP), Phosphore).
 
 ### Détail par phase du flux
 

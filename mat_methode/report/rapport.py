@@ -197,16 +197,17 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     grands = [(g, idx) for g, idx in blocs(m) if g is not None]
     sections = []
 
-    t21 = (f"Demande : {c.donneur or ph('donneur d’ordre')}{', type ' + c.type if c.type else ''} (réf. {c.ref or ph('n°')}). "
-           + phrase("Objectif", c.objectif) + (phrase("Idée testée", c.idee) if est_test(c.type) else "")
-           + phrase("Contexte", c.precisions)
-           + f"Matière étudiée : {c.matiere or ph('matière')} (lot {c.lot or ph('n°')}"
-           + (f", n° Scirius {c.scirius}" if c.scirius else "") + (f", fournisseur {c.fournisseur}" if c.fournisseur else "") + "). "
-           + "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
-           + (f", dont {fmt_vol(total_preleve(m))} mL prélevés sous forme de {ns} échantillon{'s' if ns > 1 else ''}" if ns else "")
-           + "."
-           + (f" Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else "")
-           + (" Grandes étapes : " + " ; ".join(f"{g.nom} ({plage([i + 1 for i in idx])})" for g, idx in grands) + "." if grands else ""))
+    # une idée par ligne (lisibilité) : les exports font un paragraphe par ligne
+    l21 = [f"Demande : {c.donneur or ph('donneur d’ordre')}{', type ' + c.type if c.type else ''} (réf. {c.ref or ph('n°')}).",
+           phrase("Objectif", c.objectif).strip(), (phrase("Idée testée", c.idee).strip() if est_test(c.type) else ""),
+           phrase("Contexte", c.precisions).strip(),
+           f"Matière étudiée : {c.matiere or ph('matière')} (lot {c.lot or ph('n°')}"
+           + (f", n° Scirius {c.scirius}" if c.scirius else "") + (f", fournisseur {c.fournisseur}" if c.fournisseur else "") + ").",
+           "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
+           + (f", dont {fmt_vol(total_preleve(m))} mL prélevés sous forme de {ns} échantillon{'s' if ns > 1 else ''}" if ns else "") + ".",
+           (f"Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else ""),
+           ("Grandes étapes : " + " ; ".join(f"{g.nom} ({plage([i + 1 for i in idx])})" for g, idx in grands) + "." if grands else "")]
+    t21 = "\n".join(x for x in l21 if x)
     sections.append(Section("2.1 Échantillon", t21))
 
     materiel: list[str] = []
@@ -225,7 +226,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         f = _inv(reglages, nom)
         reac_txt.append(f"{minuscule_initiale(nom)} ({etapes_txt(et)}, fournisseur {f.get('fournisseur') or ph('nom')}, lot {f.get('lot') or ph('n°')})")
     t22 = ("Matériel : " + (", ".join(f"{minuscule_initiale(x)} ({etapes_txt(materiel_etapes[norm(x)])})" for x in materiel) if materiel else ph("matériel"))
-           + "." + (f" Réactifs : {' ; '.join(reac_txt)}." if reac_txt else ""))
+           + "." + (f"\nRéactifs : {' ; '.join(reac_txt)}." if reac_txt else ""))
     sections.append(Section("2.2 Matériel et réactifs", t22))
 
     morceaux23 = []
@@ -233,7 +234,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         if g is not None:
             morceaux23.append(f"{g.nom} ({plage([i + 1 for i in idx])}).")
         morceaux23 += [f"Étape {i + 1} : {sujet(i, ne)} {clause_etape(m.etapes[i], reglages)}." for i in idx]
-    t23 = " ".join(morceaux23) if ne else ph("protocole")
+    t23 = "\n".join(morceaux23) if ne else ph("protocole")
     sections.append(Section("2.3 Méthodes", t23))
 
     if ns:
@@ -243,7 +244,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
             ids = ", ".join(x for x in [f"n° Scirius {p.scirius}" if p.scirius else "", f"n° Aramis {p.aramis}" if p.aramis else ""] if x)
             morceaux.append(f"Un échantillon de {fmt_vol(p.volume_ml or 0)} mL ({lab[p.id]}) a été prélevé {moment_phrase(m, p)}, puis analysé {labo}"
                             + (f" ({', '.join(p.analyses)})" if p.analyses else "") + (f" [{ids}]" if ids else "") + ".")
-        sections.append(Section("2.4 Prélèvements", " ".join(morceaux)))
+        sections.append(Section("2.4 Prélèvements", "\n".join(morceaux)))
 
     tab_reac = []
     for nom, et in reacs:
@@ -307,7 +308,9 @@ def markdown(m: Manip, reglages: Reglages) -> str:
         ln += ["", f"⚠ {mention_modifiee(m)}, voir la fin du document."]
     ln += ["", "## 2. Matériel et méthodes", ""]
     for s in r.sections:
-        ln += [f"### {s.titre}", "", vers_markdown(s.texte), ""]
+        ln += [f"### {s.titre}", ""]
+        for x in s.texte.split("\n"):  # un paragraphe par ligne
+            ln += [vers_markdown(x), ""]
     ln += ["### Détail par phase du flux", ""]
     for p in r.phases:
         if p.debut_groupe:

@@ -320,32 +320,40 @@ def blocs_phases(data: dict, corps) -> list:
     return blocs
 
 
-def ecrire_pdf(data: dict, chemin) -> None:
+def styles() -> dict:
     font, fontb = polices()
-    ctx, etapes, pre = data.get("contexte", {}), data["etapes"], data.get("prelevements", [])
-    titre = data.get("titre") or "Manip"
     st = getSampleStyleSheet()
     corps = ParagraphStyle("corps", parent=st["Normal"], fontName=font, fontSize=9.5, leading=14, textColor=INK)
-    petit = ParagraphStyle("petit", parent=corps, fontSize=8, leading=11, textColor=MUTED)
-    h1 = ParagraphStyle("h1", parent=st["Title"], fontName=fontb, fontSize=18, alignment=0, textColor=INK, spaceAfter=4)
-    h2 = ParagraphStyle("h2", parent=st["Heading2"], fontName=fontb, fontSize=12, textColor=TEAL, spaceBefore=10, spaceAfter=5)
-    h3 = ParagraphStyle("h3", parent=corps, fontName=fontb, spaceBefore=5, spaceAfter=2)
     cell = ParagraphStyle("c", parent=corps, fontSize=8.5, leading=11)
-    cellb = ParagraphStyle("cb", parent=cell, fontName=fontb)
+    return {
+        "font": font, "fontb": fontb, "corps": corps, "cell": cell,
+        "petit": ParagraphStyle("petit", parent=corps, fontSize=8, leading=11, textColor=MUTED),
+        "h1": ParagraphStyle("h1", parent=st["Title"], fontName=fontb, fontSize=18, alignment=0, textColor=INK, spaceAfter=4),
+        "h2": ParagraphStyle("h2", parent=st["Heading2"], fontName=fontb, fontSize=12, textColor=TEAL, spaceBefore=10, spaceAfter=5),
+        "h3": ParagraphStyle("h3", parent=corps, fontName=fontb, spaceBefore=5, spaceAfter=2),
+        "cellb": ParagraphStyle("cb", parent=cell, fontName=fontb),
+    }
+
+
+def document(chemin, titre: str, pied_texte: str = "Document généré automatiquement - à relire avant diffusion"):
+    font = polices()[0]
 
     def pied(canvas, doc):
         canvas.saveState()
         canvas.setFont(font, 7.5)
         canvas.setFillColor(MUTED)
-        canvas.drawString(18 * mm, 10 * mm, "Document généré automatiquement - à relire avant diffusion")
+        canvas.drawString(18 * mm, 10 * mm, pied_texte)
         canvas.drawRightString(192 * mm, 10 * mm, f"Mat & Méthode · page {doc.page}")
         canvas.restoreState()
 
     doc = SimpleDocTemplate(str(chemin), pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
                             topMargin=16 * mm, bottomMargin=18 * mm, title=titre, author="Mat & Méthode")
-    largeur = A4[0] - 36 * mm - 12
-    story = [Paragraph(escape(titre), h1)]
+    return doc, pied
 
+
+def cartouche(data: dict, s: dict) -> Table:
+    """Bandeau du haut : donneur d'ordre, référence, type, date, tags, version et lancement."""
+    ctx, corps = data.get("contexte", {}), s["corps"]
     lanc, jr = data.get("lancee"), data.get("journal") or []
     meta = [[("Donneur d’ordre", _ou(ctx.get("donneur"))), ("Réf. demande", _ou(ctx.get("ref")))],
             [("Type", escape(ctx.get("type") or "-")), ("Date", escape(ctx.get("date") or "-"))]]
@@ -362,8 +370,11 @@ def ecrire_pdf(data: dict, chemin) -> None:
                            ("SPAN", (1, len(rows) - 1), (3, len(rows) - 1)),
                            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]
                           + ([("SPAN", (1, 2), (3, 2))] if ctx.get("tags") else [])))
-    story += [t, Paragraph("Flux de prétraitement", h2), Flux(etapes, pre, largeur), Spacer(1, 3 * mm)]
+    return t
 
+
+def legende_flux(data: dict) -> str:
+    ctx, etapes, pre = data.get("contexte", {}), data["etapes"], data.get("prelevements", [])
     total = sum(e["parametres"].get("duree_min") or 0 for e in etapes)
     legende = (f"Durée cumulée des étapes chronométrées : {fmt_dur(total)}. Chaque prélèvement a un badge : dans la carte de l’étape, "
                "posé à son moment sur la frise (à l’extrémité droite pour un prélèvement à l’effluent), et sous la carte avec son nom, son volume et son moment.")
@@ -376,16 +387,11 @@ def ecrire_pdf(data: dict, chemin) -> None:
         reste = vd - pris
         legende += (f" Volume : {fmt_vol(vd)} mL au départ, {fmt_vol(pris)} mL prélevés, "
                     + (f"{fmt_vol(reste)} mL restants." if reste >= 0 else f"dépassement de {fmt_vol(-reste)} mL."))
-    story.append(Paragraph(escape(legende), petit))
+    return legende
 
-    story.append(Paragraph("Matériel et méthodes", h2))
-    for b in data.get("sous_sections", []):
-        if b.get("texte"):
-            story += [Paragraph(escape(b["titre"]), h3), Paragraph(avec_reperes(b["texte"]), corps)]
 
-    story.append(Paragraph("Détail par phase du flux", h2))
-    story += blocs_phases(data, corps)
-
+def table_reactifs(data: dict, s: dict) -> Table | None:
+    etapes, cell, cellb = data["etapes"], s["cell"], s["cellb"]
     inv = {r["nom"].lower(): r for r in data.get("inventaire_reactifs", [])}
     noms: list[tuple[str, list[str]]] = []
     for e in etapes:
@@ -398,26 +404,64 @@ def ecrire_pdf(data: dict, chemin) -> None:
                 noms.append(x)
             if str(e["n"]) not in x[1]:
                 x[1].append(str(e["n"]))
-    if noms:
-        lignes = [[Paragraph(h, cellb) for h in ["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Lot", "Étape"]]]
-        for nom, ns in noms:
-            f = inv.get(nom.lower(), {})
-            lignes.append([Paragraph(f"<b>{escape(nom)}</b>", cell)] + [Paragraph(_ou(f.get(k)), cell) for k in ("scirius", "emplacement", "fournisseur", "lot")]
-                          + [Paragraph(", ".join(ns), cell)])
-        tab = Table(lignes, colWidths=[30 * mm, 22 * mm, 52 * mm, 30 * mm, 20 * mm, 20 * mm], repeatRows=1)
-        tab.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-        story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
+    if not noms:
+        return None
+    lignes = [[Paragraph(h, cellb) for h in ["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Lot", "Étape"]]]
+    for nom, ns in noms:
+        f = inv.get(nom.lower(), {})
+        lignes.append([Paragraph(f"<b>{escape(nom)}</b>", cell)] + [Paragraph(_ou(f.get(k)), cell) for k in ("scirius", "emplacement", "fournisseur", "lot")]
+                      + [Paragraph(", ".join(ns), cell)])
+    tab = Table(lignes, colWidths=[30 * mm, 22 * mm, 52 * mm, 30 * mm, 20 * mm, 20 * mm], repeatRows=1)
+    tab.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    return tab
 
-    if pre:
-        lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Laboratoire", "Analyses"]]]
-        for p in pre:
-            etape = "entrée" if p["apres_etape"] == 0 else f"{p['apres_etape']} · {etapes[p['apres_etape'] - 1]['operation']}"
-            lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell), Paragraph(escape(etape), cell), Paragraph(escape(moment_texte(p)), cell),
-                           Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL", cell), Paragraph(_ou(p.get("scirius")), cell),
-                           Paragraph(_ou(p.get("aramis")), cell), Paragraph(escape(p.get("labo") or ""), cell),
-                           Paragraph(escape(", ".join(p.get("analyses", []))), cell)])
-        tab = Table(lignes, colWidths=[12 * mm, 28 * mm, 26 * mm, 17 * mm, 19 * mm, 19 * mm, 22 * mm, 31 * mm], repeatRows=1)
-        tab.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+
+def table_echantillons(data: dict, s: dict, a_remplir: bool = False) -> Table | None:
+    """Tableau des échantillons. `a_remplir` : cases vides (hautes) pour noter les numéros à la main."""
+    etapes, pre, cell, cellb = data["etapes"], data.get("prelevements", []), s["cell"], s["cellb"]
+    if not pre:
+        return None
+    vide = "" if a_remplir else MANQUE
+    lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Labo" if a_remplir else "Laboratoire", "Analyses"]]]
+    for p in pre:
+        etape = "entrée" if p["apres_etape"] == 0 else f"{p['apres_etape']} · {etapes[p['apres_etape'] - 1]['operation']}"
+        lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell), Paragraph(escape(etape), cell), Paragraph(escape(moment_texte(p)), cell),
+                       Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL", cell),
+                       Paragraph(escape(p["scirius"]) if p.get("scirius") else vide, cell),
+                       Paragraph(escape(p["aramis"]) if p.get("aramis") else vide, cell), Paragraph(escape(p.get("labo") or ""), cell),
+                       Paragraph(escape(", ".join(p.get("analyses", []))), cell)])
+    larg = [12 * mm, 28 * mm, 26 * mm, 17 * mm, 19 * mm, 19 * mm, 22 * mm, 31 * mm]
+    if a_remplir:  # colonnes des numéros plus larges, lignes plus hautes pour écrire à la main
+        larg = [11 * mm, 24 * mm, 22 * mm, 17 * mm, 25 * mm, 25 * mm, 18 * mm, 32 * mm]
+    tab = Table(lignes, colWidths=larg, repeatRows=1)
+    tab.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]
+                            + ([("TOPPADDING", (0, 1), (-1, -1), 8), ("BOTTOMPADDING", (0, 1), (-1, -1), 8)] if a_remplir else [])))
+    return tab
+
+
+def ecrire_pdf(data: dict, chemin) -> None:
+    s = styles()
+    corps, petit, h1, h2, h3, cell = s["corps"], s["petit"], s["h1"], s["h2"], s["h3"], s["cell"]
+    etapes, pre = data["etapes"], data.get("prelevements", [])
+    titre = data.get("titre") or "Manip"
+    doc, pied = document(chemin, titre)
+    largeur = A4[0] - 36 * mm - 12
+    lanc, jr = data.get("lancee"), data.get("journal") or []
+    story = [Paragraph(escape(titre), h1), cartouche(data, s), Paragraph("Flux de prétraitement", h2), Flux(etapes, pre, largeur),
+             Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
+
+    story.append(Paragraph("Matériel et méthodes", h2))
+    for b in data.get("sous_sections", []):
+        if b.get("texte"):
+            story += [Paragraph(escape(b["titre"]), h3)] + [Paragraph(avec_reperes(x), corps) for x in b["texte"].split("\n") if x]
+
+    story.append(Paragraph("Détail par phase du flux", h2))
+    story += blocs_phases(data, corps)
+    tab = table_reactifs(data, s)
+    if tab is not None:
+        story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
+    tab = table_echantillons(data, s)
+    if tab is not None:
         story.append(KeepTogether([Paragraph("Échantillons", h2), tab]))
 
     if lanc:

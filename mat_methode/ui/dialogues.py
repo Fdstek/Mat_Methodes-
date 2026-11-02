@@ -269,7 +269,7 @@ def importer(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
     return d.exec() == QDialog.DialogCode.Accepted
 
 
-FORMATS = [("pdf", "PDF avec le schéma du flux (.pdf)"), ("docx", "Word (.docx)"), ("md", "Texte (Markdown)"),
+FORMATS = [("pdf", "PDF avec le schéma du flux (.pdf)"), ("docx", "Word (.docx)"), ("ordre", "Ordre de manipulation (.pdf)"), ("md", "Texte (Markdown)"),
            ("html", "Rapport imprimable (HTML)"), ("json", "Données (JSON)")]
 
 
@@ -291,7 +291,7 @@ def exporter(parent, titre: str, contenu: Callable[[str], str], enregistrer: Cal
 
     def maj():
         f = fmt.currentData()
-        binaire = f in ("pdf", "docx")
+        binaire = f in ("pdf", "docx", "ordre")
         apercu.setVisible(not binaire)
         copier.setVisible(not binaire)
         copier.setText("Copier")
@@ -300,7 +300,8 @@ def exporter(parent, titre: str, contenu: Callable[[str], str], enregistrer: Cal
         info.setVisible(binaire)
         if not binaire:
             apercu.setPlainText(contenu(f))
-        ok.setText({"pdf": "Enregistrer le PDF…", "docx": "Enregistrer le document Word…"}.get(f, "Enregistrer…"))
+        ok.setText({"pdf": "Enregistrer le PDF…", "docx": "Enregistrer le document Word…", "ordre": "Enregistrer l’ordre de manipulation…"}
+                   .get(f, "Enregistrer…"))
         d.adjustSize()
 
     fmt.currentIndexChanged.connect(lambda *_: maj())

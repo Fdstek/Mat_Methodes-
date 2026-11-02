@@ -140,7 +140,7 @@ def test_crit18_exports_depuis_le_rapport(fen, tmp_path, monkeypatch):
         fen.exporter_fichier(fmt)
         assert cible.exists() and cible.stat().st_size > 500, fmt
     assert "Modifications après lancement" in (tmp_path / "sortie.md").read_text(encoding="utf-8")
-    assert fen.ctrl.st.lire_preferences()["dossier_export"] == str(tmp_path)
+    assert [r.fmt for r in m.rapports][-2:] == ["pdf", "docx"]  # documents émis gardés sur la manip (pas md/html/json)
 
 
 def test_import_pdf(fen):
@@ -323,3 +323,22 @@ def test_materiel_molette_et_titre(fen, qtbot):
                      Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
     liste.wheelEvent(ev)
     assert liste.currentIndex() == avant and not ev.isAccepted()
+
+
+def test_rapports_emis_par_personne_et_ordre(fen, monkeypatch):
+    from mat_methode.domain.models import Personne
+    fen.ctrl.reglages.personnes.append(Personne(nom="Claire LACOUX", igg="PIERRE"))  # IGG du poste de test : « pierre »
+    m = ethanol(fen)
+    fen.ouvrir(m.id)
+    fen.aller("rapport")
+    vus = {}
+    monkeypatch.setattr("mat_methode.ui.fenetre.QFileDialog.getSaveFileName", lambda _p, _t, chemin, _f: (vus.setdefault("chemin", chemin), "")[0:2])
+    fen.exporter_fichier("ordre")
+    chemin = vus["chemin"]
+    assert "Claire LACOUX" in chemin and chemin.endswith("DA-2026-0158 - Désacidification éthanol - Ordre de manipulation.pdf")
+    assert m.rapports and m.rapports[-1].type == "ordre" and m.rapports[-1].par == "Claire LACOUX"
+    ouverts = []
+    monkeypatch.setattr("PySide6.QtGui.QDesktopServices.openUrl", lambda url: ouverts.append(url.toLocalFile()))
+    fen.ouvrir_fichier(m.rapports[-1].chemin)
+    assert ouverts == [chemin]
+    fen.p_rapport.rafraichir()

@@ -81,6 +81,14 @@ un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans le
 
 **Listes déroulantes** : la molette de la souris ne change jamais une liste fermée (elle fait défiler la page).
 
+**Ordre de manipulation** : bouton du Rapport « Ordre de manipulation (PDF) » : document de paillasse avec le même
+cartouche que le rapport, le flux, le contexte (2.1), les réactifs, les échantillons et le détail par phase, avec des cases
+vides pour noter à la main les n° Scirius / Aramis, l'heure réelle des prélèvements et des observations.
+
+**Documents émis** : les PDF, Word et ordres de manipulation sont proposés dans `donnees\exports\<Prénom NOM>\`
+(la personne qui édite), nommés `<référence> - <nom>`. Chaque document émis est noté sur la manip : « Ouvrir le dernier
+document émis » et « Tous ▾ » dans l'onglet Rapport, « Dossier de mes rapports » ouvre le dossier.
+
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.
 

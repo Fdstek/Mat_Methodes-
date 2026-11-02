@@ -17,12 +17,21 @@ def test_html_identique_a_la_reference(ethanol, reglages):
 
 
 def test_seules_les_corrections_14_different_du_prototype(ethanol, reglages):
-    """La sortie ne diffère de la référence du prototype que sur les phrases corrigées (2.2 et 2.3)."""
+    """Une fois les lignes recollées, le texte ne diffère de la référence du prototype que sur 2.2 et 2.3 (corrections §14)."""
+    from mat_methode.report.rapport import vers_markdown
     proto = (EXEMPLES / "rapport_attendu_prototype.md").read_text(encoding="utf-8").splitlines()
-    neuf = markdown(ethanol, reglages).splitlines()
-    diff = [(a, b) for a, b in zip(proto, neuf) if a != b]
-    assert len(proto) == len(neuf) and len(diff) == 2
-    assert diff[0][1].startswith("Matériel : plaque chauffante") and diff[1][1].startswith("Étape 1 :")
+    textes = {s.titre: vers_markdown(" ".join(s.texte.split("\n"))) for s in construire(ethanol, reglages).sections}
+    for titre, egal in (("2.1 Échantillon", True), ("2.2 Matériel et réactifs", False), ("2.3 Méthodes", False), ("2.4 Prélèvements", True)):
+        ancien = proto[proto.index(f"### {titre}") + 2]
+        assert (ancien == textes[titre]) is egal, titre
+
+
+def test_une_idee_par_ligne(ethanol, reglages):
+    s = construire(ethanol, reglages).sections
+    assert s[0].texte.split("\n")[0].startswith("Demande :") and len(s[0].texte.split("\n")) == 6
+    assert s[1].texte.split("\n")[1].startswith("Réactifs :")
+    assert [x[:8] for x in s[2].texte.split("\n")] == [f"Étape {i} " for i in range(1, 6)]
+    assert len(s[3].texte.split("\n")) == 6
 
 
 def test_corrections_14_1(ethanol, reglages):
@@ -67,7 +76,7 @@ def test_phrases_facultatives(ethanol, reglages):
     c = ethanol.contexte
     c.type, c.idee, c.objectif, c.precisions = "Test d’idée", "Remplacer le solvant.", "Objectif. ", ""
     t = construire(ethanol, reglages).sections[0].texte
-    assert "Idée testée : Remplacer le solvant. " in t and "Objectif : Objectif. " in t and "Contexte" not in t
+    assert "Idée testée : Remplacer le solvant." in t and "Objectif : Objectif." in t and "Contexte" not in t
     c.type = "R&D"
     assert "Idée testée" not in construire(ethanol, reglages).sections[0].texte
 
