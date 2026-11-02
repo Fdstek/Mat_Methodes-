@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
-from mat_methode.domain.models import ANNULEE, BROUILLON, ENCOURS, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
+from mat_methode.domain.models import ANNULEE, ARCHIVEE, BROUILLON, ENCOURS, STATUTS, STATUTS_DEFINITION, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -41,6 +41,7 @@ from mat_methode.ui.widgets import (
     carte,
     champ,
     etiquette,
+    figer,
     flux_widgets,
     icone,
     ligne,
@@ -128,9 +129,11 @@ class PageFlux(QWidget):
     voir_reglages = Signal(object)  # clé de la carte des Réglages à ouvrir
     dupliquer = Signal(str)
 
-    def __init__(self, ctrl: Controleur):
+    def __init__(self, ctrl: Controleur, contexte: str = "definition"):
         super().__init__()
         self.ctrl = ctrl
+        self.contexte = contexte  # « definition » (Définition › Flux) ou « protocole » (Protocole › Édition)
+        self.edition = False  # « Modifier » appuyé : la vue en lecture devient modifiable
         self.mode = "def"
         self.etape_id = DEPART
         self.inserer_apres: int | None = None
@@ -148,7 +151,22 @@ class PageFlux(QWidget):
     def m(self):
         return self.ctrl.courante
 
+    @property
+    def consultation(self) -> bool:
+        """Vue en lecture seule : protocole (sauf « Modifier »), manip déjà validée (sauf « Modifier »), ou fichier verrouillé."""
+        m = self.m
+        if self.ctrl.lecture_seule:
+            return True
+        if self.edition:
+            return False
+        return self.contexte == "protocole" or (m is not None and m.etat != BROUILLON)
+
+    def basculer_edition(self):
+        self.edition = not self.edition
+        self.rafraichir()
+
     def ouvrir(self, mode: str):
+        self.edition = False
         self.mode = mode
         self.etape_id = DEPART
         self.inserer_apres = None
@@ -199,11 +217,12 @@ class PageFlux(QWidget):
         w = QWidget()
         w.setLayout(piv)
         self.lay.addWidget(w)
+        w.setProperty("garder", True)  # « Définir / Compléter » reste utilisable en lecture
         corps = self._definir() if self.mode == "def" else self._completer()
         self.lay.addWidget(corps)
         self.lay.addStretch(1)
-        for x in (demande, a_faire, corps):
-            x.setEnabled(not self.ctrl.lecture_seule)
+        if self.consultation:
+            figer(self)
 
     def _maj_legere(self):
         """Après une frappe : bilan, lancement, cartes du flux ; jamais les champs en cours de saisie."""
@@ -227,47 +246,46 @@ class PageFlux(QWidget):
 
     # ------------------------------------------------------------ lancement (§8.9)
     def _remplir_lancement(self):
+        """Bandeau du haut : statut de la manip (et lancement) ; dans Définition › Flux, boutons de statut et « Modifier »."""
         lay = self._lancement.layout()
         vider(lay)
         m = self.m
         f = QFrame()
         f.setObjectName("lancement")
         f.setProperty("lancee", m.lancee is not None)
+        f.setProperty("garder", True)
         h = QHBoxLayout(f)
         h.setContentsMargins(16, 10, 16, 10)
-        if not m.lancee:
-            col = QVBoxLayout()
-            if m.etat == VALIDEE:
-                rang = [x.id for x in R.protocoles(self.ctrl.manips, self.ctrl.reglages.ordre_protocoles)]
-                col.addWidget(etiquette("<b>Mat & Méthode validé</b>"))
-                col.addWidget(etiquette("Il est dans Protocole" + (f", n° {rang.index(m.id) + 1} à réaliser" if m.id in rang else "")
-                                        + ". Passe-le « En cours » dans Protocole au démarrage de la manip.", secondaire=True, wrap=True))
-                b = bouton("Remettre en brouillon", lambda: self._statut(BROUILLON), lien=True)
-            elif m.etat == ANNULEE:
-                col.addWidget(etiquette("<b>Manip annulée</b>"))
-                col.addWidget(etiquette("Elle n’apparaît plus dans Protocole.", secondaire=True))
-                b = bouton("Remettre en brouillon", lambda: self._statut(BROUILLON), lien=True)
-            else:
-                col.addWidget(etiquette("<b>Brouillon</b>"))
-                col.addWidget(etiquette("Quand le Mat & Méthode est prêt, valide-le : il passe dans Protocole, où la manip sera lancée "
-                                        "(statut « En cours »).", secondaire=True, wrap=True))
-                b = bouton("✔  Valider le Mat & Méthode", self._valider, accent=True)
-            h.addLayout(col, 1)
-            b.setEnabled(not self.ctrl.lecture_seule)
-            h.addWidget(b)
-        else:
-            col = QVBoxLayout()
-            col.addWidget(etiquette(f"<b>Manip lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}</b>"))
+        col = QVBoxLayout()
+        nom, ton = STATUTS.get(m.etat, ("Archivée", "neutre"))
+        col.addWidget(ligne(etiquette("<b>Statut</b>"), pastille(nom, ton), "stretch"))
+        if m.lancee:
             n = len(m.journal)
+            infos = [etiquette(f"Lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}", secondaire=True)]
             if n:
-                row = ligne(pastille(f"⚠ Modifiée après lancement · {n} modification{'s' if n > 1 else ''}", "warn"),
-                            bouton("Voir le journal", self._journal), "stretch")
+                infos += [pastille(f"⚠ Modifiée après lancement · {n} modification{'s' if n > 1 else ''}", "warn"),
+                          bouton("Voir le journal", self._journal)]
             else:
-                ann = bouton("Annuler le lancement", self._annuler_lancement)
-                ann.setEnabled(not self.ctrl.lecture_seule)
-                row = ligne(pastille("Aucune modification depuis le lancement", "ok"), ann, "stretch")
-            col.addWidget(row)
-            h.addLayout(col, 1)
+                infos.append(pastille("Aucune modification depuis le lancement", "ok"))
+                if not self.ctrl.lecture_seule and self.contexte == "definition":
+                    infos.append(bouton("Annuler le lancement", self._annuler_lancement))
+            col.addWidget(ligne(*infos, "stretch"))
+        elif m.etat == VALIDEE:
+            rang = [x.id for x in R.protocoles(self.ctrl.manips, self.ctrl.reglages.ordre_protocoles)]
+            col.addWidget(etiquette("Dans Protocole" + (f", n° {rang.index(m.id) + 1} à réaliser" if m.id in rang else "")
+                                    + " ; passe-le « En cours » au démarrage de la manip.", secondaire=True, wrap=True))
+        elif m.etat == BROUILLON:
+            col.addWidget(etiquette("Quand le Mat & Méthode est prêt, passe-le « Validée » : il arrive dans Protocole.",
+                                    secondaire=True, wrap=True))
+        h.addLayout(col, 1)
+        if self.contexte == "definition" and m.etat != ARCHIVEE and not self.ctrl.lecture_seule:
+            seg = Segmente([(k, STATUTS[k][0]) for k in STATUTS_DEFINITION], m.etat)
+            seg.setAccessibleName("Statut de la manip")
+            seg.change.connect(self._statut)
+            h.addWidget(seg)
+            if m.etat != BROUILLON:
+                h.addWidget(bouton("Terminer la modification" if self.edition else "✎  Modifier", self.basculer_edition,
+                                   accent=not self.edition, tip="Rendre la manip modifiable (elle est en lecture une fois validée)"))
         lay.addWidget(f)
 
     def _valider(self):
@@ -277,8 +295,12 @@ class PageFlux(QWidget):
             self._statut(VALIDEE)
 
     def _statut(self, statut: str):
+        if statut == self.m.etat:
+            return
         msg = self.ctrl.changer_statut(self.m, statut)
-        self.ctrl.toast.emit(msg or ("Validé : il est maintenant dans Protocole" if statut == VALIDEE else "Remis en brouillon"))
+        self.edition = False
+        self.ctrl.toast.emit(msg or {VALIDEE: "Validée : elle est maintenant dans Protocole", BROUILLON: "Remise en brouillon",
+                                     ANNULEE: "Annulée"}.get(statut, "Statut changé"))
 
     def _lancer(self):
         from mat_methode.ui.dialogues import confirmer
@@ -350,7 +372,8 @@ class PageFlux(QWidget):
         ctx.textChanged.connect(lambda: (setattr(c, "precisions", ctx.toPlainText()), self._toucher()))
         lay.addWidget(champ("Contexte (facultatif)", ctx))
         # tags
-        tags = [ChipSupprimable(f"#{t}", lambda t=t: self._retirer_tag(t), f"Retirer le tag {t}") for t in m.tags]
+        from mat_methode.domain.reglages_ops import couleur_tag
+        tags = [ChipSupprimable(f"#{t}", lambda t=t: self._retirer_tag(t), f"Retirer le tag {t}", couleur=couleur_tag(r, t)) for t in m.tags]
         sugg = [t for t in R.tous_les_tags(self.ctrl.manips, self.ctrl.reglages.ordre_tags) if not any(t.lower() == x.lower() for x in m.tags)]
         self._tag = ListeSaisie(sugg, "Choisir ou taper un tag")
         self._tag.setAccessibleName("Ajouter un tag")
@@ -785,6 +808,7 @@ class PageFlux(QWidget):
         gl.setContentsMargins(0, 0, 0, 0)
         gl.addWidget(ligne(etiquette("Ton flux", "sousTitre"), "stretch", bouton("Modifier le flux", lambda: self._mode("def"))))
         self._colonne = QWidget()
+        self._colonne.setProperty("garder", True)  # navigation entre les étapes, même en lecture
         cl = QVBoxLayout(self._colonne)
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(8)
@@ -941,9 +965,12 @@ class PageFlux(QWidget):
         i = o.index(self.etape_id)
         prec = bouton("←  Étape précédente", self.precedente, tip="Étape précédente (Alt+←)")
         prec.setEnabled(i > 0)
-        suiv = bouton("Terminer : voir le rapport" if i >= len(o) - 1 else "Étape suivante  →", self.suivante, accent=True,
-                      tip="Étape suivante (Alt+→)")
-        lay.addWidget(ligne(prec, "stretch", suiv))
+        fin = ("Terminer : voir le rapport" if m.etat == "realisee" else "Terminer : voir le protocole") if self.contexte == "definition" else ""
+        suiv = bouton(fin if i >= len(o) - 1 else "Étape suivante  →", self.suivante, accent=True, tip="Étape suivante (Alt+→)")
+        suiv.setVisible(bool(suiv.text()))
+        nav = ligne(prec, "stretch", suiv)
+        nav.setProperty("garder", True)
+        lay.addWidget(nav)
         return w
 
     def _conditions(self, e) -> QWidget:

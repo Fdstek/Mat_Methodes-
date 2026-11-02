@@ -45,6 +45,8 @@ def fusionner(base: Reglages, mien: Reglages, leur: Reglages) -> Reglages:
     res = dict(l)
     for nom, k in LISTES.items():
         res[nom] = fusion_liste(b.get(nom, []), m.get(nom, []), l.get(nom, []), k)
+    bc, mc = b.get("couleurs_tags", {}), m.get("couleurs_tags", {})  # couleurs : mes changements par-dessus les leurs
+    res["couleurs_tags"] = {**l.get("couleurs_tags", {}), **{k: v for k, v in mc.items() if bc.get(k) != v}}
     if not res["etats"]:
         res["etats"] = l["etats"] or m["etats"]
     return Reglages.model_validate(res)

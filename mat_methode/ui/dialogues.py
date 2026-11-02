@@ -292,6 +292,52 @@ def importer(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
     return d.exec() == QDialog.DialogCode.Accepted
 
 
+def importer_mm(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
+    """Import d'un ancien Mat & Méthode écrit à la main : fichier Word (.docx) ou texte (.txt), ou texte collé.
+    Les étapes sont reconnues par mots-clés, comme pour un ancien rapport. `traiter` retourne un message d'erreur, ou ""."""
+    from mat_methode.extraction.extract_mm import extraire_texte, lire_texte
+    d = Dialogue(parent, "Importer un ancien Mat & Méthode", 620)
+    d.lay.addWidget(etiquette("Choisis le fichier Word (.docx) ou texte (.txt) du Mat & Méthode, ou colle son texte. "
+                              "Les étapes (chauffage, filtration, désacidification…) sont reconnues par mots-clés : vérifie-les ensuite.",
+                              secondaire=True, wrap=True))
+    zone = QPlainTextEdit()
+    zone.setPlaceholderText("Coller ici le texte du Mat & Méthode (2.1 à 2.4, ou seulement les méthodes)")
+    zone.setMinimumHeight(200)
+    zone.setTabChangesFocus(True)
+    erreur = etiquette("", wrap=True)
+    erreur.setStyleSheet(f"color:{theme.P.danger};")
+
+    def importer_texte(texte: str, source: str):
+        res = extraire_texte(texte, source)
+        if not res.get("etapes"):
+            erreur.setText("Import impossible : " + (" ".join(res.get("alertes", [])) or "aucune étape reconnue."))
+            return
+        msg = traiter(res)
+        if msg:
+            erreur.setText(msg)
+        else:
+            d.accept()
+
+    def depuis_fichier():
+        f, _ = QFileDialog.getOpenFileName(d, "Choisir un ancien Mat & Méthode", dossier, "Word ou texte (*.docx *.txt *.md)")
+        if not f:
+            return
+        try:
+            texte = lire_texte(f)
+        except Exception as ex:
+            erreur.setText(f"Fichier non reconnu : {ex}")
+            return
+        importer_texte(texte, Path(f).name)
+
+    d.lay.addWidget(bouton("Choisir un fichier Word ou texte…", depuis_fichier, accent=True))
+    d.lay.addWidget(champ("Ou coller le texte", zone))
+    d.lay.addWidget(erreur)
+    d.boutons.addWidget(bouton("Annuler", d.reject))
+    d.boutons.addWidget(bouton("Importer le texte collé", lambda: importer_texte(zone.toPlainText(), "texte collé")))
+    d.finir()
+    return d.exec() == QDialog.DialogCode.Accepted
+
+
 FORMATS = [("pdf", "PDF avec le schéma du flux (.pdf)"), ("docx", "Word (.docx)"), ("protocole", "Protocole de paillasse (.pdf)"), ("md", "Texte (Markdown)"),
            ("html", "Rapport imprimable (HTML)"), ("json", "Données (JSON)")]
 

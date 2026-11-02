@@ -21,8 +21,8 @@ datas = [
 datas += collect_data_files("reportlab")   # polices Vera (repli si Segoe UI absente), données
 datas += collect_data_files("docx")        # modèle Word par défaut
 datas += collect_data_files("pdfminer")    # tables de caractères pour l'extraction PDF
-datas += collect_data_files("pypdfium2_raw") + collect_data_files("pypdfium2")  # aperçu du protocole (version.json)
-binaires = collect_dynamic_libs("pypdfium2_raw")  # pdfium.dll
+datas += collect_data_files("pypdfium2_raw") + collect_data_files("pypdfium2")  # utilisé par pdfplumber
+binaires = collect_dynamic_libs("pypdfium2_raw")  # pdfium.dll (pdfplumber)
 
 a = Analysis(
     [str(RACINE / "mat_methode" / "__main__.py")],

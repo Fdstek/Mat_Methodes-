@@ -175,13 +175,45 @@ def extraire(source) -> dict:
     """Lit un PDF (chemin ou fichier ouvert) et retourne le JSON d'extraction (voir exemples/mm_extrait.json)."""
     with pdfplumber.open(source) as pdf:
         lignes = lignes_propres(pdf)
+    return _resultat(lignes, str(getattr(source, "name", source)).replace("\\", "/").split("/")[-1])
+
+
+def lire_texte(chemin) -> str:
+    """Texte d'un ancien Mat & Méthode : Word (.docx) ou texte (.txt, .md)."""
+    chemin = str(chemin)
+    if chemin.lower().endswith(".docx"):
+        import docx
+        d = docx.Document(chemin)
+        lignes = [p.text for p in d.paragraphs]
+        for t in d.tables:
+            lignes += [" · ".join(c.text for c in r.cells) for r in t.rows]
+        return "\n".join(lignes)
+    brut = open(chemin, "rb").read()
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            return brut.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return brut.decode("latin-1")
+
+
+def extraire_texte(texte: str, source: str = "texte collé") -> dict:
+    """Ancien Mat & Méthode en texte (Word, .txt ou copier-coller). Sans titre « Matériel et méthodes »,
+    tout le texte est pris comme la section."""
+    lignes = [(1, x.strip()) for x in (texte or "").splitlines() if x.strip()]
+    if lignes and not trouver_section(lignes):
+        lignes = [(1, "2. Matériel et méthodes")] + lignes
+    return _resultat(lignes, source)
+
+
+def _resultat(lignes, source: str) -> dict:
     alertes = []
     if not lignes:
         alertes.append("Aucun texte : PDF scanné ? Une reconnaissance de texte est nécessaire (non prévue pour l’instant).")
     trouve = trouver_section(lignes) if lignes else None
     if lignes and not trouve:
         alertes.append("Section « Matériel et méthodes » introuvable.")
-    res = {"source": str(getattr(source, "name", source)).replace("\\", "/").split("/")[-1], "alertes": alertes, "etapes": []}
+    res = {"source": source, "alertes": alertes, "etapes": []}
     if trouve:
         section, niveau = trouve
         blocs = decouper(section, niveau)
