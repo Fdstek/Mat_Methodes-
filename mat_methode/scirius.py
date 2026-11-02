@@ -42,7 +42,8 @@ ALIASES = {
     "dest": ["destinataire", "nom destinataire"],
     "equipe": ["equipe", "equipe bio", "team"],
 }
-COLONNES = [("date", "Date réception"), ("stock_item", "N° Scirius (Stock Item)"), ("product", "Nom du produit"),
+NOMS_FILTRES_DEFAUT = ["C.LACOUX", "P.BURGUN"]  # destinataires affichés par défaut (comme le projet Fractionnement)
+COLONNES = [("date", "Date réception"), ("stock_item", "N° Scirius (Stock Item)"), ("nom", "Produit"),
             ("batch", "Lot"), ("supplier", "Fournisseur"), ("storage", "Stockage"), ("qty", "Quantité"), ("dest", "Destinataire")]
 
 
@@ -208,6 +209,16 @@ def lire(info: dict) -> list[dict]:
     return lignes
 
 
+def nom_produit(ln: dict) -> str:
+    """« Product Name souhaité » s'il est rempli, sinon « Nom du produit »."""
+    return (ln.get("desired") or "").strip() or (ln.get("product") or "").strip()
+
+
+def code_nom(nom: str) -> str:
+    """« C. LACOUX » -> « C.LACOUX » (majuscules, sans espaces)."""
+    return str(nom or "").strip().upper().replace(" ", "")
+
+
 def _date_tri(s: str):
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
         try:
@@ -217,12 +228,17 @@ def _date_tri(s: str):
     return datetime.min
 
 
-def chercher(lignes: list[dict], requete: str, limite: int = 300) -> list[dict]:
-    """Toutes les lignes contenant tous les mots de la requête (sans casse ni accents), les plus récentes d'abord."""
+def chercher(lignes: list[dict], requete: str, limite: int = 300, noms: list[str] | None = None) -> list[dict]:
+    """Lignes contenant tous les mots de la requête (sans casse ni accents), les plus récentes d'abord.
+    Avec `noms`, seulement les lignes dont le destinataire est l'un de ces noms (« C. LACOUX » = « C.LACOUX »)."""
     mots = cle_entete(requete).split()
+    filtres = {code_nom(n) for n in noms or [] if str(n).strip()}
     out = []
     for ln in lignes:
-        tout = cle_entete(" ".join(str(ln.get(k, "")) for k, _ in COLONNES))
+        ln.setdefault("nom", nom_produit(ln))
+        if filtres and code_nom(ln.get("dest", "")) not in filtres:
+            continue
+        tout = cle_entete(" ".join(str(ln.get(k, "")) for k, _ in COLONNES) + " " + str(ln.get("product", "")))
         if all(m in tout for m in mots):
             out.append(ln)
     out.sort(key=lambda ln: _date_tri(ln.get("date", "")), reverse=True)

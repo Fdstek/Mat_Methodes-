@@ -85,6 +85,8 @@ TYPES_DEFAUT = ["Support", "R&D", "Technologique", "Test d’idée"]
 ANALYSES_DEFAUT = ["FFA / indice d’acide", "Teneur en eau", "Impuretés insolubles", "Métaux (ICP)", "Phosphore"]
 DONNEURS_DEFAUT = ["Pierre BURGUN"]
 VOLUMES_DEFAUT = [30, 60, 120, 250, 500, 1000]  # mL ; 1000 = 1 L
+MATERIEL_DEFAUT = ["Plaque chauffante agitatrice", "Entonnoir Büchner", "Fiole à vide", "Membrane 5 µm", "Ampoule à décanter 500 mL",
+                   "Étuve", "Centrifugeuse", "Broyeur", "Bain-marie", "Évaporateur rotatif"]
 CATEGORIES_A_FAIRE_DEFAUT = ["Réflexion", "Matériel manquant", "Réactif manquant", "Autre"]
 GRANDES_ETAPES_DEFAUT = ["Degumming", "Neutralisation", "Blanchiment", "Désodorisation", "Winterisation"]
 
@@ -99,11 +101,13 @@ class Reglages(_Modele):
         Laboratoire(nom="Labo externe", volume_ml=100, analyses=ANALYSES_DEFAUT[3:])])
     analyses: list[str] = Field(default_factory=lambda: list(ANALYSES_DEFAUT))
     personnes: list[Personne] = Field(default_factory=lambda: [Personne(nom=n, initiales=initiales_de(n)) for n in DONNEURS_DEFAUT])
+    scirius_noms: list[str] = Field(default_factory=lambda: ["C.LACOUX", "P.BURGUN"])  # destinataires filtrés par défaut
     scirius_fichier: str = ""  # chemin d'un fichier Scirius choisi à la main (sinon recherche automatique)
     types_demande: list[str] = Field(default_factory=lambda: list(TYPES_DEFAUT))
     etats: list[Etat] = Field(default_factory=lambda: [e.model_copy() for e in ETATS_DEFAUT])
     reactifs: list[ReactifInventaire] = Field(default_factory=list)
     grandes_etapes: list[str] = Field(default_factory=lambda: list(GRANDES_ETAPES_DEFAUT))
+    materiels: list[str] = Field(default_factory=lambda: list(MATERIEL_DEFAUT))  # matériel proposé dans les étapes
     categories_a_faire: list[str] = Field(default_factory=lambda: list(CATEGORIES_A_FAIRE_DEFAUT))
     volumes_ml: list[float] = Field(default_factory=lambda: list(VOLUMES_DEFAUT))  # volumes proposés pour un échantillon
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])

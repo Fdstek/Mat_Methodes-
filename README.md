@@ -60,7 +60,8 @@ IGG). Choisir le donneur d'ordre crée la référence `PB-2026-10-31-01` (initia
 (`C:\Users\<IGG>\…`), comme dans le projet Fractionnement : il suffit de renseigner l'IGG de chacun dans Réglages.
 
 **Scirius** : « Chercher la charge dans Scirius… » (Départ) et « Chercher dans Scirius… » (réactifs) lisent le fichier
-`Suivi enregistrements scirius.xlsx` du site SharePoint MS-SMR-RECH-CRES-MAGASIN : d'abord dans les dossiers OneDrive /
+`Suivi enregistrements scirius.xlsx` du site SharePoint MS-SMR-RECH-CRES-MAGASIN : filtré par défaut sur les destinataires C.LACOUX et P.BURGUN (modifiables dans Réglages, case pour tout
+afficher), en prenant « Product Name souhaité » ou, s'il est vide, « Nom du produit » ; d'abord dans les dossiers OneDrive /
 SharePoint synchronisés, sinon en l'ouvrant avec Excel (compte Office de la personne), sinon la dernière copie partagée
 (`donnees\cache`). Un fichier peut aussi être choisi dans Réglages › Fichier Scirius. Ce qui n'est pas dans le fichier
 se saisit à la main.
@@ -74,6 +75,11 @@ pas dans les documents exportés. Catégories modifiables dans Réglages.
 
 **Conditions de l'étape précédente** : dans une étape, « ⧉ Reprendre les conditions de l'étape précédente » copie
 température, durée, agitation, membrane, sous vide et autres conditions (Ctrl+Z pour annuler).
+
+**Matériel** : liste dans Réglages › Matériel, proposée en liste déroulante dans « Matériel utilisé » de chaque étape ;
+un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans les étapes.
+
+**Listes déroulantes** : la molette de la souris ne change jamais une liste fermée (elle fait défiler la page).
 
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.

@@ -198,6 +198,22 @@ def renommer_reactif(r: Reglages, manips: list[Manip], ancien: str, nouveau: str
     return ch
 
 
+def renommer_materiel(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    """Renomme un matériel dans la liste et dans les étapes de toutes les manips."""
+    if not _renommer_liste(r.materiels, ancien, nouveau):
+        return []
+    ch = []
+    for m in manips:
+        touche = False
+        for e in m.etapes:
+            if ancien in e.equipements:
+                e.equipements = [nouveau.strip() if x == ancien else x for x in e.equipements]
+                touche = True
+        if touche:
+            ch.append(m)
+    return ch
+
+
 def renommer_tag(manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
     """Renomme un tag dans toutes les manips (sans créer de doublon)."""
     nouveau = nouveau.strip().lstrip("#").strip()

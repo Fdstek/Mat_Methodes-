@@ -23,7 +23,7 @@ from typing import Optional
 
 from mat_methode import SCHEMA_DONNEES
 from mat_methode.domain.models import Manip, Reglages, maintenant_iso
-from mat_methode.storage.fusion import fusionner
+from mat_methode.storage.fusion import LISTES, fusionner
 
 log = logging.getLogger("mat_methode")
 
@@ -208,7 +208,7 @@ class Stockage:
             disque = Reglages.model_validate(lire_json(self.f_reglages))
             if disque.rev != r.rev:
                 fusion = fusionner(base, r, disque)
-                for k in ("laboratoires", "analyses", "personnes", "types_demande", "etats", "reactifs", "grandes_etapes", "operations", "volumes_ml", "categories_a_faire"):
+                for k in LISTES:  # toutes les listes fusionnables des Réglages
                     setattr(r, k, getattr(fusion, k))
                 r.rev = disque.rev
                 info = f"Réglages fusionnés avec les modifications de {disque.modifie_par or 'un autre utilisateur'}."

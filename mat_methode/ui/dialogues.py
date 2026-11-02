@@ -112,7 +112,7 @@ def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str
     return champ_.text().strip()
 
 
-def chercher_scirius(parent, lire, requete: str = "", pour: str = "") -> dict | None:
+def chercher_scirius(parent, lire, requete: str = "", pour: str = "", noms: list[str] | None = None) -> dict | None:
     """Recherche dans le fichier Scirius de SharePoint. `lire(forcer, etape)` retourne une Lecture.
     Retourne la ligne choisie (dict) ou None (on saisit alors à la main)."""
     from PySide6.QtWidgets import QApplication
@@ -122,7 +122,12 @@ def chercher_scirius(parent, lire, requete: str = "", pour: str = "") -> dict | 
     etat = etiquette("Lecture du fichier Scirius…", secondaire=True, wrap=True)
     zone = ChampTexte(requete, "Nom du produit, lot, n° Scirius, fournisseur…")
     zone.setClearButtonEnabled(True)
+    from PySide6.QtWidgets import QCheckBox
+    filtre = QCheckBox(f"Seulement les réceptions de {', '.join(noms)}" if noms else "")
+    filtre.setChecked(bool(noms))
+    filtre.setVisible(bool(noms))
     d.lay.addWidget(champ("Rechercher", zone))
+    d.lay.addWidget(filtre)
     d.lay.addWidget(etat)
     t = QTableWidget(0, len(S.COLONNES))
     t.setHorizontalHeaderLabels([titre for _, titre in S.COLONNES])
@@ -139,7 +144,7 @@ def chercher_scirius(parent, lire, requete: str = "", pour: str = "") -> dict | 
         lu = etat_lecture["lu"]
         if lu is None:
             return
-        lignes = S.chercher(lu.lignes, zone.text())
+        lignes = S.chercher(lu.lignes, zone.text(), noms=noms if filtre.isChecked() else None)
         etat_lecture["visibles"] = lignes
         t.setRowCount(len(lignes))
         for i, ln in enumerate(lignes):
@@ -173,6 +178,7 @@ def chercher_scirius(parent, lire, requete: str = "", pour: str = "") -> dict | 
             d.accept()
 
     zone.textChanged.connect(lambda *_: afficher())
+    filtre.toggled.connect(lambda *_: afficher())
     zone.returnPressed.connect(utiliser)
     t.doubleClicked.connect(lambda *_: utiliser())
     d.boutons.insertWidget(0, bouton("Relire le fichier", lambda: charger(True), tip="Relire le fichier Scirius sur SharePoint"))

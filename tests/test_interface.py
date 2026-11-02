@@ -302,3 +302,24 @@ def test_a_faire_grande_etape_en_premier_et_copie(fen, monkeypatch):
     assert len(m.a_faire) == n + 1
     fen.aller("manips")
     fen.aller("rapport")
+
+
+def test_materiel_molette_et_titre(fen, qtbot):
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtGui import QWheelEvent
+
+    from mat_methode.ui.widgets import Liste, ListeSaisie
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "comp")
+    fen.p_flux.aller(m.etapes[0].id)
+    ls = fen.p_flux.findChildren(ListeSaisie)[0]
+    assert "Étuve" in [ls.itemText(i) for i in range(ls.count())]
+    fen.p_flux._ajouter_materiel(m.etapes[0], "Thermomètre")
+    assert "Thermomètre" in m.etapes[0].equipements and "Thermomètre" in fen.ctrl.reglages.materiels
+    # molette sur une liste fermée : la valeur ne change pas
+    liste = fen.p_flux.findChildren(Liste)[0]
+    avant = liste.currentIndex()
+    ev = QWheelEvent(QPointF(5, 5), QPointF(5, 5), QPoint(0, 0), QPoint(0, -120), Qt.MouseButton.NoButton,
+                     Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
+    liste.wheelEvent(ev)
+    assert liste.currentIndex() == avant and not ev.isAccepted()

@@ -20,7 +20,7 @@ from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
 from mat_methode.domain.models import Condition, ReactifEtape, Tache, maintenant_iso
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
-from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol
+from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
@@ -31,6 +31,7 @@ from mat_methode.ui.widgets import (
     Expander,
     InfoBar,
     Liste,
+    ListeSaisie,
     NumberBox,
     Segmente,
     ToggleSwitch,
@@ -847,11 +848,12 @@ class PageFlux(QWidget):
         duree = NumberBox(e.duree_min, "min", "ex. 30")
         duree.valeur.connect(lambda v: (setattr(e, "duree_min", v), self._toucher()))
         mat = [ChipSupprimable(q, lambda k=k: self._retirer_materiel(e, k)) for k, q in enumerate(e.equipements)]
-        sugg = sorted({q for mm in self.ctrl.manips for ee in mm.etapes for q in ee.equipements})
-        nouveau = ChampTexte("", "Ex. plaque chauffante agitatrice", suggestions=sugg)
-        nouveau.setMinimumWidth(240)
-        nouveau.returnPressed.connect(lambda: self._ajouter_materiel(e, nouveau.text()))
-        mat += [nouveau, bouton("+ Ajouter", lambda: self._ajouter_materiel(e, nouveau.text()))]
+        proposes = [q for q in self.ctrl.reglages.materiels if q not in e.equipements]
+        nouveau = ListeSaisie(proposes, "Choisir ou taper un matériel")
+        nouveau.setAccessibleName("Matériel à ajouter")
+        nouveau.valide.connect(lambda v: self._ajouter_materiel(e, v))
+        mat += [nouveau, bouton("+ Ajouter", lambda: self._ajouter_materiel(e, nouveau.currentText())),
+                bouton("Liste du matériel", lambda: self.voir_reglages.emit("materiel"), lien=True)]
         duree.setMaximumWidth(200)
         x.ajouter(champ("Durée de l’étape", duree))
         x.ajouter(champ("Matériel utilisé", flux_widgets(mat)))
@@ -887,6 +889,10 @@ class PageFlux(QWidget):
         v = v.strip()
         if v and v not in e.equipements:
             e.equipements.append(v)
+            r = self.ctrl.reglages
+            if not any(norm(v) == norm(x) for x in r.materiels):  # tapé à la main : ajouté aux Réglages
+                r.materiels.append(v)
+                self.ctrl.toucher_reglages()
             self._toucher(True)
 
     def _retirer_materiel(self, e, k):
@@ -971,10 +977,12 @@ class PageFlux(QWidget):
     def _scirius_charge(self):
         from mat_methode.ui.dialogues import chercher_scirius
         c = self.m.contexte
-        ln = chercher_scirius(self, self.ctrl.lire_scirius, c.matiere if c.matiere != "Graisse animale" else "", "charge de départ")
+        ln = chercher_scirius(self, self.ctrl.lire_scirius, c.matiere if c.matiere != "Graisse animale" else "", "charge de départ",
+                              noms=self.ctrl.reglages.scirius_noms)
         if ln is None:
             return
-        c.matiere = ln.get("product") or c.matiere
+        from mat_methode.scirius import nom_produit
+        c.matiere = nom_produit(ln) or c.matiere
         c.lot = ln.get("batch") or c.lot
         c.scirius = ln.get("stock_item") or c.scirius
         c.fournisseur = ln.get("supplier") or c.fournisseur
@@ -984,11 +992,12 @@ class PageFlux(QWidget):
     def _scirius_reactif(self, re_):
         from mat_methode.domain import reglages_ops as O
         from mat_methode.ui.dialogues import chercher_scirius
-        ln = chercher_scirius(self, self.ctrl.lire_scirius, re_.nom, re_.nom or "réactif")
+        ln = chercher_scirius(self, self.ctrl.lire_scirius, re_.nom, re_.nom or "réactif", noms=self.ctrl.reglages.scirius_noms)
         if ln is None:
             return
         r = self.ctrl.reglages
-        nom = re_.nom or ln.get("product", "").strip()
+        from mat_methode.scirius import nom_produit
+        nom = re_.nom or nom_produit(ln)
         if not nom:
             return
         if r.reactif(nom) is None:

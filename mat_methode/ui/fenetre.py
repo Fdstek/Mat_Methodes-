@@ -94,7 +94,7 @@ class Fenetre(QMainWindow):
         tete = QHBoxLayout()
         tete.setContentsMargins(36, 22, 36, 6)
         titres = QVBoxLayout()
-        self.titre = etiquette("", "titrePage")
+        self.titre = etiquette("", "titrePage", wrap=True)
         self.sous_titre = QWidget()
         QHBoxLayout(self.sous_titre).setContentsMargins(0, 0, 0, 0)
         titres.addWidget(self.titre)
