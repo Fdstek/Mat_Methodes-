@@ -42,7 +42,7 @@ def fichier(f, m) -> dict:
 def test_premier_lancement_cree_donnees_et_exemples(fen, tmp_path):
     assert (tmp_path / "donnees" / "reglages.json").exists()
     assert len(fen.ctrl.manips) == 4
-    assert fen.p_manips.b_actives.text() == "Mes manips (3)"
+    assert fen.p_manips.b_actives.text() == "Manips (3)"
 
 
 def test_crit29_enregistrement_automatique(fen, qtbot):
@@ -200,13 +200,13 @@ def test_grande_etape_dans_definir_et_completer(fen):
     assert m.groupes == []
 
 
-def test_non_realisee_puis_suppression(fen, monkeypatch):
-    from mat_methode.domain.models import NON_REALISEE
+def test_annulee_puis_suppression(fen, monkeypatch):
+    from mat_methode.domain.models import ANNULEE
     monkeypatch.setattr(D, "confirmer", lambda *a, **k: True)
     m = next(x for x in fen.ctrl.manips if x.nom == "Désacidification acétone")
     fen.aller("manips")
-    fen.p_manips._non_realisee(m)
-    assert m.etat == NON_REALISEE and fichier(fen, m)["etat"] == NON_REALISEE
+    fen.p_manips._statut(m, ANNULEE)
+    assert m.etat == ANNULEE and fichier(fen, m)["etat"] == ANNULEE
     fen.p_manips._supprimer(m)
     assert m not in fen.ctrl.manips and not (fen.ctrl.st.d_manips / f"{m.id}.json").exists()
     fen._annuler()  # Ctrl+Z
@@ -340,7 +340,7 @@ def test_rapports_emis_par_personne_et_protocole(fen, monkeypatch):
     ouverts = []
     monkeypatch.setattr("PySide6.QtGui.QDesktopServices.openUrl", lambda url: ouverts.append(url.toLocalFile()))
     fen.ouvrir_fichier(m.rapports[-1].chemin)
-    assert ouverts == [chemin]
+    assert [Path(x) for x in ouverts] == [Path(chemin)]  # Windows : « / » et « \\ » désignent le même fichier
     fen.p_rapport.rafraichir()
 
 
@@ -358,24 +358,49 @@ def test_onglet_protocole_apercu(fen):
     assert "Ouvrir le dernier protocole émis" not in [b.text() for b in fen.p_rapport.findChildren(QPushButton)]
 
 
-def test_etat_dans_ma_demande_et_lancement(fen, monkeypatch):
+def test_parcours_definition_protocole_rapport(fen, monkeypatch):
+    """Brouillon -> Validée (Définition) -> Protocole (ordre, En cours = lancée) -> Réalisée -> Rapport."""
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import BROUILLON, ENCOURS, REALISEE, VALIDEE
     from mat_methode.ui.widgets import Liste
+    ctrl = fen.ctrl
+    a, b = (next(x for x in ctrl.manips if x.nom == n) for n in ("Désacidification acétone", "Désacidification éthanol"))
+    for m in (a, b):
+        m.etat, m.lancee, m.journal = BROUILLON, None, []
+    fen.aller("manips")
+    st = next(x for x in fen.p_manips.findChildren(Liste) if x.accessibleName() == f"Statut de {b.nom}")
+    assert [st.itemText(i) for i in range(st.count())] == ["Brouillon", "Validée", "Annulée"]
+    st.choisi.emit(VALIDEE)
+    fen.p_manips._statut(a, VALIDEE)
+    assert b.etat == VALIDEE and R.protocoles(ctrl.manips, ctrl.reglages.ordre_protocoles)[:2] == [b, a]
+    fen.aller("protocoles")
+    assert fen.titre.text() == "Protocole" and not fen.nav["protocole"].isEnabled() or ctrl.courante
+    ctrl.deplacer_protocole(a, -1)
+    assert R.protocoles(ctrl.manips, ctrl.reglages.ordre_protocoles)[:2] == [a, b]
+    assert ctrl.changer_statut(a, ENCOURS) == "" and a.lancee is not None
+    fen.ouvrir_protocole(a.id)
+    assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {a.nom}" and fen.p_protocole.nb_pages >= 1
+    fen.p_protocole._mode("modifier")
+    assert fen.p_protocole.flux.isVisibleTo(fen.p_protocole) and not fen.p_protocole.apercu.isVisibleTo(fen.p_protocole)
+    fen.p_protocole._mode("apercu")
+    fen.aller("rapports")
+    assert a not in R.rapports_clotures(ctrl.manips)
+    ctrl.changer_statut(a, REALISEE)
+    fen.aller("rapports")
+    assert R.rapports_clotures(ctrl.manips)[0] is a
+    fen.ouvrir_rapport(a.id)
+    assert fen.page == "rapport" and fen.titre.text() == f"Rapport · {a.nom}"
+    assert fichier(fen, a)["etat"] == REALISEE
+
+
+def test_lancer_passe_en_cours(fen, monkeypatch):
+    from mat_methode.domain.models import ENCOURS, VALIDEE
     m = ethanol(fen)
-    m.lancee, m.journal = None, []
-    m.etat = "brouillon"
-    from mat_methode.domain.models import Etat
-    from mat_methode.storage.stockage import etats_v5
-    r = fen.ctrl.reglages
-    r.etats = [Etat(**e) for e in etats_v5([e.model_dump() for e in r.etats])]  # comme après la mise à jour des Réglages
+    m.lancee, m.journal, m.etat = None, [], VALIDEE
     fen.ouvrir(m.id, "def")
-    etat = next(x for x in fen.p_flux.findChildren(Liste) if x.accessibleName() == "État de la manip")
-    libelles = [etat.itemText(i) for i in range(etat.count())]
-    assert libelles[:3] == ["Brouillon", "À faire", "Lancée"] and "Non réalisée" in libelles
-    etat.choisi.emit("afaire")
-    assert m.etat == "afaire"
     monkeypatch.setattr("mat_methode.ui.dialogues.confirmer", lambda *a, **k: True)
     fen.p_flux._lancer()
-    assert m.lancee and m.etat == "lancee"
+    assert m.lancee and m.etat == ENCOURS and m.id in fen.ctrl.reglages.ordre_protocoles
 
 
 def test_dupliquer_grande_etape_et_ordre_a_faire(fen, monkeypatch):

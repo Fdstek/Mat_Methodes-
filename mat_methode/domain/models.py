@@ -13,7 +13,21 @@ from mat_methode.domain.catalogue import OPERATIONS
 Moment = Literal["avant", "pendant", "effluent"]
 Ton = Literal["neutre", "info", "ok", "warn", "danger"]
 ARCHIVEE = "archivee"
-NON_REALISEE = "non_realisee"  # état fixe : manip non réalisée, qu'on peut archiver ou supprimer
+# Statuts (fixes) : Brouillon -> Validée (Définition) -> En cours -> Réalisée (Protocole) ; Annulée possible partout.
+BROUILLON, VALIDEE, ENCOURS, REALISEE, ANNULEE = "brouillon", "validee", "encours", "realisee", "annulee"
+NON_REALISEE = ANNULEE  # ancien nom
+STATUTS: dict[str, tuple[str, str]] = {BROUILLON: ("Brouillon", "warn"), VALIDEE: ("Validée", "info"), ENCOURS: ("En cours", "info"),
+                                       REALISEE: ("Réalisée", "ok"), ANNULEE: ("Annulée", "danger")}
+STATUTS_DEFINITION = [BROUILLON, VALIDEE, ANNULEE]  # choisis dans « Définition Mat & Méthode »
+STATUTS_PROTOCOLE = [VALIDEE, ENCOURS, REALISEE, ANNULEE]  # choisis dans « Protocole »
+ANCIENS_ETATS = {"afaire": VALIDEE, "lancee": ENCOURS, "terminee": REALISEE, "non_realisee": ANNULEE}  # schéma < 7
+
+
+def statut_connu(etat: str) -> str:
+    """Ramène un ancien état (ou un état personnalisé des Réglages) sur les statuts fixes."""
+    if etat == ARCHIVEE or etat in STATUTS:
+        return etat
+    return ANCIENS_ETATS.get(etat, BROUILLON)
 
 
 def nouvel_id() -> str:
@@ -114,6 +128,7 @@ class Reglages(_Modele):
     categories_a_faire: list[str] = Field(default_factory=lambda: list(CATEGORIES_A_FAIRE_DEFAUT))
     volumes_ml: list[float] = Field(default_factory=lambda: list(VOLUMES_DEFAUT))  # volumes proposés pour un échantillon
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
+    ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
@@ -138,7 +153,7 @@ class Reglages(_Modele):
         return next((p for p in self.personnes if igg and p.igg.strip().upper() == igg), None)
 
     def etat_initial(self) -> str:
-        return self.etats[0].id if self.etats else "brouillon"
+        return BROUILLON
 
     def etat(self, ident: str) -> Optional[Etat]:
         return next((e for e in self.etats if e.id == ident), None)
@@ -300,6 +315,13 @@ class Manip(_Modele):
     rapports: list[RapportEmis] = Field(default_factory=list)  # documents émis, le plus récent en dernier
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _anciens_etats(cls, d):
+        if isinstance(d, dict) and isinstance(d.get("etat"), str) and d["etat"] != statut_connu(d["etat"]):
+            d = dict(d, etat=statut_connu(d["etat"]))
+        return d
 
     @property
     def archivee(self) -> bool:

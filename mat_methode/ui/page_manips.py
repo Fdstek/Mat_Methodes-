@@ -1,11 +1,11 @@
-"""Page « Mes manips » (§6.1, maquette W01)."""
+"""Page « Définition Mat & Méthode » (anciennement « Mes manips », §6.1) : liste des manips et leur statut."""
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QSizePolicy, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
-from mat_methode.domain.models import ARCHIVEE, NON_REALISEE
+from mat_methode.domain.models import ARCHIVEE, STATUTS_DEFINITION
 from mat_methode.domain.regles import tous_les_tags
 from mat_methode.domain.texte import fmt_dt, norm
 from mat_methode.ui import theme
@@ -17,6 +17,7 @@ from mat_methode.ui.widgets import (
     bouton_tag_couleur,
     etiquette,
     flux_widgets,
+    liste_statut,
     pastille,
     pastille_couleur,
     vider,
@@ -48,7 +49,7 @@ class PageManips(QWidget):
         self.recherche.setPlaceholderText("Rechercher une manip, un tag, un objectif…")
         self.recherche.setAccessibleName("Rechercher une manip (Ctrl+F)")
         self.recherche.setClearButtonEnabled(True)
-        self.recherche.setMinimumWidth(260)
+        self.recherche.setMinimumWidth(180)
         self.recherche.textChanged.connect(lambda *_: self.rafraichir())
         barre.addWidget(self.recherche)
         lay.addLayout(barre)
@@ -73,7 +74,7 @@ class PageManips(QWidget):
         self.l_liste.setSpacing(0)
         lay.addWidget(self.liste)
         bas = QHBoxLayout()
-        bas.addWidget(etiquette("Dupliquer, Exporter, Archiver : menu « … » de chaque ligne.", secondaire=True))
+        bas.addWidget(etiquette("Modifier le flux, Dupliquer, Exporter, Archiver : menu « … » de chaque ligne.", secondaire=True, wrap=True), 1)
         bas.addStretch(1)
         bas.addWidget(bouton("Actualiser", self._actualiser))
         bas.addWidget(bouton("Restaurer les exemples", self._exemples))
@@ -124,7 +125,7 @@ class PageManips(QWidget):
         ctrl, r = self.ctrl, self.ctrl.reglages
         n_a = sum(1 for m in ctrl.manips if m.etat != ARCHIVEE)
         n_r = len(ctrl.manips) - n_a
-        self.b_actives.setText(f"Mes manips ({n_a})")
+        self.b_actives.setText(f"Manips ({n_a})")
         self.b_archives.setText(f"Archivées ({n_r})")
         for b, actif in ((self.b_actives, not self.archives), (self.b_archives, self.archives)):
             b.setProperty("actif", actif)
@@ -146,11 +147,10 @@ class PageManips(QWidget):
         types.setAccessibleName("Filtrer par type de demande")
         types.choisi.connect(lambda v: (setattr(self, "f_type", v), self.rafraichir()))
         self.filtres.addWidget(types)
-        if self.f_tag:
-            self.filtres.addWidget(bouton(f"Tag : {self.f_tag}  ✕", lambda: (setattr(self, "f_tag", ""), self.rafraichir()),
-                                          tip="Retirer le filtre tag"))
-        else:
-            self.filtres.addWidget(etiquette("Clique un tag pour filtrer.", secondaire=True))
+        tags = Liste(tous_les_tags(ctrl.manips), self.f_tag, vide="Tous les tags")
+        tags.setAccessibleName("Filtrer par tag")
+        tags.choisi.connect(lambda v: (setattr(self, "f_tag", v), self.rafraichir()))
+        self.filtres.addWidget(tags)
         self.filtres.addStretch(1)
 
         vider(self.bandeaux)
@@ -168,8 +168,37 @@ class PageManips(QWidget):
             vide = etiquette("Aucune manip archivée." if self.archives else "Aucune manip. Crée-en une avec « Nouvelle manip ».", secondaire=True)
             vide.setContentsMargins(16, 24, 16, 24)
             self.l_liste.addWidget(vide)
+        else:
+            self.l_liste.addWidget(self._entete())
         for i, m in enumerate(lignes):
             self.l_liste.addWidget(self._ligne(m, i == len(lignes) - 1))
+
+    LARGEURS = (160, 130, 80, 40)  # contenu, statut, Ouvrir, « … » : colonnes alignées sur l'en-tête
+
+    def _grille(self, g: QGridLayout):
+        g.setContentsMargins(14, 12, 14, 12)
+        g.setHorizontalSpacing(12)
+        g.setColumnStretch(0, 1)
+        for k, lg in enumerate(self.LARGEURS, start=1):
+            g.setColumnMinimumWidth(k, lg)
+
+    def _fixe(self, w: QWidget, k: int) -> QWidget:
+        w.setFixedWidth(self.LARGEURS[k - 1])
+        return w
+
+    def _entete(self) -> QWidget:
+        w = QFrame()
+        w.setObjectName("ligneManip")
+        w.setStyleSheet(f"QFrame#ligneManip{{border-bottom:1px solid {theme.P.trait};}}")
+        g = QGridLayout(w)
+        self._grille(g)
+        g.setContentsMargins(14, 8, 14, 8)
+        g.addWidget(etiquette("MANIP", "etiquetteChamp"), 0, 0)
+        g.addWidget(self._fixe(etiquette("CONTENU", "etiquetteChamp"), 1), 0, 1)
+        g.addWidget(self._fixe(etiquette("STATUT", "etiquetteChamp"), 2), 0, 2)
+        for k in (3, 4):
+            g.addWidget(self._fixe(QWidget(), k), 0, k)
+        return w
 
     def _ligne(self, m, derniere: bool) -> QWidget:
         r, p = self.ctrl.reglages, theme.P
@@ -177,8 +206,7 @@ class PageManips(QWidget):
         w.setStyleSheet("" if derniere else f"QFrame#ligneManip{{border-bottom:1px solid {p.trait};}}")
         w.setObjectName("ligneManip")
         g = QGridLayout(w)
-        g.setContentsMargins(14, 12, 14, 12)
-        g.setHorizontalSpacing(12)
+        self._grille(g)
         gauche = QVBoxLayout()
         gauche.setSpacing(4)
         nom = etiquette(m.nom, "titreCarte", wrap=True)  # titre complet, sur plusieurs lignes si besoin
@@ -195,9 +223,6 @@ class PageManips(QWidget):
         reste = sum(1 for t in m.a_faire if not t.fait)
         if reste:
             tags.append(pastille(f"{reste} à faire", "warn", " ; ".join(t.texte for t in m.a_faire if not t.fait)))
-        if m.lancee:
-            n = len(m.journal)
-            tags.append(pastille(f"Lancée · modifiée après lancement ({n})" if n else "Lancée", "warn" if n else "ok"))
         v = self.ctrl.st.verrou_autre(m.id)
         if v:
             tags.append(pastille(f"Modifiée en ce moment par {self.ctrl.nom_de(v.utilisateur)}", "info"))
@@ -206,36 +231,39 @@ class PageManips(QWidget):
             o = etiquette("", secondaire=True)
             o.setStyleSheet("font-style:italic;")
             o.setText(o.fontMetrics().elidedText(m.contexte.objectif, Qt.TextElideMode.ElideRight, 330))
+            o.setMinimumWidth(1)
+            o.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             o.setToolTip(m.contexte.objectif)
             gauche.addWidget(o)
         cg = QWidget()
         cg.setLayout(gauche)
-        cg.setMaximumWidth(380)
+        gauche.setContentsMargins(0, 0, 0, 0)
         g.addWidget(cg, 0, 0)
-        g.setColumnStretch(0, 1)
         ne = len(m.etapes)
-        g.addWidget(etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch.<br>{fmt_dt(m.maj)} · v{m.rev}",
-                              secondaire=True), 0, 1)
-        g.addWidget(pastille(*O.nom_etat(r, m.etat)), 0, 2)
-        g.addWidget(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True, tip=f"Ouvrir {m.nom}"), 0, 3)
-        g.addWidget(bouton("Modifier le flux", lambda: self.ouvrir.emit(m.id, "def")), 0, 4)
+        g.addWidget(self._fixe(etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch.<br>{fmt_dt(m.maj)} · v{m.rev}",
+                                         secondaire=True), 1), 0, 1)
+        if m.etat == ARCHIVEE:
+            g.addWidget(self._fixe(etiquette("Archivée", secondaire=True), 2), 0, 2)
+        else:
+            st = liste_statut(m, STATUTS_DEFINITION)
+            st.setMinimumWidth(0)
+            st.choisi.connect(lambda v, m=m: self._statut(m, v))
+            g.addWidget(self._fixe(st, 2), 0, 2)
+        g.addWidget(self._fixe(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True,
+                                      tip=f"Ouvrir le flux de {m.nom}"), 3), 0, 3)
         plus = bouton("…", tip=f"Autres actions pour {m.nom}")
         menu = QMenu(plus)
+        menu.addAction("Modifier le flux (étapes)", lambda: self.ouvrir.emit(m.id, "def"))
         menu.addAction("Dupliquer", lambda: self._dupliquer(m.id))
         menu.addAction("Exporter", lambda: self.exporter.emit(m.id))
-        if m.etat != ARCHIVEE:
-            menu.addAction("Remettre comme réalisée" if m.etat == NON_REALISEE else "Marquer comme non réalisée",
-                           lambda: self._non_realisee(m))
         menu.addAction("Restaurer" if m.etat == ARCHIVEE else "Archiver", lambda: self._archiver(m))
         if O.peut_supprimer(m):
             menu.addAction("Supprimer", lambda: self._supprimer(m))
         plus.setMenu(menu)
         plus.setStyleSheet("QPushButton::menu-indicator{width:0;}")
-        plus.setFixedWidth(40)
-        g.addWidget(plus, 0, 5)
-        g.setColumnMinimumWidth(1, 175)
-        g.setColumnMinimumWidth(2, 105)
-        for k in range(1, 6):
+        self._fixe(plus, 4)
+        g.addWidget(plus, 0, 4)
+        for k in range(1, 5):
             g.setAlignment(g.itemAtPosition(0, k).widget(), Qt.AlignmentFlag.AlignVCenter)
         return w
 
@@ -259,19 +287,12 @@ class PageManips(QWidget):
         self.ctrl.toast.emit("Archivée" if a else "Restaurée")
         self.rafraichir()
 
-    def _non_realisee(self, m):
-        if self.ctrl.st.verrou_autre(m.id):
-            self.ctrl.toast.emit("Impossible : la manip est modifiée en ce moment par quelqu’un d’autre")
-            return
-        from mat_methode.ui.dialogues import confirmer
-        if m.etat != NON_REALISEE and not confirmer(
-                self, "Marquer comme non réalisée ?", f"« {m.nom} » sera marquée « Non réalisée ». Tu pourras ensuite l’archiver "
-                "ou la supprimer (menu « … »), ou la remettre comme réalisée.", "Marquer non réalisée", danger=False):
-            return
-        marquee = O.basculer_non_realisee(self.ctrl.reglages, m)
-        self.ctrl.toucher(m)
-        self.ctrl.enregistrer_tout()
-        self.ctrl.toast.emit("Marquée non réalisée : archive-la ou supprime-la avec le menu « … »" if marquee else "Remise comme réalisée")
+    def _statut(self, m, statut: str):
+        msg = self.ctrl.changer_statut(m, statut)
+        if msg:
+            self.ctrl.toast.emit(msg)
+        elif statut == "validee":
+            self.ctrl.toast.emit("Validée : elle apparaît maintenant dans Protocole")
         self.rafraichir()
 
     def _supprimer(self, m):

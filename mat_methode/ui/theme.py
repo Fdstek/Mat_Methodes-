@@ -171,6 +171,7 @@ QPushButton[icone="true"] {{ padding: 4px; min-width: 24px; max-width: 32px; }}
 QPushButton[nav="true"] {{ background: transparent; border: none; text-align: left; padding: 8px 12px; border-radius: 4px; }}
 QPushButton[nav="true"]:hover {{ background: {p.selection}; }}
 QPushButton[nav="true"][actif="true"] {{ background: {p.selection}; font-weight: 600; border-left: 3px solid {p.accent}; }}
+QPushButton[nav="true"][sous="true"] {{ padding-left: 34px; font-size: 9pt; }}
 QPushButton[pivot="true"] {{ background: transparent; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 6px 4px; font-size: 12pt; color: {p.texte2}; }}
 QPushButton[pivot="true"][actif="true"] {{ color: {p.texte}; font-weight: 600; border-bottom: 3px solid {p.accent}; }}
 QPushButton[seg="true"] {{ border-radius: 0; padding: 5px 12px; }}

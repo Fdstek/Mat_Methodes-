@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
-from mat_methode.domain.models import ARCHIVEE, NON_REALISEE, Manip, Reglages, maintenant_iso
+from mat_methode.domain.models import Manip, Reglages, maintenant_iso
 from mat_methode.domain.prototype import exemples
 from mat_methode.domain.texte import fmt_dt
 from mat_methode.storage.stockage import Liste, Stockage, Verrou
@@ -294,6 +294,31 @@ class Controleur(QObject):
         self.enregistrer_tout()
         return c
 
+    def changer_statut(self, m: Manip, statut: str) -> str:
+        """Change le statut d'une manip (listes Définition et Protocole). « En cours » lance la manip (journal des modifications).
+        Retourne un message si c'est impossible."""
+        if m.etat == statut:
+            return ""
+        v = self.st.verrou_autre(m.id)
+        if v:
+            return f"Impossible : « {m.nom} » est modifiée en ce moment par {self.nom_de(v.utilisateur)}"
+        from mat_methode.domain import journal as J
+        from mat_methode.domain.models import ENCOURS
+        if R.changer_statut(m, statut, self.reglages):
+            self.toucher_reglages()
+        if statut == ENCOURS and not m.lancee:
+            J.lancer(m, par=self.operateur(m))
+        self.sales.add(m.id)
+        self.enregistrer_tout()
+        self.modifie.emit(True)
+        return ""
+
+    def deplacer_protocole(self, m: Manip, sens: int) -> None:
+        if R.deplacer_protocole(self.manips, self.reglages, m, sens):
+            self.toucher_reglages()
+            self.enregistrer_tout()
+            self.modifie.emit(True)
+
     def supprimer(self, ident: str) -> None:
         m = self.manip(ident)
         if m is None:
@@ -328,8 +353,6 @@ class Controleur(QObject):
         for m in ms:
             if m.id in ids:
                 self.manips = [x for x in self.manips if x.id != m.id]
-            if m.etat not in (ARCHIVEE, NON_REALISEE) and not self.reglages.etat(m.etat):
-                m.etat = self.reglages.etat_initial()
             self.manips.append(m)
             if not self.st.lecture_seule:
                 self.st.ecrire_tel_quel(m)

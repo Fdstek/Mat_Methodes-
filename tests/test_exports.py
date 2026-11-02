@@ -115,8 +115,9 @@ def test_protocole(ethanol, reglages, tmp_path):
     with pdfplumber.open(f) as pdf:
         texte = " ".join(" ".join(p.extract_text() for p in pdf.pages).split())
     for x in ("Protocole : Désacidification éthanol", "Réf. demande", "DA-2026-0158", "Flux de prétraitement", "Contexte", "Demande : Interne · R&D",
-              "Réactifs", "Détail du flux par phase", "Heure réelle", "Observations", "S3a", "S5b"):
+              "Réactifs", "Détail du flux par phase", "N° Aramis", "S3a", "S5b"):
         assert x in texte, x
+    assert "Heure réelle" not in texte and "Observations" not in texte
     # ordre demandé : contexte, flux, réactifs, puis le détail par phase (les échantillons sont dans chaque phase)
     assert texte.index("Contexte") < texte.index("Flux de prétraitement") < texte.index("Réactifs") < texte.index("Détail du flux par phase")
     assert "Échantillons" not in texte.split("Détail du flux par phase")[0]

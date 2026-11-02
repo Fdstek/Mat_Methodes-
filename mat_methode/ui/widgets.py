@@ -183,13 +183,14 @@ class Liste(SansMolette, QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i) or ""))
 
 
-def liste_etat(m, reglages) -> Liste:
-    """Liste déroulante de l'état d'une manip (états des Réglages + « Non réalisée », et « Archivée » si elle l'est)."""
-    from mat_methode.domain.models import ARCHIVEE, NON_REALISEE
-    etats = [e.id for e in reglages.etats] + [NON_REALISEE] + ([ARCHIVEE] if m.etat == ARCHIVEE else [])
-    x = Liste(etats, m.etat, vide=None, libelles={**{e.id: e.nom for e in reglages.etats}, ARCHIVEE: "Archivée", NON_REALISEE: "Non réalisée"})
-    x.setAccessibleName("État de la manip")
-    x.setToolTip("État de la manip (liste modifiable dans Réglages › États des manips)")
+def liste_statut(m, choix: list[str]) -> Liste:
+    """Liste déroulante du statut d'une manip (choix proposés + statut actuel s'il n'en fait pas partie)."""
+    from mat_methode.domain.models import ARCHIVEE, STATUTS
+    libelles = {**{k: v[0] for k, v in STATUTS.items()}, ARCHIVEE: "Archivée"}
+    x = Liste(list(choix), m.etat, vide=None, libelles=libelles)
+    x.setAccessibleName(f"Statut de {m.nom}")
+    x.setToolTip("Statut de la manip")
+    x.setMinimumContentsLength(9)
     return x
 
 

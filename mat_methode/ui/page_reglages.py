@@ -9,7 +9,6 @@ from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.models import Personne, initiales_de
 from mat_methode.domain.regles import basculer_analyse, tous_les_tags
 from mat_methode.domain.texte import libelle_volume, norm
-from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.dialogues import confirmer
 from mat_methode.ui.widgets import (
@@ -17,7 +16,6 @@ from mat_methode.ui.widgets import (
     ChipSupprimable,
     ChoixVolume,
     Expander,
-    Liste,
     NumberBox,
     bouton,
     champ,
@@ -68,7 +66,6 @@ class PageReglages(QWidget):
             ("analyses", "Analyses", "Analyses disponibles pour les laboratoires", f"{len(r.analyses)}", self._analyses),
             ("types", "Types de demande", "Support, R&D, Test d’idée…", f"{len(r.types_demande)}", self._types),
             ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
-            ("etats", "États des manips", "Brouillon, En cours, Terminée… et leurs couleurs", f"{len(r.etats)}", self._etats),
             ("a_faire", "Catégories « À faire »", "Réflexion, Matériel manquant, Réactif manquant…",
              f"{len(r.categories_a_faire)}", self._categories),
             ("tags", "Tags", "Renommer ou retirer un tag partout", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
@@ -447,43 +444,6 @@ class PageReglages(QWidget):
 
     def _suppr_analyse(self, nom):
         O.supprimer_analyse(self.r, nom)
-
-    # ------------------------------------------------------------ états
-    def _etats(self):
-        x = self._section("États des manips", f"{len(self.r.etats)}")
-        x.ajouter(etiquette("Les états proposés dans « Mes manips » et dans le Rapport. Le premier de la liste est celui d’une nouvelle manip, "
-                            "d’une copie et d’une manip restaurée. « Archivée » est fixe : il sert à ranger les manips.", secondaire=True, wrap=True))
-        n = len(self.r.etats)
-        for i, e in enumerate(self.r.etats):
-            nb = sum(1 for m in self.ctrl.manips if m.etat == e.id)
-            nom = ChampTexte(e.nom)
-            nom.modifie.connect(lambda v, e=e: (setattr(e, "nom", v), self.ctrl.toucher_reglages()))
-            ton = Liste(list(theme.TONS), e.ton, vide=None, libelles=theme.TONS)
-            ton.choisi.connect(lambda v, e=e: (setattr(e, "ton", v), self._changer(), self.rafraichir()))
-            haut = icone("↑", f"Monter {e.nom}", lambda i=i: (O.deplacer_etat(self.r, i, -1), self._changer(), self.rafraichir()))
-            haut.setEnabled(i > 0)
-            bas = icone("↓", f"Descendre {e.nom}", lambda i=i: (O.deplacer_etat(self.r, i, 1), self._changer(), self.rafraichir()))
-            bas.setEnabled(i < n - 1)
-            sup = icone("✕", f"Supprimer {e.nom}", lambda i=i: self._suppr_etat(i), danger=True)
-            sup.setEnabled(n > 1)
-            x.ajouter(ligne(pastille(e.nom, e.ton), champ("Nom de l’état", nom), champ("Couleur", ton),
-                            etiquette(f"{nb} manip{'s' if nb > 1 else ''}", secondaire=True), "stretch", haut, bas, sup))
-        nouveau = ChampTexte("", "Ex. En attente de résultats")
-
-        def ajout():
-            if O.ajouter_etat(self.r, nouveau.text()):
-                self._changer()
-                self.rafraichir()
-
-        nouveau.returnPressed.connect(ajout)
-        x.ajouter(ligne(champ("Nouvel état", nouveau), bouton("Ajouter", ajout), "stretch"))
-
-    def _suppr_etat(self, i):
-        ch, msg = O.supprimer_etat(self.r, self.ctrl.manips, i)
-        self._changer(ch)
-        if msg:
-            self.ctrl.toast.emit(msg)
-        self.rafraichir()
 
     # ------------------------------------------------------------ tags
     def _tags(self):

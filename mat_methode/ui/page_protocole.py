@@ -1,4 +1,4 @@
-"""Page « Protocole » : aperçu du PDF de paillasse, export et documents émis."""
+"""Page « Protocole › Édition » : aperçu du PDF de paillasse ou modification du flux, puis export PDF."""
 from __future__ import annotations
 
 import logging
@@ -12,8 +12,9 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from mat_methode.domain import regles as R
 from mat_methode.exports.echange import exporter
 from mat_methode.ui.controleur import Controleur
+from mat_methode.ui.page_flux import PageFlux
 from mat_methode.ui.page_rapport import ligne_emis
-from mat_methode.ui.widgets import InfoBar, bouton, carte, etiquette, ligne, vider
+from mat_methode.ui.widgets import InfoBar, Segmente, bouton, carte, etiquette, ligne, vider
 
 LARGEUR_APERCU = 820  # px
 
@@ -42,30 +43,64 @@ class PageProtocole(QWidget):
     def __init__(self, ctrl: Controleur):
         super().__init__()
         self.ctrl = ctrl
-        self.lay = QVBoxLayout(self)
+        racine = QVBoxLayout(self)
+        racine.setContentsMargins(0, 0, 0, 0)
+        racine.setSpacing(14)
+        self.haut = QWidget()
+        self.lay = QVBoxLayout(self.haut)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
+        racine.addWidget(self.haut)
+        self.flux = PageFlux(ctrl)  # « Modifier » : le même éditeur que Définition › Flux
+        racine.addWidget(self.flux)
+        self.apercu = QWidget()
+        self.l_apercu = QVBoxLayout(self.apercu)
+        self.l_apercu.setContentsMargins(0, 0, 0, 0)
+        self.l_apercu.setSpacing(14)
+        racine.addWidget(self.apercu)
+        self.mode = "apercu"
         self.nb_pages = 0
+
+    def ouvrir(self, mode: str = "apercu"):
+        self.mode = mode
+        self.flux.ouvrir("comp" if self.ctrl.courante and self.ctrl.courante.etapes else "def")
+
+    def _mode(self, mode: str):
+        self.mode = mode
+        self.rafraichir()
 
     def rafraichir(self, structure=True):
         m, r = self.ctrl.courante, self.ctrl.reglages
         if m is None:
             return
+        if self.mode == "modifier" and not structure:
+            self.flux.rafraichir(structure=False)
+            return
         vider(self.lay)
-        self.lay.addWidget(ligne(bouton("Exporter le protocole (PDF)", self.exporter_pdf.emit, accent=True,
-                                        tip="Enregistrer le protocole en PDF dans le dossier de mes documents"),
+        seg = Segmente([("apercu", "Aperçu du protocole"), ("modifier", "Modifier")], self.mode)
+        seg.change.connect(self._mode)
+        self.lay.addWidget(ligne(seg, bouton("Exporter le protocole (PDF)", self.exporter_pdf.emit, accent=True,
+                                             tip="Enregistrer le protocole en PDF dans le dossier de mes documents"),
                                  "stretch", bouton("Dossier de mes documents", self.ouvrir_dossier.emit, lien=True,
                                                    tip="Ouvrir le dossier où sont rangés mes rapports et protocoles")))
         self.lay.addWidget(ligne_emis(m, ("protocole", "ordre"), self.ouvrir_fichier.emit, [], "Aucun protocole émis pour l’instant."))
+        self.flux.setVisible(self.mode == "modifier")
+        self.apercu.setVisible(self.mode != "modifier")
+        if self.mode == "modifier":
+            self.lay.addWidget(etiquette("Les modifications sont enregistrées automatiquement ; reviens sur « Aperçu du protocole » "
+                                         "pour le relire, puis exporte-le en PDF.", secondaire=True, wrap=True))
+            self.flux.rafraichir()
+            return
+        vider(self.l_apercu)
         self.lay.addWidget(etiquette("Document de paillasse : titre, cartouche, contexte, flux, réactifs, puis chaque phase avec ses "
-                                     "échantillons et des cases à remplir à la main (n° Scirius, n° Aramis, heure réelle, observations).",
+                                     "échantillons et des cases pour noter à la main les n° Scirius et Aramis.",
                                      secondaire=True, wrap=True))
         reste = [t for t in m.a_faire if not t.fait]
         if reste:
-            self.lay.addWidget(InfoBar(" ; ".join(f"{t.categorie} : {t.texte}" for t in reste[:5]) + (" …" if len(reste) > 5 else ""),
+            self.l_apercu.addWidget(InfoBar(" ; ".join(f"{t.categorie} : {t.texte}" for t in reste[:5]) + (" …" if len(reste) > 5 else ""),
                                        niveau="info", titre=f"{len(reste)} point{'s' if len(reste) > 1 else ''} encore à faire"))
         if not m.etapes:
-            self.lay.addWidget(InfoBar("Ajoute des étapes dans l’onglet Flux pour obtenir un protocole.", titre="Flux vide"))
+            self.l_apercu.addWidget(InfoBar("Ajoute des étapes avec « Modifier » pour obtenir un protocole.", titre="Flux vide"))
         f, cl = carte()
         cl.addWidget(etiquette("Aperçu", "titreCarte"))
         try:
@@ -90,5 +125,5 @@ class PageProtocole(QWidget):
         if R.numeros_a_saisir(m):
             cl.addWidget(etiquette("Les numéros Scirius / Aramis non saisis apparaissent en cases vides, à remplir à la main.",
                                    secondaire=True, wrap=True))
-        self.lay.addWidget(f)
-        self.lay.addStretch(1)
+        self.l_apercu.addWidget(f)
+        self.l_apercu.addStretch(1)
