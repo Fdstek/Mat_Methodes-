@@ -1,8 +1,9 @@
-"""PDF « Ordre de manipulation » : document de paillasse, à emporter pendant la manip.
+"""PDF « Protocole » : document de paillasse, à emporter pendant la manip.
 
-Contenu : le cartouche du rapport, le schéma du flux, le contexte (2.1), les réactifs, les échantillons, puis le
-détail du flux par phase avec des cases vides pour noter à la main les numéros d'échantillon (Scirius, Aramis),
-l'heure réelle du prélèvement et des observations. Construit à partir du même JSON d'échange que le rapport.
+Contenu : le titre « Protocole : <nom de la manip> », le cartouche du rapport, le contexte (2.1), le schéma du flux,
+les réactifs, puis le détail du flux par phase ; chaque phase porte le tableau de ses échantillons, avec des cases
+vides pour noter à la main les numéros (Scirius, Aramis) et l'heure réelle du prélèvement, et une case Observations.
+Construit à partir du même JSON d'échange que le rapport.
 """
 from __future__ import annotations
 
@@ -23,7 +24,6 @@ from mat_methode.exports.pdf import (
     legende_flux,
     moment_texte,
     styles,
-    table_echantillons,
     table_reactifs,
 )
 
@@ -81,31 +81,26 @@ def phases_a_remplir(data: dict, s: dict) -> list:
     return blocs
 
 
-def ecrire_ordre(data: dict, chemin) -> None:
+def ecrire_protocole(data: dict, chemin) -> None:
     s = styles()
     h1, h2, corps, petit = s["h1"], s["h2"], s["corps"], s["petit"]
     titre = data.get("titre") or "Manip"
-    doc, pied = document(chemin, f"Ordre de manipulation · {titre}",
-                         "Ordre de manipulation - à compléter à la main pendant la manip")
+    doc, pied = document(chemin, f"Protocole : {titre}", "Protocole - à compléter à la main pendant la manip")
     largeur = A4[0] - 36 * mm - 12
-    story = [Paragraph("Ordre de manipulation", h1), Paragraph(escape(titre), s["h3"]), cartouche(data, s),
-             Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
-             Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
+    story = [Paragraph(f"Protocole : {escape(titre)}", h1), cartouche(data, s)]
     contexte = next((b for b in data.get("sous_sections", []) if b.get("titre", "").startswith("2.1")), None)
     if contexte:
         story.append(Paragraph("Contexte", h2))
         story += [Paragraph(avec_reperes(x.replace(", décrites en 2.3", "")), corps) for x in contexte["texte"].split("\n") if x]
+    story += [Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
+              Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
     tab = table_reactifs(data, s)
     if tab is not None:
         story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
-    tab = table_echantillons(data, s, a_remplir=True)
-    if tab is not None:
-        story.append(KeepTogether([Paragraph("Échantillons", h2),
-                                   Paragraph("Cases vides : numéros à noter à la main.", petit), tab]))
     story.append(Paragraph("Détail du flux par phase", h2))
-    story.append(Paragraph("Pour chaque phase : noter les numéros d’échantillon, l’heure réelle des prélèvements et les observations.", petit))
+    story.append(Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros et heure réelle à noter à la main) et les observations.", petit))
     story += phases_a_remplir(data, s)
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
 
 
-__all__ = ["ecrire_ordre"]
+__all__ = ["ecrire_protocole"]

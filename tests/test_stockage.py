@@ -136,4 +136,12 @@ def test_crit24_temp_dans_le_dossier(tmp_path, monkeypatch):
 
 def test_reglages_par_defaut(tmp_path):
     r = _st(tmp_path).charger_reglages()
-    assert isinstance(r, Reglages) and [e.nom for e in r.etats] == ["Brouillon", "En cours", "Terminée"]
+    assert isinstance(r, Reglages) and [e.nom for e in r.etats] == ["Brouillon", "À faire", "Lancée", "En cours", "Terminée"]
+
+
+def test_migration_etats_a_faire_et_lancee(tmp_path):
+    from mat_methode.storage.stockage import migrer
+    f = tmp_path / "reglages.json"
+    f.write_text("{}", encoding="utf-8")
+    d = migrer({"schema": 4, "etats": [{"id": "brouillon", "nom": "Brouillon"}, {"id": "x", "nom": "lancée"}]}, f)
+    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée"] and d["schema"] == 5

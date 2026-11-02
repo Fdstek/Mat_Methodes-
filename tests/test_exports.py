@@ -108,13 +108,16 @@ def test_crit17_word(ethanol, reglages, tmp_path):
         assert any(n.startswith("word/media/") for n in z.namelist())
 
 
-def test_ordre_de_manipulation(ethanol, reglages, tmp_path):
-    from mat_methode.exports.ordre import ecrire_ordre
-    f = tmp_path / "ordre.pdf"
-    ecrire_ordre(exporter(ethanol, reglages), f)
+def test_protocole(ethanol, reglages, tmp_path):
+    from mat_methode.exports.protocole import ecrire_protocole
+    f = tmp_path / "protocole.pdf"
+    ecrire_protocole(exporter(ethanol, reglages), f)
     with pdfplumber.open(f) as pdf:
         texte = " ".join(" ".join(p.extract_text() for p in pdf.pages).split())
-    for x in ("Ordre de manipulation", "Réf. demande", "DA-2026-0158", "Flux de prétraitement", "Contexte", "Demande : Interne · R&D",
-              "Réactifs", "Échantillons", "Détail du flux par phase", "Heure réelle", "Observations", "S3a", "S5b"):
+    for x in ("Protocole : Désacidification éthanol", "Réf. demande", "DA-2026-0158", "Flux de prétraitement", "Contexte", "Demande : Interne · R&D",
+              "Réactifs", "Détail du flux par phase", "Heure réelle", "Observations", "S3a", "S5b"):
         assert x in texte, x
+    # ordre demandé : contexte, flux, réactifs, puis le détail par phase (les échantillons sont dans chaque phase)
+    assert texte.index("Contexte") < texte.index("Flux de prétraitement") < texte.index("Réactifs") < texte.index("Détail du flux par phase")
+    assert "Échantillons" not in texte.split("Détail du flux par phase")[0]
     assert "2.3 Méthodes" not in texte and "2.4 Prélèvements" not in texte and "décrites en 2.3" not in texte  # pas le texte du rapport

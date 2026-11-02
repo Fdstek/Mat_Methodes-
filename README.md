@@ -42,6 +42,8 @@ Les réglages modifiés en même temps sont fusionnés.
 sous-étapes (chauffage, ajout d'acide, centrifugation…). Les numéros restent continus sur tout le flux (étapes 2 à 4,
 échantillon S4…) ; la grande étape apparaît comme un cadre à l'écran, un bandeau sur les cartes du PDF et du Word, et une
 phrase « Degumming (étapes 2 à 4). » dans le texte. La liste des noms se règle dans Réglages.
+Le bouton ⧉ d'une grande étape la duplique (choix du nombre de copies, échantillons recopiés sans leurs numéros si on le
+souhaite) ; les copies se placent juste après et la numérotation suit.
 
 **Réglages modifiables** : les opérations proposées dans « Définir le flux » (chauffage, filtration…) s'ajoutent, se
 renomment, se suppriment et s'ordonnent dans Réglages, avec le participe passé utilisé dans le texte (« filtré »).
@@ -70,7 +72,7 @@ se saisit à la main.
 Réactifs, Volumes, Analyses, Types, Grandes étapes, États, Tags, Fichier Scirius).
 
 **À faire** : chaque manip a une liste « À faire » (carte sous « Ma demande ») : réflexion, matériel manquant, réactif
-manquant… avec case à cocher. Le nombre de points restants s'affiche dans Mes manips et le Rapport ; la liste n'apparaît
+manquant… avec case à cocher, dans l'ordre de réalisation (↑ ↓ pour le changer). Le nombre de points restants s'affiche dans Mes manips et le Rapport ; la liste n'apparaît
 pas dans les documents exportés. Catégories modifiables dans Réglages.
 
 **Conditions de l'étape précédente** : dans une étape, « ⧉ Reprendre les conditions de l'étape précédente » copie
@@ -81,13 +83,18 @@ un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans le
 
 **Listes déroulantes** : la molette de la souris ne change jamais une liste fermée (elle fait défiler la page).
 
-**Ordre de manipulation** : bouton du Rapport « Ordre de manipulation (PDF) » : document de paillasse avec le même
-cartouche que le rapport, le flux, le contexte (2.1), les réactifs, les échantillons et le détail par phase, avec des cases
-vides pour noter à la main les n° Scirius / Aramis, l'heure réelle des prélèvements et des observations.
+**État de la manip** : liste déroulante « État » dans « Ma demande » (et dans le Rapport) : Brouillon, À faire, Lancée,
+En cours, Terminée, Non réalisée. « Modifier la liste » ouvre Réglages › États (ajouter, renommer, couleur, ordre ↑ ↓).
+« Lancer la manip » passe l'état à « Lancée ».
 
-**Documents émis** : les PDF, Word et ordres de manipulation sont proposés dans `donnees\exports\<Prénom NOM>\`
+**Protocole** : onglet « Protocole » (entre Flux et Rapport) avec l'aperçu du PDF, « Exporter le protocole (PDF) »,
+le dernier protocole émis et « Dossier de mes documents ». Le PDF de paillasse contient : « Protocole : <nom> », le même
+cartouche que le rapport, le contexte (2.1), le flux, les réactifs, puis le détail par phase avec, dans chaque phase, le
+tableau de ses échantillons et des cases vides pour noter à la main les n° Scirius / Aramis, l'heure réelle et des observations.
+
+**Documents émis** : les PDF, Word et protocoles sont proposés dans `donnees\exports\<Prénom NOM>\`
 (la personne qui édite), nommés `<référence> - <nom>`. Chaque document émis est noté sur la manip : « Ouvrir le dernier
-document émis » et « Tous ▾ » dans l'onglet Rapport, « Dossier de mes rapports » ouvre le dossier.
+rapport émis » et « Tous ▾ » dans l'onglet Rapport (idem pour les protocoles dans l'onglet Protocole), « Dossier de mes rapports » ouvre le dossier.
 
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.

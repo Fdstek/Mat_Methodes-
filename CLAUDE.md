@@ -2,7 +2,7 @@
 
 Application de bureau Windows 11 (Python, PySide6) livrée en `.exe` portable sur SharePoint.
 Elle sert à décrire une manip de prétraitement étape par étape (le flux), puis à générer le « Matériel et méthodes »
-(sections 2.1 à 2.4), le PDF du rapport (avec le schéma du flux), le Word, et le PDF « Ordre de manipulation ».
+(sections 2.1 à 2.4), le PDF du rapport (avec le schéma du flux), le Word, et le PDF « Protocole » (document de paillasse, onglet Protocole).
 Les données sont partagées entre plusieurs utilisateurs.
 Utilisateur : Pierre BURGUN, technicien de labo, francophone. **Toute l'interface, les documents et les réponses sont en français**, sans jargon.
 Le cahier des charges complet est dans `docs/cahier_des_charges/`.
@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\<Prénom NOM>\` : un dossier par personne éditrice. On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 4` (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 5` (5 : états « À faire » et « Lancée » ajoutés aux Réglages) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -38,7 +38,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `domain/reglages_ops.py` : renommer, ajouter ou supprimer les éléments des Réglages ; « non réalisée » ; archivage.
 - `domain/journal.py` : modifications après le lancement d'une manip.
 - `report/rapport.py` (texte 2.1 à 2.4, **une idée par ligne** séparée par `\n`), `report/html.py`.
-- `exports/pdf.py` (blocs communs : `styles`, `document`, `cartouche`, `Flux`…), `exports/ordre.py` (Ordre de manipulation, avec cases à remplir à la main), `exports/word.py`, `exports/echange.py` (JSON).
+- `exports/pdf.py` (blocs communs : `styles`, `document`, `cartouche`, `Flux`…), `exports/protocole.py` (Protocole de paillasse : échantillons dans chaque phase, cases à remplir à la main), `exports/word.py`, `exports/echange.py` (JSON).
 - `scirius.py` : fichier `Suivi enregistrements scirius.xlsx`, feuille « Suivi General », en-tête en ligne 8.
   - Le n° Scirius est la colonne « Stock Item » ; le nom vient de « Product Name souhaité », sinon de « Nom du produit ».
   - Filtre par défaut sur les destinataires C.LACOUX et P.BURGUN.
@@ -49,17 +49,20 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   - `fenetre.py` : navigation et exports ;
   - `page_manips.py` : liste « Mes manips » ;
   - `page_flux.py` : édition du flux, Scirius, réactifs, matériel, « À faire » ;
-  - `page_rapport.py` : exports, dernier document émis ;
+  - `page_rapport.py` : exports, dernier rapport émis (`ligne_emis`) ;
+  - `page_protocole.py` : aperçu du protocole (rendu PDF par pypdfium2), export, dernier protocole émis ;
   - `page_reglages.py` : cartes des Réglages ;
   - `widgets.py` : `SansMolette`, `ListeSaisie`, `ChipSupprimable`, `Expander` ;
   - `dialogues.py`, `controleur.py`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 9.
-- Dernier commit poussé : `97b5722` (rapport une ligne par idée, documents émis par personne, Ordre de manipulation, icône PNG et AppUserModelID). **La PR n'est pas encore ouverte** : l'ouvrir quand l'utilisateur le demande.
+- Lots livrés et fusionnés jusqu'à la PR n° 11.
+- Lot du 02/11 14h57 (duplication de grande étape, états À faire / Lancée choisis dans Ma demande, ordre des « À faire »,
+  Protocole et onglet Protocole) : poussé sur la branche, PR à ouvrir quand l'utilisateur le demande.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
-  - la police Segoe UI dans les PDF.
+  - la police Segoe UI dans les PDF ;
+  - l'aperçu du protocole dans l'exe (pdfium.dll embarquée par le `.spec`).
 - L'utilisateur envoie ses demandes sous forme de fichiers markdown « Correctifs à faire ». Les traiter point par point, envoyer des captures ou des PDF d'exemple, puis proposer la PR.

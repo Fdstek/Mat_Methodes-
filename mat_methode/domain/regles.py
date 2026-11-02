@@ -252,12 +252,47 @@ def deplacer_groupe(m: Manip, groupe_id: str, sens: int) -> bool:
     return True
 
 
+def dupliquer_groupe(m: Manip, groupe_id: str, fois: int = 1, echantillons: bool = False) -> list[Groupe]:
+    """Recopie une grande étape (ses étapes, conditions, réactifs, matériel) « fois » fois, juste après elle.
+    Les échantillons sont recopiés sur demande, sans leurs numéros Scirius / Aramis."""
+    g = m.groupe(groupe_id)
+    idx = [i for i, e in enumerate(m.etapes) if e.groupe_id == groupe_id]
+    if g is None or not idx or fois < 1:
+        return []
+    modeles = [m.etapes[i] for i in idx]
+    pos, nouveaux = idx[-1] + 1, []
+    for _ in range(fois):
+        ng = Groupe(nom=g.nom)
+        m.groupes.insert(m.groupes.index(g) + len(nouveaux) + 1, ng)
+        nouveaux.append(ng)
+        for e in modeles:
+            c = e.model_copy(deep=True)
+            c.id, c.groupe_id = nouvel_id(), ng.id
+            m.etapes.insert(pos, c)
+            pos += 1
+            if echantillons:
+                for p in [p for p in m.prelevements if p.etape_id == e.id]:
+                    q = p.model_copy(deep=True)
+                    q.id, q.etape_id, q.scirius, q.aramis = nouvel_id(), c.id, "", ""
+                    m.prelevements.append(q)
+    return nouveaux
+
+
 def dupliquer_etape(m: Manip, etape_id: str) -> Etape:
     i = [e.id for e in m.etapes].index(etape_id)
     c = m.etapes[i].model_copy(deep=True)
     c.id = nouvel_id()
     m.etapes.insert(i + 1, c)
     return c
+
+
+def deplacer_tache(m: Manip, tache_id: str, sens: int) -> bool:
+    """Change l'ordre de réalisation des points « à faire »."""
+    i = next((k for k, t in enumerate(m.a_faire) if t.id == tache_id), None)
+    if i is None or not 0 <= i + sens < len(m.a_faire):
+        return False
+    m.a_faire[i], m.a_faire[i + sens] = m.a_faire[i + sens], m.a_faire[i]
+    return True
 
 
 def deplacer_etape(m: Manip, etape_id: str, sens: int) -> bool:

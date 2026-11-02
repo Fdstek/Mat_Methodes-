@@ -27,12 +27,13 @@ from mat_methode.ui import dialogues as D
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.page_flux import PageFlux
 from mat_methode.ui.page_manips import PageManips
+from mat_methode.ui.page_protocole import PageProtocole
 from mat_methode.ui.page_rapport import PageRapport
 from mat_methode.ui.page_reglages import PageReglages
 from mat_methode.ui.widgets import Toast, bouton, etiquette, pastille, vider
 
 # Segoe Fluent Icons (Windows 11) ; repli sur des symboles simples
-ICONES = {"manips": ("", "≡"), "flux": ("", "⇄"), "rapport": ("", "▤"), "reglages": ("", "⚙")}
+ICONES = {"manips": ("", "≡"), "flux": ("", "⇄"), "protocole": ("\uE9D5", "☑"), "rapport": ("", "▤"), "reglages": ("", "⚙")}
 
 
 def police_icones() -> str | None:
@@ -81,7 +82,8 @@ class Fenetre(QMainWindow):
         v.addSpacing(8)
         self.nav = {}
         pi = police_icones()
-        for k, t in (("manips", "Mes manips"), ("flux", "Flux"), ("rapport", "Rapport"), ("reglages", "Réglages")):
+        for k, t in (("manips", "Mes manips"), ("flux", "Flux"), ("protocole", "Protocole"), ("rapport", "Rapport"),
+                     ("reglages", "Réglages")):
             v.addWidget(self._nav(k, t, pi))
         v.addStretch(1)
         h.addWidget(self.volet)
@@ -112,9 +114,11 @@ class Fenetre(QMainWindow):
         self.p_manips = PageManips(ctrl)
         self.p_flux = PageFlux(ctrl)
         self.p_rapport = PageRapport(ctrl)
+        self.p_protocole = PageProtocole(ctrl)
         self.p_reglages = PageReglages(ctrl)
         self.defilements = {}
-        for k, p in (("manips", self.p_manips), ("flux", self.p_flux), ("rapport", self.p_rapport), ("reglages", self.p_reglages)):
+        for k, p in (("manips", self.p_manips), ("flux", self.p_flux), ("rapport", self.p_rapport), ("reglages", self.p_reglages),
+                     ("protocole", self.p_protocole)):
             s = QScrollArea()
             s.setWidgetResizable(True)
             s.setFrameShape(QFrame.Shape.NoFrame)
@@ -148,7 +152,9 @@ class Fenetre(QMainWindow):
         self.p_rapport.exporter_pdf.connect(lambda: self.exporter_fichier("pdf"))
         self.p_rapport.exporter_word.connect(lambda: self.exporter_fichier("docx"))
         self.p_rapport.autres_formats.connect(lambda: self.autres_formats())
-        self.p_rapport.ordre.connect(lambda: self.exporter_fichier("ordre"))
+        self.p_protocole.exporter_pdf.connect(lambda: self.exporter_fichier("protocole"))
+        self.p_protocole.ouvrir_fichier.connect(self.ouvrir_fichier)
+        self.p_protocole.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_rapports())))
         self.p_rapport.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_rapports())))
         self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante))
@@ -175,13 +181,13 @@ class Fenetre(QMainWindow):
 
     # ------------------------------------------------------------ navigation
     def aller(self, page: str, section: str | None = None):
-        if page in ("flux", "rapport") and self.ctrl.courante is None:
+        if page in ("flux", "rapport", "protocole") and self.ctrl.courante is None:
             return
         if page == "reglages":
             self.p_reglages.section = section  # le menu ramène aux cartes ; un lien ouvre directement la bonne carte
         self.ctrl.journaliser()
         self.page = page
-        self.pile.setCurrentIndex(["manips", "flux", "rapport", "reglages"].index(page))
+        self.pile.setCurrentIndex(["manips", "flux", "rapport", "reglages", "protocole"].index(page))
         self.rafraichir()
         self.defilements[page].verticalScrollBar().setValue(0)
 
@@ -211,12 +217,12 @@ class Fenetre(QMainWindow):
             self.titre.setText("Réglages")
             self.p_reglages.rafraichir()
         elif m is not None:
-            self.titre.setText(m.nom if self.page == "flux" else f"Rapport · {m.nom}")
+            self.titre.setText(m.nom if self.page == "flux" else f"{'Rapport' if self.page == 'rapport' else 'Protocole'} · {m.nom}")
             sous.addWidget(etiquette(O.nom_etat(ctrl.reglages, m.etat)[0], secondaire=True))
             if ctrl.lecture_seule:
                 sous.addWidget(pastille("Lecture seule", "info"))
             sous.addStretch(1)
-            (self.p_flux if self.page == "flux" else self.p_rapport).rafraichir()
+            {"flux": self.p_flux, "rapport": self.p_rapport, "protocole": self.p_protocole}[self.page].rafraichir()
         self._statut(self._texte_statut() if not ctrl.st.lecture_seule else "Non enregistré : dossier inaccessible",
                      ctrl.st.lecture_seule)
 
@@ -231,7 +237,7 @@ class Fenetre(QMainWindow):
                              f"{len(m.prelevements)} éch.")
 
     def _texte_statut(self) -> str:
-        return self.ctrl.texte_statut(manip=self.page in ("flux", "rapport"))
+        return self.ctrl.texte_statut(manip=self.page in ("flux", "rapport", "protocole"))
 
     def _statut(self, texte: str, erreur: bool):
         if texte.startswith("Enregistré automatiquement"):
@@ -263,8 +269,10 @@ class Fenetre(QMainWindow):
     def _reglages_changes(self):
         if self.page == "reglages":
             return  # la page se met à jour elle-même (pas de reconstruction pendant la frappe)
-        if self.page in ("rapport",):
+        if self.page == "rapport":
             self.p_rapport.rafraichir()
+        elif self.page == "protocole":
+            self.p_protocole.rafraichir()
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
@@ -329,16 +337,16 @@ class Fenetre(QMainWindow):
         return d
 
     def exporter_fichier(self, fmt: str, ident: str | None = None):
-        """fmt : pdf, docx, md, html, json, ou « ordre » (ordre de manipulation en PDF)."""
+        """fmt : pdf, docx, md, html, json, ou « protocole » (protocole de paillasse en PDF)."""
         m = self.ctrl.manip(ident) if ident else self.ctrl.courante
         if m is None:
             return
         self.ctrl.journaliser()
         self.ctrl.enregistrer_tout()
-        ext = {"pdf": "PDF (*.pdf)", "ordre": "PDF (*.pdf)", "docx": "Document Word (*.docx)", "md": "Texte Markdown (*.md)",
+        ext = {"pdf": "PDF (*.pdf)", "protocole": "PDF (*.pdf)", "docx": "Document Word (*.docx)", "md": "Texte Markdown (*.md)",
                "html": "Page HTML (*.html)", "json": "Données JSON (*.json)"}[fmt]
         base = nom_fichier(f"{m.contexte.ref} - {m.nom}" if m.contexte.ref.strip() else m.nom)
-        nom = f"{base} - Ordre de manipulation.pdf" if fmt == "ordre" else f"{base}.{fmt}"
+        nom = f"{base} - Protocole.pdf" if fmt == "protocole" else f"{base}.{fmt}"
         f, _ = QFileDialog.getSaveFileName(self, "Enregistrer sous", str(self.dossier_rapports() / nom), ext)
         if not f:
             return
@@ -347,9 +355,9 @@ class Fenetre(QMainWindow):
             if fmt == "pdf":
                 from mat_methode.exports.pdf import ecrire_pdf
                 ecrire_pdf(data, f)
-            elif fmt == "ordre":
-                from mat_methode.exports.ordre import ecrire_ordre
-                ecrire_ordre(data, f)
+            elif fmt == "protocole":
+                from mat_methode.exports.protocole import ecrire_protocole
+                ecrire_protocole(data, f)
             elif fmt == "docx":
                 from mat_methode.exports.word import ecrire_docx
                 ecrire_docx(data, f)
@@ -358,12 +366,12 @@ class Fenetre(QMainWindow):
         except OSError as ex:
             D.informer(self, "Export impossible", f"Le fichier n’a pas pu être écrit : {ex.strerror or ex}. Ferme-le s’il est ouvert dans Word ou un lecteur PDF.")
             return
-        if fmt in ("pdf", "docx", "ordre"):  # documents émis : retrouvables depuis l'onglet Rapport
+        if fmt in ("pdf", "docx", "protocole"):  # documents émis : retrouvables depuis les onglets Rapport et Protocole
             from mat_methode.domain.models import RapportEmis, maintenant_iso
-            m.rapports.append(RapportEmis(type="ordre" if fmt == "ordre" else "rapport", fmt="pdf" if fmt == "ordre" else fmt,
+            m.rapports.append(RapportEmis(type="protocole" if fmt == "protocole" else "rapport", fmt="pdf" if fmt == "protocole" else fmt,
                                           chemin=str(f), le=maintenant_iso(), par=self.ctrl.nom_utilisateur()))
             del m.rapports[:-30]
-            self.ctrl.toucher(m, structure=self.page == "rapport")
+            self.ctrl.toucher(m, structure=self.page in ("rapport", "protocole"))
         self.toast.montrer(f"Fichier enregistré : {Path(f).name}")
 
     def ouvrir_fichier(self, chemin: str) -> None:
