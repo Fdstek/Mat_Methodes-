@@ -340,7 +340,7 @@ def test_rapports_emis_par_personne_et_protocole(fen, monkeypatch):
     ouverts = []
     monkeypatch.setattr("PySide6.QtGui.QDesktopServices.openUrl", lambda url: ouverts.append(url.toLocalFile()))
     fen.ouvrir_fichier(m.rapports[-1].chemin)
-    assert ouverts == [chemin]
+    assert [Path(x) for x in ouverts] == [Path(chemin)]  # Windows : « / » et « \\ » désignent le même fichier
     fen.p_rapport.rafraichir()
 
 
