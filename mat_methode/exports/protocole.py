@@ -64,7 +64,8 @@ def phases_a_remplir(data: dict, s: dict) -> list:
             lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis", "Heure réelle"]]]
             for p in ps:
                 lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell),
-                               Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}", cell),
+                               Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}"
+                                         + (f"<br/><i>{escape(p['commentaire'])}</i>" if p.get("commentaire") else ""), cell),
                                Paragraph(f"{escape(p.get('labo') or '')}<br/><font color='#566360'>{escape(', '.join(p.get('analyses', [])))}</font>", cell),
                                _case(p.get("scirius"), cell), _case(p.get("aramis"), cell), Paragraph("", cell)])
             t = Table(lignes, colWidths=[13 * mm, 30 * mm, 50 * mm, 27 * mm, 27 * mm, 27 * mm], repeatRows=1)

@@ -31,18 +31,11 @@ def numero_etape(m: Manip, p: Prelevement) -> int:
     return 0
 
 
-def _rang(p: Prelevement) -> float:
-    if p.moment == "avant":
-        return -1
-    if p.moment == "pendant":
-        return p.temps_min or 0
-    return 1e9
-
-
 def echantillons_tries(m: Manip) -> list[Prelevement]:
-    """Ordre : étape, puis avant < pendant (temps croissant) < effluent, puis ordre de saisie."""
+    """Ordre : étape, puis ordre d'ajout. Un échantillon ajouté se met à la suite des existants (S3a, S3b, puis S3c),
+    quel que soit son moment : les étiquettes déjà notées ne changent pas."""
     idx = list(enumerate(m.prelevements))
-    idx.sort(key=lambda x: (numero_etape(m, x[1]), _rang(x[1]), x[0]))
+    idx.sort(key=lambda x: (numero_etape(m, x[1]), x[0]))
     return [p for _, p in idx]
 
 
@@ -98,6 +91,17 @@ def total_preleve(m: Manip) -> float:
 
 def numeros_a_saisir(m: Manip) -> int:
     return sum((0 if p.scirius.strip() else 1) + (0 if p.aramis.strip() else 1) for p in m.prelevements)
+
+
+def suivi_volumes(m: Manip) -> list[tuple[str, str, float, float]]:
+    """Échantillons dans l'ordre du flux : (étiquette, où et quand, volume prélevé, volume restant après ce prélèvement)."""
+    lab, reste, out = etiquettes(m), m.contexte.volume_depart_ml or 0, []
+    for p in echantillons_tries(m):
+        n = numero_etape(m, p)
+        reste -= p.volume_ml or 0
+        ou = "avant traitement" if est_entree(m, p) else f"étape {n} ({m.etapes[n - 1].operation}) · {moment_court(m, p)}"
+        out.append((lab[p.id], ou, p.volume_ml or 0, reste))
+    return out
 
 
 def bilan(m: Manip) -> Bilan:

@@ -184,7 +184,8 @@ class PageRapport(QWidget):
                 col_e.addWidget(ligne(badge(R.code_badge(x.id)), etiquette(f"<b style='color:{theme.P.ambre_texte}'>{x.id}</b> "
                                                                            f"{fmt_vol(x.volume or 0)} mL · {escape(x.moment)}"), "stretch"))
                 col_e.addWidget(etiquette(f"{escape(x.labo)} · {escape(', '.join(x.analyses) or 'aucune analyse')}<br>"
-                                          f"<span style='color:{theme.P.texte2}'>n° Scirius</span> {a_saisir(x.scirius)} · "
+                                          + (f"<i>{escape(x.commentaire)}</i><br>" if x.commentaire else "")
+                                          + f"<span style='color:{theme.P.texte2}'>n° Scirius</span> {a_saisir(x.scirius)} · "
                                           f"<span style='color:{theme.P.texte2}'>n° Aramis</span> {a_saisir(x.aramis)}", wrap=True))
             col_e.addStretch(1)
             g.addLayout(col_r, 0, 0)

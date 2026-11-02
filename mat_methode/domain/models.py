@@ -82,6 +82,7 @@ ETATS_DEFAUT = [Etat(id="brouillon", nom="Brouillon", ton="warn"),
                 Etat(id="afaire", nom="À faire", ton="neutre"),
                 Etat(id="lancee", nom="Lancée", ton="info"),
                 Etat(id="encours", nom="En cours", ton="info"),
+                Etat(id="realisee", nom="Réalisée", ton="ok"),
                 Etat(id="terminee", nom="Terminée", ton="ok")]
 TYPES_DEFAUT = ["Support", "R&D", "Technologique", "Test d’idée"]
 ANALYSES_DEFAUT = ["FFA / indice d’acide", "Teneur en eau", "Impuretés insolubles", "Métaux (ICP)", "Phosphore"]
@@ -217,6 +218,7 @@ class Prelevement(_Modele):
     analyses: list[str] = Field(default_factory=list)
     scirius: str = ""
     aramis: str = ""
+    commentaire: str = ""  # une ligne libre (ex. « prélever sous agitation »)
 
 
 class Contexte(_Modele):

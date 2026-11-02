@@ -312,7 +312,7 @@ def test_materiel_molette_et_titre(fen, qtbot):
     m = ethanol(fen)
     fen.ouvrir(m.id, "comp")
     fen.p_flux.aller(m.etapes[0].id)
-    ls = fen.p_flux.findChildren(ListeSaisie)[0]
+    ls = next(x for x in fen.p_flux.findChildren(ListeSaisie) if x.accessibleName() != "Ajouter un tag")
     assert "Étuve" in [ls.itemText(i) for i in range(ls.count())]
     fen.p_flux._ajouter_materiel(m.etapes[0], "Thermomètre")
     assert "Thermomètre" in m.etapes[0].equipements and "Thermomètre" in fen.ctrl.reglages.materiels
@@ -393,3 +393,18 @@ def test_dupliquer_grande_etape_et_ordre_a_faire(fen, monkeypatch):
     assert len(m.prelevements) > ne
     m.a_faire = [Tache(texte="a"), Tache(texte="b")]
     assert R.deplacer_tache(m, m.a_faire[1].id, -1) and [t.texte for t in m.a_faire] == ["b", "a"]
+
+
+def test_tags_en_liste_et_section_volumes(fen):
+    from mat_methode.ui.widgets import ListeSaisie
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    tag = next(x for x in fen.p_flux.findChildren(ListeSaisie) if x.accessibleName() == "Ajouter un tag")
+    choix = [tag.itemText(i) for i in range(tag.count())]
+    assert choix and not set(choix) & set(m.tags)
+    tag.valide.emit(choix[0])
+    assert choix[0] in m.tags
+    x = fen.p_flux._volumes_x
+    assert "1\u202f000 mL engagés · 325 mL prélevés · 675 mL restants" in x.tete.text()
+    textes = [w.text() for w in fen.p_flux._volumes.findChildren(type(fen.titre))]
+    assert "ENGAGÉ" in textes and "RESTANT" in textes and "S5b" in " ".join(textes)

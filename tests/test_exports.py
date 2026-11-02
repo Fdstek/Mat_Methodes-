@@ -121,3 +121,15 @@ def test_protocole(ethanol, reglages, tmp_path):
     assert texte.index("Contexte") < texte.index("Flux de prétraitement") < texte.index("Réactifs") < texte.index("Détail du flux par phase")
     assert "Échantillons" not in texte.split("Détail du flux par phase")[0]
     assert "2.3 Méthodes" not in texte and "2.4 Prélèvements" not in texte and "décrites en 2.3" not in texte  # pas le texte du rapport
+
+
+def test_commentaire_echantillon(ethanol, reglages, tmp_path):
+    from mat_methode.exports.protocole import ecrire_protocole
+    ethanol.prelevements[0].commentaire = "flacon ambré"
+    d = exporter(ethanol, reglages)
+    assert d["prelevements"][0]["commentaire"] == "flacon ambré" and "commentaire" not in d["prelevements"][1]
+    m, _ = importer(json.loads(json.dumps(d)), reglages)
+    assert m.prelevements[0].commentaire == "flacon ambré"
+    ecrire_protocole(d, tmp_path / "p.pdf")
+    with pdfplumber.open(tmp_path / "p.pdf") as pdf:
+        assert "flacon ambré" in " ".join(p.extract_text() for p in pdf.pages)

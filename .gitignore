@@ -9,3 +9,5 @@ dist/
 # données créées à l'exécution, à côté de l'application
 /donnees/
 /temp/
+build/build.log
+.venv-build/

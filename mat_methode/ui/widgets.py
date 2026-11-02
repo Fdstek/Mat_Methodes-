@@ -500,6 +500,10 @@ class Expander(QFrame):
         self.tete.setText(f"{fl}   {self._titre}    {self._note}".rstrip())
         self.tete.setAccessibleName(f"{self._titre}, {'ouvert' if self.ouvert else 'replié'}")
 
+    def changer_note(self, note: str):
+        self._note = note
+        self._maj()
+
     def basculer(self):
         self.ouvert = not self.ouvert
         self.corps.setVisible(self.ouvert)
