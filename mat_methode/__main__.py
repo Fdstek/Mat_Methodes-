@@ -22,26 +22,32 @@ def main() -> int:
     from mat_methode.ui.controleur import Controleur
     from mat_methode.ui.fenetre import Fenetre
 
+    if sys.platform == "win32":  # avant toute fenêtre : la barre des tâches regroupe sous l'icône de l'application
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MatMethode.MatMethode.1")
+        except Exception:
+            pass
     QCoreApplication.setOrganizationName("")  # aucun QSettings dans le registre (préférences dans donnees\preferences)
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     app.setApplicationName(NOM_APPLICATION)
     app.setApplicationVersion(VERSION)
-    if sys.platform == "win32":  # la barre des tâches de Windows affiche alors l'icône de l'application
-        try:
-            import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MatMethode.MatMethode")
-        except Exception:
-            pass
     from importlib import resources
-    ico = resources.files("mat_methode.data").joinpath("MatMethode.ico")
-    if ico.is_file():
-        app.setWindowIcon(QIcon(str(ico)))
+    icone = QIcon()
+    for nom in ("MatMethode.png", "MatMethode.ico"):  # PNG d'abord : lu par Qt sans module supplémentaire
+        f = resources.files("mat_methode.data").joinpath(nom)
+        if f.is_file():
+            icone = QIcon(str(f))
+            if not icone.isNull():
+                break
+    app.setWindowIcon(icone)
 
     st = Stockage(racine, utilisateur(), poste())
     ctrl = Controleur(st)
     theme.appliquer(app)
     fen = Fenetre(ctrl)
+    fen.setWindowIcon(icone)
     ctrl.demarrer()
 
     def suivre_theme(*_):

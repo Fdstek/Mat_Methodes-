@@ -75,7 +75,7 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
             f'<div class="s"><b>{e(x.id)}</b> · {fmt_vol(x.volume or 0)} mL · {e(x.moment)} · {e(x.labo)} · {e(", ".join(x.analyses))} — '
             f"n° Scirius {td(x.scirius)}, n° Aramis {td(x.aramis)}</div>" for x in ph.echantillons) or "aucun") + "</div></div>"
         for ph in r.phases)
-    corps = "".join(f"<h3>{e(s.titre)}</h3><p>{texte_html(s.texte)}</p>" for s in r.sections)
+    corps = "".join(f"<h3>{e(s.titre)}</h3>" + "".join(f"<p>{texte_html(x)}</p>" for x in s.texte.split("\n")) for s in r.sections)
     lanc = ""
     if m.lancee:
         lanc = f" · <b>lancée le</b> {fmt_dt(m.lancee.le)} par {e(m.lancee.par)}"

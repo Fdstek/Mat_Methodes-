@@ -265,7 +265,9 @@ def ecrire_docx(data: dict, chemin) -> None:
     for ss in data.get("sous_sections", []):
         if ss.get("texte"):
             doc.add_heading(ss["titre"], level=3)
-            ecrire(doc.add_paragraph(), ss["texte"])
+            for x in ss["texte"].split("\n"):  # un paragraphe par ligne
+                if x:
+                    ecrire(doc.add_paragraph(), x)
 
     doc.add_heading("Détail par phase du flux", level=1)
     for i, ph in enumerate(data.get("phases", [])):

@@ -353,6 +353,7 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     c.etat = reglages.etat_initial()
     c.rev, c.lancee, c.journal, c.base = 1, None, [], None
     c.a_faire = []  # la liste « à faire » est propre à chaque manip
+    c.rapports = []
     c.maj = maintenant_iso()
     c.contexte.ref = ""
     c.contexte.lot = ""

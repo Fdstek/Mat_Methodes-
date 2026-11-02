@@ -266,6 +266,15 @@ class Tache(_Modele):
     le: str = ""
 
 
+class RapportEmis(_Modele):
+    """Document émis pour une manip (rapport PDF/Word, ordre de manipulation…) : où il a été enregistré, quand, par qui."""
+    type: str = "rapport"  # rapport | ordre
+    fmt: str = "pdf"
+    chemin: str = ""
+    le: str = ""
+    par: str = ""
+
+
 class Manip(_Modele):
     schema_: int = Field(default=SCHEMA_DONNEES, alias="schema")
     id: str = Field(default_factory=nouvel_id)
@@ -284,6 +293,7 @@ class Manip(_Modele):
     prelevements: list[Prelevement] = Field(default_factory=list)
     groupes: list[Groupe] = Field(default_factory=list)
     a_faire: list[Tache] = Field(default_factory=list)
+    rapports: list[RapportEmis] = Field(default_factory=list)  # documents émis, le plus récent en dernier
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 

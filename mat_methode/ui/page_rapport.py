@@ -67,6 +67,9 @@ class PageRapport(QWidget):
     exporter_word = Signal()
     autres_formats = Signal()
     journal = Signal()
+    ordre = Signal()
+    ouvrir_fichier = Signal(str)
+    ouvrir_dossier = Signal()
 
     def __init__(self, ctrl: Controleur):
         super().__init__()
@@ -88,8 +91,12 @@ class PageRapport(QWidget):
         etat.setEnabled(not self.ctrl.lecture_seule)
         self.lay.addWidget(ligne(bouton("Exporter en PDF", self.exporter_pdf.emit, accent=True, tip="Exporter en PDF (Ctrl+E pour les autres formats)"),
                                  bouton("Exporter en Word", self.exporter_word.emit, accent=True),
+                                 bouton("Ordre de manipulation (PDF)", self.ordre.emit, accent=True,
+                                        tip="Document de paillasse : cartouche, flux, contexte, réactifs, échantillons, place pour noter les numéros"),
                                  bouton("Copier le texte", self._copier), bouton("Autres formats…", self.autres_formats.emit),
-                                 "stretch", etiquette("État de la manip", secondaire=True), etat))
+                                 "stretch", bouton("Dossier de mes rapports", self.ouvrir_dossier.emit, lien=True)))
+        etat.setToolTip("État de la manip")
+        self.lay.addWidget(self._emis(m, [etat]))
         v = f"Version {m.rev} · enregistrée automatiquement le {fmt_dt(m.maj)}"
         if m.lancee:
             v += f" · lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}"
@@ -115,7 +122,7 @@ class PageRapport(QWidget):
         cl.addWidget(etiquette("2. Matériel et méthodes", "sousTitre"))
         for s in rap.sections:
             cl.addWidget(etiquette(s.titre, "titreCarte"))
-            t = QLabel(texte_riche(s.texte))
+            t = QLabel("<br><br>".join(texte_riche(x) for x in s.texte.split("\n")))
             t.setWordWrap(True)
             t.setTextFormat(Qt.TextFormat.RichText)
             t.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
@@ -185,6 +192,26 @@ class PageRapport(QWidget):
             else:
                 self.lay.addWidget(pastille("Aucune modification depuis le lancement", "ok"))
         self.lay.addStretch(1)
+
+    def _emis(self, m, fin: list) -> QWidget:
+        """« Ouvrir le dernier rapport émis » + menu de tous les documents émis (le plus récent d'abord)."""
+        from PySide6.QtWidgets import QMenu
+        libelle = {"rapport": "Rapport", "ordre": "Ordre de manipulation"}
+        emis = list(reversed(m.rapports))
+        if not emis:
+            return ligne(etiquette("Aucun document émis pour l’instant.", secondaire=True), "stretch", *fin)
+        d = emis[0]
+        dernier = bouton("Ouvrir le dernier document émis", lambda: self.ouvrir_fichier.emit(d.chemin), tip=d.chemin)
+        tous = bouton("Tous  ▾", tip="Documents émis pour cette manip")
+        menu = QMenu(tous)
+        for r in emis[:15]:
+            menu.addAction(f"{libelle.get(r.type, r.type)} {r.fmt.upper()} · {fmt_dt(r.le)} · {r.par}", lambda c=r.chemin: self.ouvrir_fichier.emit(c))
+        tous.setMenu(menu)
+        tous.setStyleSheet("QPushButton::menu-indicator{width:0;}")
+        info = etiquette(f"{'Ordre' if d.type == 'ordre' else 'Rapport'} {d.fmt.upper()} · {fmt_dt(d.le)[:10]} · {d.par}", secondaire=True)
+        info.setToolTip(f"{libelle.get(d.type, d.type)} {d.fmt.upper()} émis le {fmt_dt(d.le)} par {d.par}")
+        return ligne(dernier, tous, info,
+                     "stretch", *fin)
 
     def _copier(self):
         m = self.ctrl.courante

@@ -148,6 +148,9 @@ class Fenetre(QMainWindow):
         self.p_rapport.exporter_pdf.connect(lambda: self.exporter_fichier("pdf"))
         self.p_rapport.exporter_word.connect(lambda: self.exporter_fichier("docx"))
         self.p_rapport.autres_formats.connect(lambda: self.autres_formats())
+        self.p_rapport.ordre.connect(lambda: self.exporter_fichier("ordre"))
+        self.p_rapport.ouvrir_fichier.connect(self.ouvrir_fichier)
+        self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_rapports())))
         self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante))
 
         for seq, f in (("Ctrl+N", self.nouvelle), ("Ctrl+F", self._recherche), ("Ctrl+E", lambda: self.autres_formats()),
@@ -316,19 +319,27 @@ class Fenetre(QMainWindow):
                 msg += f" À relire : étape{'s' if len(res['a_verifier']) > 1 else ''} {', '.join(map(str, res['a_verifier']))} (plusieurs opérations détectées)."
             D.informer(self, "Manip importée", msg + " Vérifie chaque étape : l’extraction repose sur des mots-clés.")
 
-    def _dossier_export(self) -> str:
-        p = self.ctrl.st.lire_preferences().get("dossier_export")
-        return p if p and Path(p).exists() else str(self.ctrl.st.d_exports)
+    def dossier_rapports(self) -> Path:
+        """Dossier des documents de la personne qui édite : donnees\\exports\\<Prénom NOM>."""
+        d = self.ctrl.st.d_exports / nom_fichier(self.ctrl.nom_utilisateur())
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return self.ctrl.st.d_exports
+        return d
 
     def exporter_fichier(self, fmt: str, ident: str | None = None):
+        """fmt : pdf, docx, md, html, json, ou « ordre » (ordre de manipulation en PDF)."""
         m = self.ctrl.manip(ident) if ident else self.ctrl.courante
         if m is None:
             return
         self.ctrl.journaliser()
         self.ctrl.enregistrer_tout()
-        ext = {"pdf": "PDF (*.pdf)", "docx": "Document Word (*.docx)", "md": "Texte Markdown (*.md)", "html": "Page HTML (*.html)",
-               "json": "Données JSON (*.json)"}[fmt]
-        f, _ = QFileDialog.getSaveFileName(self, "Enregistrer sous", str(Path(self._dossier_export()) / f"{nom_fichier(m.nom)}.{fmt}"), ext)
+        ext = {"pdf": "PDF (*.pdf)", "ordre": "PDF (*.pdf)", "docx": "Document Word (*.docx)", "md": "Texte Markdown (*.md)",
+               "html": "Page HTML (*.html)", "json": "Données JSON (*.json)"}[fmt]
+        base = nom_fichier(f"{m.contexte.ref} - {m.nom}" if m.contexte.ref.strip() else m.nom)
+        nom = f"{base} - Ordre de manipulation.pdf" if fmt == "ordre" else f"{base}.{fmt}"
+        f, _ = QFileDialog.getSaveFileName(self, "Enregistrer sous", str(self.dossier_rapports() / nom), ext)
         if not f:
             return
         try:
@@ -336,6 +347,9 @@ class Fenetre(QMainWindow):
             if fmt == "pdf":
                 from mat_methode.exports.pdf import ecrire_pdf
                 ecrire_pdf(data, f)
+            elif fmt == "ordre":
+                from mat_methode.exports.ordre import ecrire_ordre
+                ecrire_ordre(data, f)
             elif fmt == "docx":
                 from mat_methode.exports.word import ecrire_docx
                 ecrire_docx(data, f)
@@ -344,10 +358,21 @@ class Fenetre(QMainWindow):
         except OSError as ex:
             D.informer(self, "Export impossible", f"Le fichier n’a pas pu être écrit : {ex.strerror or ex}. Ferme-le s’il est ouvert dans Word ou un lecteur PDF.")
             return
-        p = self.ctrl.st.lire_preferences()
-        p["dossier_export"] = str(Path(f).parent)
-        self.ctrl.st.ecrire_preferences(p)
+        if fmt in ("pdf", "docx", "ordre"):  # documents émis : retrouvables depuis l'onglet Rapport
+            from mat_methode.domain.models import RapportEmis, maintenant_iso
+            m.rapports.append(RapportEmis(type="ordre" if fmt == "ordre" else "rapport", fmt="pdf" if fmt == "ordre" else fmt,
+                                          chemin=str(f), le=maintenant_iso(), par=self.ctrl.nom_utilisateur()))
+            del m.rapports[:-30]
+            self.ctrl.toucher(m, structure=self.page == "rapport")
         self.toast.montrer(f"Fichier enregistré : {Path(f).name}")
+
+    def ouvrir_fichier(self, chemin: str) -> None:
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        if not Path(chemin).exists():
+            self.toast.montrer("Fichier introuvable : il a été déplacé ou supprimé")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(chemin)))
 
     def _contenu(self, m, fmt: str) -> str:
         import json

@@ -106,3 +106,15 @@ def test_crit17_word(ethanol, reglages, tmp_path):
     assert len(d.inline_shapes) == 1
     with zipfile.ZipFile(f) as z:
         assert any(n.startswith("word/media/") for n in z.namelist())
+
+
+def test_ordre_de_manipulation(ethanol, reglages, tmp_path):
+    from mat_methode.exports.ordre import ecrire_ordre
+    f = tmp_path / "ordre.pdf"
+    ecrire_ordre(exporter(ethanol, reglages), f)
+    with pdfplumber.open(f) as pdf:
+        texte = " ".join(" ".join(p.extract_text() for p in pdf.pages).split())
+    for x in ("Ordre de manipulation", "Réf. demande", "DA-2026-0158", "Flux de prétraitement", "Contexte", "Demande : Interne · R&D",
+              "Réactifs", "Échantillons", "Détail du flux par phase", "Heure réelle", "Observations", "S3a", "S5b"):
+        assert x in texte, x
+    assert "2.3 Méthodes" not in texte and "2.4 Prélèvements" not in texte and "décrites en 2.3" not in texte  # pas le texte du rapport

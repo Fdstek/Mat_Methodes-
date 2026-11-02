@@ -66,7 +66,7 @@ def test_texte_du_rapport():
     r = construire(m, Reglages())
     assert "Grandes étapes : Degumming (étapes 2 à 4)." in r.sections[0].texte
     t = r.sections[2].texte
-    assert "Étape 1 : le produit a été chauffé" in t and "Degumming (étapes 2 à 4). Étape 2 :" in t and "Étape 5 :" in t
+    assert "Étape 1 : le produit a été chauffé" in t and "Degumming (étapes 2 à 4).\nÉtape 2 :" in t and "Étape 5 :" in t
     ph = r.phases
     assert [p.groupe for p in ph] == ["", "", "Degumming", "Degumming", "Degumming", ""]
     assert [p.debut_groupe for p in ph] == [False, False, True, False, False, False]
