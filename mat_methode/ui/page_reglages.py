@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QVBoxLayout, QWidget
 from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.models import Personne, initiales_de
-from mat_methode.domain.regles import basculer_analyse, tous_les_tags
+from mat_methode.domain.regles import basculer_analyse, deplacer_tag, tous_les_tags
 from mat_methode.domain.texte import libelle_volume, norm
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.dialogues import confirmer
@@ -126,7 +126,7 @@ class PageReglages(QWidget):
         self._liste_simple("Réactifs", [x.nom for x in self.r.reactifs], self._suppr_reactif, self._ajout_reactif, "Nouveau réactif",
                            "Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape "
                            "(ou depuis Scirius) et sont gardés pour la prochaine fois. On peut aussi ajouter un réactif depuis une étape.",
-                           renommer=self._ren(O.renommer_reactif, lambda: [x.nom for x in self.r.reactifs]))
+                           renommer=self._ren(O.renommer_reactif, lambda: [x.nom for x in self.r.reactifs]), ordre=self.r.reactifs)
 
     def _analyses(self):
         self._liste_simple("Analyses disponibles", self.r.analyses, self._suppr_analyse,
@@ -163,7 +163,8 @@ class PageReglages(QWidget):
         x.ajouter(etiquette("Les donneurs d’ordre proposés dans « Ma demande ». Les initiales forment la référence des manips "
                             "(ex. PB-2026-10-31-01). L’IGG (identifiant Windows) permet de reconnaître la personne connectée : "
                             f"sur ce poste, l’IGG est {self.ctrl.st.utilisateur}.", secondaire=True, wrap=True))
-        for p in self.r.personnes:
+        n_p = len(self.r.personnes)
+        for i, p in enumerate(self.r.personnes):
             nom = ChampTexte(p.nom)
             nom.editingFinished.connect(lambda nom=nom, p=p: self._renommer_personne(p, nom.text()))
             ini = ChampTexte(p.initiales, initiales_de(p.nom), mono=True)
@@ -176,6 +177,7 @@ class PageReglages(QWidget):
             moi = pastille("c’est vous", "ok") if p.igg and p.igg.upper() == self.ctrl.st.utilisateur else None
             x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg),
                             etiquette(f"{nb} manip{'s' if nb > 1 else ''}", secondaire=True), *( [moi] if moi else []), "stretch",
+                            *self._fleches(self.r.personnes, i, n_p, p.nom),
                             icone("✕", f"Supprimer {p.nom}", lambda p=p: self._suppr_personne(p), danger=True)))
         nouveau = ChampTexte("", "ex. Pierre BURGUN")
         nigg = ChampTexte("", "IGG (facultatif)", mono=True)
@@ -193,6 +195,14 @@ class PageReglages(QWidget):
         nigg.returnPressed.connect(ajout)
         moi = bouton("Me remplir (IGG de ce poste)", lambda: nigg.setText(self.ctrl.st.utilisateur), lien=True)
         x.ajouter(ligne(champ("Nouvelle personne", nouveau), champ("IGG", nigg), bouton("Ajouter", ajout), moi, "stretch"))
+
+    def _fleches(self, liste: list, i: int, n: int, nom: str) -> list:
+        """↑ ↓ pour changer l'ordre d'une ligne (personnes, laboratoires)."""
+        haut = icone("↑", f"Monter {nom}", lambda: self._deplacer(liste, i, -1))
+        haut.setEnabled(i > 0)
+        bas = icone("↓", f"Descendre {nom}", lambda: self._deplacer(liste, i, 1))
+        bas.setEnabled(i < n - 1)
+        return [haut, bas]
 
     def _renommer_personne(self, p, nouveau):
         nouveau = nouveau.strip()
@@ -347,7 +357,8 @@ class PageReglages(QWidget):
                             "n’affiche que ces analyses (toutes cochées au départ) ; "
                             "on peut toujours les changer échantillon par échantillon.", secondaire=True, wrap=True))
         tous = [p for m in self.ctrl.manips for p in m.prelevements]
-        for lab in self.r.laboratoires:
+        n_l = len(self.r.laboratoires)
+        for i, lab in enumerate(self.r.laboratoires):
             f = QFrame()
             f.setObjectName("sousCarte")
             v = QVBoxLayout(f)
@@ -359,6 +370,7 @@ class PageReglages(QWidget):
             vol.choisi.connect(lambda val, lab=lab: (setattr(lab, "volume_ml", val), self.ctrl.toucher_reglages()))
             v.addWidget(ligne(champ("Nom du laboratoire", nom), champ("Volume par échantillon", vol), "stretch",
                               etiquette(f"utilisé dans {n} échantillon{'s' if n > 1 else ''}", secondaire=True),
+                              *self._fleches(self.r.laboratoires, i, n_l, lab.nom),
                               icone("✕", f"Supprimer {lab.nom}", lambda lab=lab: self._suppr_labo(lab.nom), danger=True)))
             an = []
             for a in self.r.analyses:
@@ -389,13 +401,17 @@ class PageReglages(QWidget):
             self.rafraichir()
 
     # ------------------------------------------------------------ listes simples
-    def _liste_simple(self, titre, items, supprimer, ajouter, libelle, aide="", renommer=None):
+    def _liste_simple(self, titre, items, supprimer, ajouter, libelle, aide="", renommer=None, ordre: list | None = None):
+        """`ordre` : la liste des Réglages à réordonner (◂ ▸) ; par défaut `items` lui-même."""
+        ordre = items if ordre is None else ordre
         x = self._section(titre, f"{len(items)}")
-        if aide:
-            x.ajouter(etiquette(aide, secondaire=True, wrap=True))
+        x.ajouter(etiquette((aide + " " if aide else "") + "◂ ▸ : changer l’ordre (c’est l’ordre des listes déroulantes).",
+                            secondaire=True, wrap=True))
+        n = len(items)
         x.ajouter(flux_widgets([ChipSupprimable(a, lambda a=a: (supprimer(a), self._changer(), self.rafraichir()), f"Supprimer {a}",
-                                                renommer=(lambda a=a: self._renommer(titre, a, renommer)) if renommer else None)
-                                for a in items]) if items else etiquette("Aucun pour l’instant", secondaire=True))
+                                                renommer=(lambda a=a: self._renommer(titre, a, renommer)) if renommer else None,
+                                                deplacer=lambda sens, i=i: self._deplacer(ordre, i, sens), bornes=(i == 0, i == n - 1))
+                                for i, a in enumerate(items)]) if items else etiquette("Aucun pour l’instant", secondaire=True))
         nouveau = ChampTexte("", libelle)
 
         def ajout():
@@ -405,6 +421,11 @@ class PageReglages(QWidget):
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ(libelle, nouveau), bouton("Ajouter", ajout), "stretch"))
+
+    def _deplacer(self, liste: list, i: int, sens: int) -> None:
+        if O.deplacer_dans(liste, i, sens):
+            self._changer()
+            self.rafraichir()
 
     def _renommer(self, titre: str, ancien: str, fn, tag=False) -> None:
         """Renomme une entrée et met à jour toutes les manips qui l'utilisent."""
@@ -447,18 +468,32 @@ class PageReglages(QWidget):
 
     # ------------------------------------------------------------ tags
     def _tags(self):
-        ts = tous_les_tags(self.ctrl.manips)
+        ts = tous_les_tags(self.ctrl.manips, self.r.ordre_tags)
         x = self._section("Tags utilisés", f"{len(ts)}")
-        x.ajouter(etiquette("Les tags se créent dans la manip (carte « Ma demande »). Ici, on peut en renommer (✎) ou en retirer (✕) un dans toutes les manips.",
+        x.ajouter(etiquette("Les tags se créent dans la manip (carte « Ma demande »). Ici, on peut en renommer (✎) ou en retirer (✕) un "
+                            "dans toutes les manips, et changer leur ordre (◂ ▸ : c’est l’ordre des listes déroulantes).",
                             secondaire=True, wrap=True))
         chips = []
-        for t in ts:
+        n = len(ts)
+        for i, t in enumerate(ts):
             nb = sum(1 for m in self.ctrl.manips if any(norm(y) == norm(t) for y in m.tags))
             chips.append(ChipSupprimable(f"#{t}  {nb}", lambda t=t: self._retirer_tag(t), f"Retirer {t} de toutes les manips",
-                                         renommer=lambda t=t: self._renommer("Tags", t, lambda a, b: O.renommer_tag(self.ctrl.manips, a, b) or None,
-                                                                             tag=True),
-                                         tip_renommer=f"Renommer le tag {t} dans toutes les manips"))
+                                         renommer=lambda t=t: self._renommer("Tags", t, self._renommer_tag, tag=True),
+                                         tip_renommer=f"Renommer le tag {t} dans toutes les manips",
+                                         deplacer=lambda sens, t=t: self._deplacer_tag(t, sens), bornes=(i == 0, i == n - 1)))
         x.ajouter(flux_widgets(chips) if chips else etiquette("Aucun tag pour l’instant", secondaire=True))
+
+    def _renommer_tag(self, a: str, b: str):
+        ch = O.renommer_tag(self.ctrl.manips, a, b)
+        if ch:  # l'ordre choisi suit le nouveau nom
+            self.r.ordre_tags = [b if norm(x) == norm(a) else x for x in self.r.ordre_tags]
+            self.ctrl.toucher_reglages()
+        return ch or None
+
+    def _deplacer_tag(self, t: str, sens: int):
+        if deplacer_tag(self.ctrl.manips, self.r, t, sens):
+            self._changer()
+            self.rafraichir()
 
     def _retirer_tag(self, t):
         if confirmer(self, "Retirer ce tag ?", f"#{t} sera retiré de toutes les manips.", "Retirer"):

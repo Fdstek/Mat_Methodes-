@@ -256,6 +256,16 @@ def deplacer_operation(r: Reglages, index: int, sens: int) -> bool:
     return True
 
 
+# ------------------------------------------------------------------ ordre des listes
+def deplacer_dans(liste: list, index: int, sens: int) -> bool:
+    """Déplace l'élément `index` d'un cran (-1 : avant, +1 : après) dans une liste des Réglages."""
+    j = index + sens
+    if not (0 <= index < len(liste) and 0 <= j < len(liste)):
+        return False
+    liste[index], liste[j] = liste[j], liste[index]
+    return True
+
+
 # ------------------------------------------------------------------ statuts
 def peut_supprimer(m: Manip) -> bool:
     """Seules les manips archivées ou annulées peuvent être supprimées."""

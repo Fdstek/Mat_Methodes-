@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
-from mat_methode.domain.models import BROUILLON, ENCOURS, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
+from mat_methode.domain.models import ANNULEE, BROUILLON, ENCOURS, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -237,10 +237,22 @@ class PageFlux(QWidget):
         h.setContentsMargins(16, 10, 16, 10)
         if not m.lancee:
             col = QVBoxLayout()
-            col.addWidget(etiquette("<b>Manip pas encore lancée</b>"))
-            col.addWidget(etiquette("Quand elle démarre, lance-la : chaque modification sera ensuite notée avec la date, l’heure et ton nom.", secondaire=True, wrap=True))
+            if m.etat == VALIDEE:
+                rang = [x.id for x in R.protocoles(self.ctrl.manips, self.ctrl.reglages.ordre_protocoles)]
+                col.addWidget(etiquette("<b>Mat & Méthode validé</b>"))
+                col.addWidget(etiquette("Il est dans Protocole" + (f", n° {rang.index(m.id) + 1} à réaliser" if m.id in rang else "")
+                                        + ". Passe-le « En cours » dans Protocole au démarrage de la manip.", secondaire=True, wrap=True))
+                b = bouton("Remettre en brouillon", lambda: self._statut(BROUILLON), lien=True)
+            elif m.etat == ANNULEE:
+                col.addWidget(etiquette("<b>Manip annulée</b>"))
+                col.addWidget(etiquette("Elle n’apparaît plus dans Protocole.", secondaire=True))
+                b = bouton("Remettre en brouillon", lambda: self._statut(BROUILLON), lien=True)
+            else:
+                col.addWidget(etiquette("<b>Brouillon</b>"))
+                col.addWidget(etiquette("Quand le Mat & Méthode est prêt, valide-le : il passe dans Protocole, où la manip sera lancée "
+                                        "(statut « En cours »).", secondaire=True, wrap=True))
+                b = bouton("✔  Valider le Mat & Méthode", self._valider, accent=True)
             h.addLayout(col, 1)
-            b = bouton("▶  Lancer la manip", self._lancer, accent=True)
             b.setEnabled(not self.ctrl.lecture_seule)
             h.addWidget(b)
         else:
@@ -258,6 +270,16 @@ class PageFlux(QWidget):
             h.addLayout(col, 1)
         lay.addWidget(f)
 
+    def _valider(self):
+        from mat_methode.ui.dialogues import confirmer
+        if confirmer(self, "Valider le Mat & Méthode ?", "Il passe au statut « Validée » et apparaît dans Protocole, à la suite des "
+                     "protocoles à réaliser.", "Valider", danger=False):
+            self._statut(VALIDEE)
+
+    def _statut(self, statut: str):
+        msg = self.ctrl.changer_statut(self.m, statut)
+        self.ctrl.toast.emit(msg or ("Validé : il est maintenant dans Protocole" if statut == VALIDEE else "Remis en brouillon"))
+
     def _lancer(self):
         from mat_methode.ui.dialogues import confirmer
         if confirmer(self, "Lancer la manip ?", "À partir de maintenant, chaque modification (étapes, conditions, réactifs, échantillons, "
@@ -271,6 +293,8 @@ class PageFlux(QWidget):
 
     def _annuler_lancement(self):
         if J.annuler_lancement(self.m):
+            if self.m.etat == ENCOURS:
+                self.m.etat = VALIDEE  # revient « à réaliser » dans Protocole
             self._toucher(True)
             self.ctrl.toast.emit("Lancement annulé")
 
@@ -327,7 +351,7 @@ class PageFlux(QWidget):
         lay.addWidget(champ("Contexte (facultatif)", ctx))
         # tags
         tags = [ChipSupprimable(f"#{t}", lambda t=t: self._retirer_tag(t), f"Retirer le tag {t}") for t in m.tags]
-        sugg = [t for t in R.tous_les_tags(self.ctrl.manips) if not any(t.lower() == x.lower() for x in m.tags)]
+        sugg = [t for t in R.tous_les_tags(self.ctrl.manips, self.ctrl.reglages.ordre_tags) if not any(t.lower() == x.lower() for x in m.tags)]
         self._tag = ListeSaisie(sugg, "Choisir ou taper un tag")
         self._tag.setAccessibleName("Ajouter un tag")
         self._tag.setToolTip("Liste des tags déjà utilisés ; on peut aussi en taper un nouveau (Entrée)")
