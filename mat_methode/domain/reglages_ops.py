@@ -2,7 +2,7 @@
 (à enregistrer) et, si utile, un message court."""
 from __future__ import annotations
 
-from mat_methode.domain.models import ARCHIVEE, NON_REALISEE, Etat, Laboratoire, Manip, Operation, Reglages, nouvel_id
+from mat_methode.domain.models import ANNULEE, ARCHIVEE, STATUTS, Laboratoire, Manip, Operation, Reglages
 from mat_methode.domain.texte import minuscule_initiale, norm
 
 
@@ -76,36 +76,6 @@ def supprimer_reactif(r: Reglages, nom: str) -> None:
 def reactif_a_des_infos(r: Reglages, nom: str) -> bool:
     x = r.reactif(nom)
     return bool(x and (x.scirius or x.emplacement or x.fournisseur or x.lot))
-
-
-def ajouter_etat(r: Reglages, nom: str) -> bool:
-    nom = nom.strip()
-    if not nom:
-        return False
-    r.etats.append(Etat(id="s" + nouvel_id(), nom=nom, ton="neutre"))
-    return True
-
-
-def supprimer_etat(r: Reglages, manips: list[Manip], index: int) -> tuple[list[Manip], str]:
-    """Déplace les manips vers le premier état restant ; il faut en garder au moins un."""
-    if len(r.etats) < 2 or not 0 <= index < len(r.etats):
-        return [], ""
-    x = r.etats.pop(index)
-    cible = r.etats[0]
-    changees = [m for m in manips if m.etat == x.id]
-    for m in changees:
-        m.etat = cible.id
-    n = len(changees)
-    msg = f"{n} manip{'s' if n > 1 else ''} passée{'s' if n > 1 else ''} en « {cible.nom} »" if n else "État supprimé"
-    return changees, msg
-
-
-def deplacer_etat(r: Reglages, index: int, sens: int) -> bool:
-    j = index + sens
-    if not (0 <= index < len(r.etats) and 0 <= j < len(r.etats)):
-        return False
-    r.etats[index], r.etats[j] = r.etats[j], r.etats[index]
-    return True
 
 
 def retirer_tag_partout(manips: list[Manip], tag: str) -> list[Manip]:
@@ -286,29 +256,17 @@ def deplacer_operation(r: Reglages, index: int, sens: int) -> bool:
     return True
 
 
-# ------------------------------------------------------------------ non réalisée
-def basculer_non_realisee(r: Reglages, m: Manip) -> bool:
-    """Marque la manip « non réalisée » (ou revient au premier état). Retourne True si elle vient d'être marquée."""
-    if m.etat == NON_REALISEE:
-        m.etat = r.etat_initial()
-        return False
-    m.etat = NON_REALISEE
-    return True
-
-
+# ------------------------------------------------------------------ statuts
 def peut_supprimer(m: Manip) -> bool:
-    """Seules les manips archivées ou non réalisées peuvent être supprimées."""
-    return m.etat in (ARCHIVEE, NON_REALISEE)
+    """Seules les manips archivées ou annulées peuvent être supprimées."""
+    return m.etat in (ARCHIVEE, ANNULEE)
 
 
-def nom_etat(r: Reglages, ident: str) -> tuple[str, str]:
-    """(libellé, ton) d'un état, y compris les états fixes."""
+def nom_etat(r: Reglages | None, ident: str) -> tuple[str, str]:
+    """(libellé, ton) d'un statut."""
     if ident == ARCHIVEE:
         return "Archivée", "neutre"
-    if ident == NON_REALISEE:
-        return "Non réalisée", "danger"
-    e = r.etat(ident)
-    return (e.nom, e.ton) if e else ("—", "neutre")
+    return STATUTS.get(ident, ("—", "neutre"))
 
 
 def archiver_ou_restaurer(r: Reglages, m: Manip) -> bool:

@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\<Prénom NOM>\` : un dossier par personne éditrice. On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 6` (5 : états « À faire » et « Lancée » ; 6 : état « Réalisée » et commentaire d'échantillon) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 7` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -47,7 +47,12 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `storage/` : chemins, stockage, fusion.
 - `ui/` :
   - `fenetre.py` : navigation et exports ;
-  - `page_manips.py` : liste « Mes manips » ;
+  - menu : Définition Mat & Méthode (`page_manips.py`) › Flux (`page_flux.py`) ; Protocole (`page_listes.PageProtocoles`) › Édition
+    (`page_protocole.py`, aperçu ou « Modifier » avec un 2e `PageFlux`) ; Rapport (`page_listes.PageRapports`, manips réalisées) ›
+    Rapport de la manip (`page_rapport.py`) ; Réglages ;
+  - statuts fixes dans `domain/models.py` (`STATUTS`, `STATUTS_DEFINITION`, `STATUTS_PROTOCOLE`, anciens états convertis à la lecture) ;
+    `regles.protocoles / changer_statut / deplacer_protocole / rapports_clotures` ; `Controleur.changer_statut` (« En cours » lance la manip) ;
+  - `page_manips.py` : liste « Définition Mat & Méthode » (colonne Statut) ;
   - `page_flux.py` : édition du flux, Scirius, réactifs, matériel, « À faire » ;
   - `page_rapport.py` : exports, dernier rapport émis (`ligne_emis`) ;
   - `page_protocole.py` : aperçu du protocole (rendu PDF par pypdfium2), export, dernier protocole émis ;
@@ -57,10 +62,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 12.
-- Lot du 02/11 17h48 (échantillons numérotés à la suite, commentaire d'échantillon, tags en liste déroulante, état
-  « Réalisée », fenêtre PowerShell qui reste ouverte + build.log + Construire.bat, section « Volumes ») : poussé sur la
-  branche, PR à ouvrir quand l'utilisateur le demande.
+- Lots livrés et fusionnés jusqu'à la PR n° 14 (+ correctif de test Windows sur la branche).
+- Lot du 02/11 19h47 (menu Définition / Protocole / Rapport avec sous-sections, statuts fixes, ordre des protocoles,
+  Protocole › Édition avec aperçu ou modification, rapport = manips réalisées, PDF sans heure réelle ni observations,
+  tags en liste déroulante dans Définition) : poussé sur la branche, PR à ouvrir quand l'utilisateur le demande.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

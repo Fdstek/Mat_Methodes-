@@ -1,7 +1,7 @@
 """Règles métier (§8) et critères d'acceptation §17 n° 1, 3 à 7, 21 à 23."""
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
-from mat_methode.domain.models import ARCHIVEE, Etape, Manip, Prelevement
+from mat_methode.domain.models import Etape, Manip, Prelevement
 
 
 def test_crit1_manip_exemple(ethanol):
@@ -133,18 +133,22 @@ def test_crit21_couleur_donneur(reglages, exemples):
     assert O.couleur_donneur(reglages, "Interne · R&D") != O.couleur_donneur(reglages, "Interne · Production")
 
 
-def test_crit22_etats(reglages, exemples):
-    manips = exemples[1]
-    i = [e.id for e in reglages.etats].index("encours")
-    reglages.etats[i].nom, reglages.etats[i].ton = "En attente de résultats", "danger"
-    assert reglages.etat(manips[0].etat).nom == "En attente de résultats"
-    manips[0].etat = "brouillon"
-    changees, msg = O.supprimer_etat(reglages, manips, 0)
-    assert manips[0] in changees and manips[0].etat == "encours" and "passée" in msg
-    while len(reglages.etats) > 1:
-        O.supprimer_etat(reglages, manips, 0)
-    assert O.supprimer_etat(reglages, manips, 0) == ([], "")
-    assert len(reglages.etats) == 1 and ARCHIVEE not in [e.id for e in reglages.etats]
+def test_statuts_fixes_et_anciens_etats():
+    from mat_methode.domain.models import Manip as M
+    assert [M(etat=e).etat for e in ("afaire", "lancee", "terminee", "non_realisee", "perso", "archivee", "validee")] == [
+        "validee", "encours", "realisee", "annulee", "brouillon", "archivee", "validee"]
+
+
+def test_ordre_des_protocoles(reglages):
+    a, b, c = Manip(nom="a"), Manip(nom="b"), Manip(nom="c")
+    ms = [a, b, c]
+    for m in (b, a):
+        R.changer_statut(m, "validee", reglages)
+    assert reglages.ordre_protocoles == [b.id, a.id] and R.protocoles(ms, reglages.ordre_protocoles) == [b, a]
+    assert R.deplacer_protocole(ms, reglages, a, -1) and R.protocoles(ms, reglages.ordre_protocoles) == [a, b]
+    assert not R.deplacer_protocole(ms, reglages, a, -1) and not R.deplacer_protocole(ms, reglages, c, 1)
+    R.changer_statut(a, "realisee", reglages)
+    assert R.protocoles(ms, reglages.ordre_protocoles) == [b] and R.rapports_clotures(ms) == [a]
 
 
 def test_archiver_restaurer(reglages, ethanol):

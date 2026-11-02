@@ -7,6 +7,9 @@ from dataclasses import dataclass
 
 from mat_methode.domain.catalogue import DEFAUTS_CONDITIONS, est_centrifugation
 from mat_methode.domain.models import (
+    ENCOURS,
+    REALISEE,
+    VALIDEE,
     Etape,
     Groupe,
     Manip,
@@ -409,6 +412,47 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
             p.etape_id = corresp.get(p.etape_id)
         p.scirius = p.aramis = ""
     return c
+
+
+# ------------------------------------------------------------------ statuts et ordre des protocoles
+A_REALISER = (VALIDEE, ENCOURS)  # liste « Protocole › À réaliser »
+
+
+def protocoles(manips: list[Manip], ordre: list[str], statuts=A_REALISER) -> list[Manip]:
+    """Manips de ces statuts, dans l'ordre de réalisation des Réglages ; les non classées à la fin (les plus anciennes d'abord)."""
+    rang = {i: k for k, i in enumerate(ordre)}
+    ms = [m for m in manips if m.etat in statuts]
+    return sorted(ms, key=lambda m: (m.id not in rang, rang.get(m.id, 0), m.maj))
+
+
+def changer_statut(m: Manip, statut: str, reglages: Reglages) -> bool:
+    """Change le statut ; une manip qui devient « Validée » ou « En cours » prend la dernière place de la liste Protocole.
+    Retourne True si l'ordre des protocoles (Réglages) a changé."""
+    m.etat = statut
+    if statut in A_REALISER and m.id not in reglages.ordre_protocoles:
+        reglages.ordre_protocoles = reglages.ordre_protocoles + [m.id]
+        return True
+    return False
+
+
+def deplacer_protocole(manips: list[Manip], reglages: Reglages, m: Manip, sens: int) -> bool:
+    """Monte (-1) ou descend (+1) une manip dans la liste « À réaliser » (ordre gardé dans les Réglages)."""
+    liste = protocoles(manips, reglages.ordre_protocoles)
+    if m not in liste:
+        return False
+    i = liste.index(m)
+    j = i + sens
+    if not 0 <= j < len(liste):
+        return False
+    liste[i], liste[j] = liste[j], liste[i]
+    actifs = {x.id for x in liste}
+    reglages.ordre_protocoles = [x.id for x in liste] + [x for x in reglages.ordre_protocoles if x not in actifs]
+    return True
+
+
+def rapports_clotures(manips: list[Manip]) -> list[Manip]:
+    """Manips réalisées (protocoles clôturés), la plus récente d'abord."""
+    return sorted((m for m in manips if m.etat == REALISEE), key=lambda m: m.maj, reverse=True)
 
 
 # ------------------------------------------------------------------ tags (§8.7 bis)

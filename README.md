@@ -72,7 +72,7 @@ se saisit à la main.
 Réactifs, Volumes, Analyses, Types, Grandes étapes, États, Tags, Fichier Scirius).
 
 **À faire** : chaque manip a une liste « À faire » (carte sous « Ma demande ») : réflexion, matériel manquant, réactif
-manquant… avec case à cocher, dans l'ordre de réalisation (↑ ↓ pour le changer). Le nombre de points restants s'affiche dans Mes manips et le Rapport ; la liste n'apparaît
+manquant… avec case à cocher, dans l'ordre de réalisation (↑ ↓ pour le changer). Le nombre de points restants s'affiche dans Définition Mat & Méthode et le Rapport ; la liste n'apparaît
 pas dans les documents exportés. Catégories modifiables dans Réglages.
 
 **Conditions de l'étape précédente** : dans une étape, « ⧉ Reprendre les conditions de l'étape précédente » copie
@@ -92,14 +92,22 @@ protocole et le détail du Rapport.
 
 **Listes déroulantes** : la molette de la souris ne change jamais une liste fermée (elle fait défiler la page).
 
-**État de la manip** : liste déroulante « État » dans « Ma demande » (et dans le Rapport) : Brouillon, À faire, Lancée,
-En cours, Réalisée, Terminée, Non réalisée. « Modifier la liste » ouvre Réglages › États (ajouter, renommer, couleur, ordre ↑ ↓).
-« Lancer la manip » passe l'état à « Lancée ».
+**Menu et parcours d'une manip** :
 
-**Protocole** : onglet « Protocole » (entre Flux et Rapport) avec l'aperçu du PDF, « Exporter le protocole (PDF) »,
-le dernier protocole émis et « Dossier de mes documents ». Le PDF de paillasse contient : « Protocole : <nom> », le même
-cartouche que le rapport, le contexte (2.1), le flux, les réactifs, puis le détail par phase avec, dans chaque phase, le
-tableau de ses échantillons et des cases vides pour noter à la main les n° Scirius / Aramis, l'heure réelle et des observations.
+| Menu | Contenu | Sous-section (manip ouverte) |
+|---|---|---|
+| Définition Mat & Méthode | toutes les manips, avec une colonne « Statut » (Brouillon à la création, Validée, Annulée) et des filtres (donneur, type, tag en liste déroulante) | Flux : Ma demande, Volumes, À faire, Définir / Compléter les étapes |
+| Protocole | « À réaliser » : les manips validées et en cours, dans l'ordre de réalisation (↑ ↓) ; « Clôturés » : réalisées et annulées. Statut modifiable : En cours, Réalisée, Annulée (repris dans Définition) | Édition : aperçu du protocole ou « Modifier » (même éditeur que Flux), puis « Exporter le protocole (PDF) » |
+| Rapport | seulement les manips réalisées (protocoles clôturés) | Rapport de la manip : texte 2.1 à 2.4, exports PDF / Word |
+
+Passer une manip « En cours » la lance : chaque modification est ensuite notée dans le journal. L'ordre des protocoles est
+gardé dans les Réglages partagés (`ordre_protocoles`) : le changer ne modifie aucune manip. Les anciens états sont repris
+automatiquement : À faire → Validée, Lancée / En cours → En cours, Terminée / Réalisée → Réalisée, Non réalisée → Annulée.
+Seules les manips annulées ou archivées peuvent être supprimées (menu « … »).
+
+**Protocole (PDF)** : « Protocole : <nom> », le même cartouche que le rapport, le contexte (2.1), le flux, les réactifs,
+puis le détail par phase avec, dans chaque phase, le tableau de ses échantillons (commentaire compris) et des cases vides
+pour noter à la main les n° Scirius / Aramis.
 
 **Documents émis** : les PDF, Word et protocoles sont proposés dans `donnees\exports\<Prénom NOM>\`
 (la personne qui édite), nommés `<référence> - <nom>`. Chaque document émis est noté sur la manip : « Ouvrir le dernier

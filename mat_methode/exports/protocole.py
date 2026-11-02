@@ -2,7 +2,7 @@
 
 Contenu : le titre « Protocole : <nom de la manip> », le cartouche du rapport, le contexte (2.1), le schéma du flux,
 les réactifs, puis le détail du flux par phase ; chaque phase porte le tableau de ses échantillons, avec des cases
-vides pour noter à la main les numéros (Scirius, Aramis) et l'heure réelle du prélèvement, et une case Observations.
+vides pour noter à la main les numéros (Scirius, Aramis).
 Construit à partir du même JSON d'échange que le rapport.
 """
 from __future__ import annotations
@@ -61,23 +61,21 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         contenu = [tete]
         ps = [p for p in pre if p["apres_etape"] == n]
         if ps:
-            lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis", "Heure réelle"]]]
+            lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis"]]]
             for p in ps:
                 lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell),
                                Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}"
                                          + (f"<br/><i>{escape(p['commentaire'])}</i>" if p.get("commentaire") else ""), cell),
                                Paragraph(f"{escape(p.get('labo') or '')}<br/><font color='#566360'>{escape(', '.join(p.get('analyses', [])))}</font>", cell),
-                               _case(p.get("scirius"), cell), _case(p.get("aramis"), cell), Paragraph("", cell)])
-            t = Table(lignes, colWidths=[13 * mm, 30 * mm, 50 * mm, 27 * mm, 27 * mm, 27 * mm], repeatRows=1)
+                               _case(p.get("scirius"), cell), _case(p.get("aramis"), cell)])
+            t = Table(lignes, colWidths=[14 * mm, 38 * mm, 64 * mm, 29 * mm, 29 * mm], repeatRows=1)
             t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
                                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                                    ("TOPPADDING", (0, 1), (-1, -1), 9), ("BOTTOMPADDING", (0, 1), (-1, -1), 9)]))
             contenu.append(t)
         else:
             contenu.append(Paragraph("Aucun prélèvement prévu.", petit))
-        obs = Table([[Paragraph("<font color='#566360'>Observations :</font>", cell)]], colWidths=[174 * mm], rowHeights=[14 * mm])
-        obs.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
-        contenu += [obs, Spacer(1, 4 * mm)]
+        contenu.append(Spacer(1, 4 * mm))
         blocs.append(KeepTogether(contenu))
     return blocs
 
@@ -99,7 +97,7 @@ def ecrire_protocole(data: dict, chemin) -> None:
     if tab is not None:
         story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
     story.append(Paragraph("Détail du flux par phase", h2))
-    story.append(Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros et heure réelle à noter à la main) et les observations.", petit))
+    story.append(Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros Scirius / Aramis à noter à la main).", petit))
     story += phases_a_remplir(data, s)
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
 

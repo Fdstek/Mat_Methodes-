@@ -71,13 +71,12 @@ def test_renommer_tag_sans_doublon(exemples):
     assert manips[0].tags.count("graisse animale") == 1
 
 
-def test_non_realisee(reglages, ethanol):
+def test_annulee(reglages, ethanol):
     assert not O.peut_supprimer(ethanol)
-    assert O.basculer_non_realisee(reglages, ethanol) and ethanol.etat == NON_REALISEE
-    assert O.peut_supprimer(ethanol) and O.nom_etat(reglages, ethanol.etat) == ("Non réalisée", "danger")
-    assert O.archiver_ou_restaurer(reglages, ethanol) and ethanol.etat == ARCHIVEE and O.peut_supprimer(ethanol)
     ethanol.etat = NON_REALISEE
-    assert not O.basculer_non_realisee(reglages, ethanol) and ethanol.etat == reglages.etat_initial()
+    assert ethanol.etat == "annulee" and O.peut_supprimer(ethanol) and O.nom_etat(reglages, ethanol.etat) == ("Annulée", "danger")
+    assert O.archiver_ou_restaurer(reglages, ethanol) and ethanol.etat == ARCHIVEE and O.peut_supprimer(ethanol)
+    assert not O.archiver_ou_restaurer(reglages, ethanol) and ethanol.etat == "brouillon"
 
 
 def test_fusion_operations():

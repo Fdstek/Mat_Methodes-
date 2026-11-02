@@ -17,11 +17,12 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import regles as R
+from mat_methode.domain.models import REALISEE
 from mat_methode.domain.texte import fmt_dt, fmt_vol
 from mat_methode.report.rapport import REPERE, construire, markdown, mention_modifiee
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
-from mat_methode.ui.widgets import InfoBar, badge, bouton, carte, etiquette, ligne, liste_etat, numero, pastille, vider
+from mat_methode.ui.widgets import InfoBar, badge, bouton, carte, etiquette, ligne, numero, pastille, vider
 
 
 def texte_riche(s: str) -> str:
@@ -105,14 +106,14 @@ class PageRapport(QWidget):
             return
         vider(self.lay)
         rap = construire(m, r)
-        etat = liste_etat(m, r)
-        etat.choisi.connect(lambda v: (setattr(m, "etat", v), self.ctrl.toucher(m)))
-        etat.setEnabled(not self.ctrl.lecture_seule)
         self.lay.addWidget(ligne(bouton("Exporter en PDF", self.exporter_pdf.emit, accent=True, tip="Exporter en PDF (Ctrl+E pour les autres formats)"),
                                  bouton("Exporter en Word", self.exporter_word.emit, accent=True),
                                  bouton("Copier le texte", self._copier), bouton("Autres formats…", self.autres_formats.emit),
                                  "stretch", bouton("Dossier de mes rapports", self.ouvrir_dossier.emit, lien=True)))
-        self.lay.addWidget(ligne_emis(m, ("rapport",), self.ouvrir_fichier.emit, [etat], "Aucun rapport émis pour l’instant."))
+        self.lay.addWidget(ligne_emis(m, ("rapport",), self.ouvrir_fichier.emit, [], "Aucun rapport émis pour l’instant."))
+        if m.etat != REALISEE:
+            self.lay.addWidget(InfoBar("Le rapport reste consultable ; la manip apparaîtra dans la liste Rapport quand son protocole "
+                                       "sera passé à « Réalisée » (Protocole).", niveau="info", titre="Manip pas encore réalisée"))
         v = f"Version {m.rev} · enregistrée automatiquement le {fmt_dt(m.maj)}"
         if m.lancee:
             v += f" · lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}"

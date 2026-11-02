@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
-from mat_methode.domain.models import Condition, ReactifEtape, Tache, maintenant_iso
+from mat_methode.domain.models import BROUILLON, ENCOURS, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -44,7 +44,6 @@ from mat_methode.ui.widgets import (
     flux_widgets,
     icone,
     ligne,
-    liste_etat,
     numero,
     pastille,
     vider,
@@ -264,9 +263,9 @@ class PageFlux(QWidget):
         if confirmer(self, "Lancer la manip ?", "À partir de maintenant, chaque modification (étapes, conditions, réactifs, échantillons, "
                      "demande) sera notée avec la date, l’heure et ton nom, et signalée dans le rapport.", "Lancer", danger=False):
             J.lancer(self.m, par=self.ctrl.operateur(self.m))
-            lancee = next((e.id for e in self.ctrl.reglages.etats if e.id == "lancee" or norm(e.nom) == "lancee"), None)
-            if lancee and self.m.etat in (self.ctrl.reglages.etat_initial(), "afaire"):
-                self.m.etat = lancee  # l'état suit le lancement
+            if self.m.etat in (BROUILLON, VALIDEE):
+                if R.changer_statut(self.m, ENCOURS, self.ctrl.reglages):  # le statut suit le lancement
+                    self.ctrl.toucher_reglages()
             self._toucher(True)
             self.ctrl.toast.emit("Manip lancée")
 
@@ -306,12 +305,7 @@ class PageFlux(QWidget):
         g.addWidget(champ("Type de demande", typ), 2, 0)
         op = ChampTexte(c.operateur, "Nom d’utilisateur Windows")
         op.modifie.connect(lambda v: (setattr(c, "operateur", v), self._toucher()))
-        g.addWidget(champ("Opérateur (nom d’utilisateur Windows)", op), 2, 1)
-        etat = liste_etat(m, r)
-        etat.choisi.connect(lambda v: (setattr(m, "etat", v), self._toucher(True)))
-        etat.setEnabled(not self.ctrl.lecture_seule)
-        g.addWidget(champ("État", ligne(etat, bouton("Modifier la liste", lambda: self.voir_reglages.emit("etats"), lien=True,
-                                                    tip="Ajouter, renommer ou changer l’ordre des états (Réglages)"))), 2, 2)
+        g.addWidget(champ("Opérateur (nom d’utilisateur Windows)", op), 2, 1, 1, 2)
         for k in range(3):
             g.setColumnStretch(k, 1)
         lay.addLayout(g)

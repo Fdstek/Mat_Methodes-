@@ -26,6 +26,7 @@ from mat_methode.exports.echange import exporter as exporter_json
 from mat_methode.ui import dialogues as D
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.page_flux import PageFlux
+from mat_methode.ui.page_listes import PageProtocoles, PageRapports
 from mat_methode.ui.page_manips import PageManips
 from mat_methode.ui.page_protocole import PageProtocole
 from mat_methode.ui.page_rapport import PageRapport
@@ -33,7 +34,15 @@ from mat_methode.ui.page_reglages import PageReglages
 from mat_methode.ui.widgets import Toast, bouton, etiquette, pastille, vider
 
 # Segoe Fluent Icons (Windows 11) ; repli sur des symboles simples
-ICONES = {"manips": ("", "≡"), "flux": ("", "⇄"), "protocole": ("\uE9D5", "☑"), "rapport": ("", "▤"), "reglages": ("", "⚙")}
+ICONES = {"manips": ("\ue8fd", "≡"), "flux": ("\ue8ab", "⇄"),
+          "protocoles": ("\ue9d5", "☑"), "protocole": ("\ue70f", "✎"), "rapports": ("\ue8a5", "▤"), "rapport": ("\ue7c3", "▭"), "reglages": ("\ue713", "⚙")}
+# Menu : (clé, libellé, sous-section ?) ; une sous-section concerne la manip ouverte.
+NAV = [("manips", "Définition Mat && Méthode", False), ("flux", "Flux", True),
+       ("protocoles", "Protocole", False), ("protocole", "Édition", True),
+       ("rapports", "Rapport", False), ("rapport", "Rapport de la manip", True),
+       ("reglages", "Réglages", False)]
+PAGES_MANIP = ("flux", "protocole", "rapport")  # pages qui demandent une manip ouverte
+TITRES = {"manips": "Définition Mat & Méthode", "protocoles": "Protocole", "rapports": "Rapport", "reglages": "Réglages"}
 
 
 def police_icones() -> str | None:
@@ -82,9 +91,8 @@ class Fenetre(QMainWindow):
         v.addSpacing(8)
         self.nav = {}
         pi = police_icones()
-        for k, t in (("manips", "Mes manips"), ("flux", "Flux"), ("protocole", "Protocole"), ("rapport", "Rapport"),
-                     ("reglages", "Réglages")):
-            v.addWidget(self._nav(k, t, pi))
+        for k, t, sous in NAV:
+            v.addWidget(self._nav(k, t, pi, sous))
         v.addStretch(1)
         h.addWidget(self.volet)
 
@@ -116,13 +124,16 @@ class Fenetre(QMainWindow):
         self.p_rapport = PageRapport(ctrl)
         self.p_protocole = PageProtocole(ctrl)
         self.p_reglages = PageReglages(ctrl)
+        self.p_protocoles = PageProtocoles(ctrl)
+        self.p_rapports = PageRapports(ctrl)
+        self.pages = {"manips": self.p_manips, "flux": self.p_flux, "protocoles": self.p_protocoles, "protocole": self.p_protocole,
+                      "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages}
         self.defilements = {}
-        for k, p in (("manips", self.p_manips), ("flux", self.p_flux), ("rapport", self.p_rapport), ("reglages", self.p_reglages),
-                     ("protocole", self.p_protocole)):
+        for k, p in self.pages.items():
             s = QScrollArea()
             s.setWidgetResizable(True)
             s.setFrameShape(QFrame.Shape.NoFrame)
-            s.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff if k == "manips" else Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            s.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff if k in ("manips", "protocoles", "rapports") else Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             boite = QWidget()
             boite.setObjectName("page")
             bl = QVBoxLayout(boite)
@@ -149,6 +160,12 @@ class Fenetre(QMainWindow):
         self.p_flux.voir_rapport.connect(lambda: self.aller("rapport"))
         self.p_flux.voir_reglages.connect(lambda section: self.aller("reglages", section))
         self.p_flux.dupliquer.connect(self._dupliquer_ouvrir)
+        f2 = self.p_protocole.flux  # éditeur du flux dans Protocole › Édition
+        f2.voir_rapport.connect(lambda: self.aller("rapport"))
+        f2.voir_reglages.connect(lambda section: self.aller("reglages", section))
+        f2.dupliquer.connect(self._dupliquer_ouvrir)
+        self.p_protocoles.ouvrir.connect(self.ouvrir_protocole)
+        self.p_rapports.ouvrir.connect(self.ouvrir_rapport)
         self.p_rapport.exporter_pdf.connect(lambda: self.exporter_fichier("pdf"))
         self.p_rapport.exporter_word.connect(lambda: self.exporter_fichier("docx"))
         self.p_rapport.autres_formats.connect(lambda: self.autres_formats())
@@ -164,11 +181,12 @@ class Fenetre(QMainWindow):
                        ("F5", ctrl.actualiser)):
             QShortcut(QKeySequence(seq), self, activated=f)
 
-    def _nav(self, k, texte, pi) -> QWidget:
+    def _nav(self, k, texte, pi, sous=False) -> QWidget:
         b = bouton("")
         b.setProperty("nav", True)
-        b.setAccessibleName(texte)
-        b.setToolTip(texte)
+        b.setProperty("sous", sous)
+        b.setAccessibleName(texte.replace("&&", "&"))
+        b.setToolTip(texte.replace("&&", "&"))
         icone = ICONES[k][0] if pi else ICONES[k][1]
         b._textes = (f"{icone}    {texte}", icone)
         b.setText(b._textes[0])
@@ -181,13 +199,13 @@ class Fenetre(QMainWindow):
 
     # ------------------------------------------------------------ navigation
     def aller(self, page: str, section: str | None = None):
-        if page in ("flux", "rapport", "protocole") and self.ctrl.courante is None:
+        if page in PAGES_MANIP and self.ctrl.courante is None:
             return
         if page == "reglages":
             self.p_reglages.section = section  # le menu ramène aux cartes ; un lien ouvre directement la bonne carte
         self.ctrl.journaliser()
         self.page = page
-        self.pile.setCurrentIndex(["manips", "flux", "rapport", "reglages", "protocole"].index(page))
+        self.pile.setCurrentIndex(list(self.pages).index(page))
         self.rafraichir()
         self.defilements[page].verticalScrollBar().setValue(0)
 
@@ -196,6 +214,21 @@ class Fenetre(QMainWindow):
         m = self.ctrl.courante
         self.p_flux.ouvrir(mode if m and m.etapes else "def")
         self.aller("flux")
+        self._memoriser(ident)
+
+    def ouvrir_protocole(self, ident: str, mode: str = "apercu"):
+        """Protocole › Édition de cette manip."""
+        self.ctrl.ouvrir(ident)
+        self.p_protocole.ouvrir(mode)
+        self.aller("protocole")
+        self._memoriser(ident)
+
+    def ouvrir_rapport(self, ident: str):
+        self.ctrl.ouvrir(ident)
+        self.aller("rapport")
+        self._memoriser(ident)
+
+    def _memoriser(self, ident: str):
         p = self.ctrl.st.lire_preferences()
         p["derniere_manip"] = ident
         self.ctrl.st.ecrire_preferences(p)
@@ -204,25 +237,22 @@ class Fenetre(QMainWindow):
         m, ctrl = self.ctrl.courante, self.ctrl
         for k, b in self.nav.items():
             b.setProperty("actif", k == self.page)
-            b.setEnabled(k in ("manips", "reglages") or m is not None)
+            b.setEnabled(k not in PAGES_MANIP or m is not None)
             b.style().unpolish(b)
             b.style().polish(b)
         self._carte()
         sous = self.sous_titre.layout()
         vider(sous)
-        if self.page == "manips":
-            self.titre.setText("Mes manips")
-            self.p_manips.rafraichir()
-        elif self.page == "reglages":
-            self.titre.setText("Réglages")
-            self.p_reglages.rafraichir()
+        if self.page in TITRES:
+            self.titre.setText(TITRES[self.page])
+            self.pages[self.page].rafraichir()
         elif m is not None:
-            self.titre.setText(m.nom if self.page == "flux" else f"{'Rapport' if self.page == 'rapport' else 'Protocole'} · {m.nom}")
+            self.titre.setText({"flux": m.nom, "protocole": f"Protocole · {m.nom}", "rapport": f"Rapport · {m.nom}"}[self.page])
             sous.addWidget(etiquette(O.nom_etat(ctrl.reglages, m.etat)[0], secondaire=True))
             if ctrl.lecture_seule:
                 sous.addWidget(pastille("Lecture seule", "info"))
             sous.addStretch(1)
-            {"flux": self.p_flux, "rapport": self.p_rapport, "protocole": self.p_protocole}[self.page].rafraichir()
+            self.pages[self.page].rafraichir()
         self._statut(self._texte_statut() if not ctrl.st.lecture_seule else "Non enregistré : dossier inaccessible",
                      ctrl.st.lecture_seule)
 
@@ -237,7 +267,7 @@ class Fenetre(QMainWindow):
                              f"{len(m.prelevements)} éch.")
 
     def _texte_statut(self) -> str:
-        return self.ctrl.texte_statut(manip=self.page in ("flux", "rapport", "protocole"))
+        return self.ctrl.texte_statut(manip=self.page in PAGES_MANIP)
 
     def _statut(self, texte: str, erreur: bool):
         if texte.startswith("Enregistré automatiquement"):
@@ -258,10 +288,12 @@ class Fenetre(QMainWindow):
             self.p_flux.rafraichir(structure=False)
             if m and self.titre.text() != m.nom:
                 self.titre.setText(m.nom)
+        elif self.page == "protocole":
+            self.p_protocole.rafraichir(structure=False)
 
     def _liste_changee(self):
-        if self.page == "manips":
-            self.p_manips.rafraichir()
+        if self.page in ("manips", "protocoles", "rapports"):
+            self.pages[self.page].rafraichir()
         self._carte()
         if not self.ctrl.sales:
             self._statut(self._texte_statut(), self.ctrl.st.lecture_seule)
@@ -269,9 +301,9 @@ class Fenetre(QMainWindow):
     def _reglages_changes(self):
         if self.page == "reglages":
             return  # la page se met à jour elle-même (pas de reconstruction pendant la frappe)
-        if self.page == "rapport":
-            self.p_rapport.rafraichir()
-        elif self.page == "protocole":
+        if self.page in ("rapport", "protocoles"):
+            self.pages[self.page].rafraichir()
+        elif self.page == "protocole" and self.p_protocole.mode != "modifier":
             self.p_protocole.rafraichir()
 
     def resizeEvent(self, e):
