@@ -112,6 +112,29 @@ def demander_texte(parent, titre: str, libelle: str, valeur: str = "", aide: str
     return champ_.text().strip()
 
 
+def dupliquer_groupe(parent, nom: str, nb_etapes: int, nb_echantillons: int) -> tuple[int, bool] | None:
+    """Combien de copies de la grande étape, et faut-il recopier ses échantillons ? None si annulé."""
+    from PySide6.QtWidgets import QCheckBox
+    d = Dialogue(parent, f"Dupliquer la grande étape · {nom}")
+    d.lay.addWidget(etiquette(f"Les {nb_etapes} sous-étape{'s' if nb_etapes > 1 else ''} (conditions, réactifs, matériel) sont recopiées "
+                              "juste après la grande étape. La numérotation des étapes suit.", secondaire=True, wrap=True))
+    nb = Liste([str(k) for k in range(1, 11)], "1", vide=None)
+    nb.setAccessibleName("Nombre de copies")
+    d.lay.addWidget(champ("Nombre de copies", nb))
+    ech = QCheckBox(f"Recopier aussi les échantillons ({nb_echantillons}), sans leurs numéros Scirius / Aramis")
+    ech.setChecked(nb_echantillons > 0)
+    ech.setEnabled(nb_echantillons > 0)
+    d.lay.addWidget(ech)
+    d.boutons.addWidget(bouton("Annuler", d.reject))
+    ok = bouton("Dupliquer", d.accept, accent=True)
+    ok.setDefault(True)
+    d.boutons.addWidget(ok)
+    d.finir()
+    if d.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return int(nb.currentData() or 1), ech.isChecked()
+
+
 def chercher_scirius(parent, lire, requete: str = "", pour: str = "", noms: list[str] | None = None) -> dict | None:
     """Recherche dans le fichier Scirius de SharePoint. `lire(forcer, etape)` retourne une Lecture.
     Retourne la ligne choisie (dict) ou None (on saisit alors à la main)."""
@@ -269,7 +292,7 @@ def importer(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
     return d.exec() == QDialog.DialogCode.Accepted
 
 
-FORMATS = [("pdf", "PDF avec le schéma du flux (.pdf)"), ("docx", "Word (.docx)"), ("ordre", "Ordre de manipulation (.pdf)"), ("md", "Texte (Markdown)"),
+FORMATS = [("pdf", "PDF avec le schéma du flux (.pdf)"), ("docx", "Word (.docx)"), ("protocole", "Protocole de paillasse (.pdf)"), ("md", "Texte (Markdown)"),
            ("html", "Rapport imprimable (HTML)"), ("json", "Données (JSON)")]
 
 
@@ -291,7 +314,7 @@ def exporter(parent, titre: str, contenu: Callable[[str], str], enregistrer: Cal
 
     def maj():
         f = fmt.currentData()
-        binaire = f in ("pdf", "docx", "ordre")
+        binaire = f in ("pdf", "docx", "protocole")
         apercu.setVisible(not binaire)
         copier.setVisible(not binaire)
         copier.setText("Copier")

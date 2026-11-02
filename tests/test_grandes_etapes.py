@@ -136,3 +136,19 @@ def test_reglages_par_defaut_et_fusion():
     mien.grandes_etapes.append("Estérification")
     leur.grandes_etapes.append("Hydrogénation")
     assert {"Estérification", "Hydrogénation"} <= set(fusionner(base, mien, leur).grandes_etapes)
+
+
+def test_dupliquer_grande_etape():
+    m = Manip()
+    g = degumming(m)
+    centri = m.etapes[3]
+    p = R.nouvel_echantillon(m, Reglages(), centri.id)
+    p.scirius = "123"
+    copies = R.dupliquer_groupe(m, g.id, 2, echantillons=True)
+    assert len(copies) == 2 and len(m.etapes) == 11 and m.etapes[-1].operation == "séchage"
+    assert [(x.nom if x else None, idx) for x, idx in R.blocs(m)] == [
+        (None, [0]), ("Degumming", [1, 2, 3]), ("Degumming", [4, 5, 6]), ("Degumming", [7, 8, 9]), (None, [10])]
+    assert [R.etiquettes(m)[x.id] for x in m.prelevements] == ["S4", "S7", "S10"]
+    assert [x.scirius for x in m.prelevements] == ["123", "", ""]
+    assert "Degumming (étapes 2 à 4) ; Degumming (étapes 5 à 7) ; Degumming (étapes 8 à 10)" in construire(m, Reglages()).sections[0].texte
+    assert R.dupliquer_groupe(m, g.id, 1) and len(m.prelevements) == 3  # sans les échantillons

@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 RACINE = Path(SPECPATH).parent
 sys.path.insert(0, str(RACINE))
@@ -21,12 +21,15 @@ datas = [
 datas += collect_data_files("reportlab")   # polices Vera (repli si Segoe UI absente), données
 datas += collect_data_files("docx")        # modèle Word par défaut
 datas += collect_data_files("pdfminer")    # tables de caractères pour l'extraction PDF
+datas += collect_data_files("pypdfium2_raw") + collect_data_files("pypdfium2")  # aperçu du protocole (version.json)
+binaires = collect_dynamic_libs("pypdfium2_raw")  # pdfium.dll
 
 a = Analysis(
     [str(RACINE / "mat_methode" / "__main__.py")],
     pathex=[str(RACINE)],
     datas=datas,
-    hiddenimports=["mat_methode.data", "openpyxl"] + (["win32com.client", "pythoncom", "pywintypes"] if sys.platform == "win32" else []),
+    binaries=binaires,
+    hiddenimports=["mat_methode.data", "openpyxl", "pypdfium2", "pypdfium2_raw"] + (["win32com.client", "pythoncom", "pywintypes"] if sys.platform == "win32" else []),
     excludes=["tkinter", "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.Qt3DCore", "PySide6.QtQuick",
               "PySide6.QtQml", "PySide6.QtMultimedia", "PySide6.QtCharts", "PySide6.QtDataVisualization", "PySide6.QtPdf",
               "PySide6.QtBluetooth", "PySide6.QtNetworkAuth", "PySide6.QtSql", "PySide6.QtTest", "pytest", "pytestqt"],

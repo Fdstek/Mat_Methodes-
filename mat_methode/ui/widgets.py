@@ -183,6 +183,16 @@ class Liste(SansMolette, QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i) or ""))
 
 
+def liste_etat(m, reglages) -> Liste:
+    """Liste déroulante de l'état d'une manip (états des Réglages + « Non réalisée », et « Archivée » si elle l'est)."""
+    from mat_methode.domain.models import ARCHIVEE, NON_REALISEE
+    etats = [e.id for e in reglages.etats] + [NON_REALISEE] + ([ARCHIVEE] if m.etat == ARCHIVEE else [])
+    x = Liste(etats, m.etat, vide=None, libelles={**{e.id: e.nom for e in reglages.etats}, ARCHIVEE: "Archivée", NON_REALISEE: "Non réalisée"})
+    x.setAccessibleName("État de la manip")
+    x.setToolTip("État de la manip (liste modifiable dans Réglages › États des manips)")
+    return x
+
+
 class ChoixVolume(SansMolette, QComboBox):
     """Volume d'échantillon choisi dans la liste des Réglages (30 mL … 1 L).
     Un volume existant hors liste reste affiché comme option."""

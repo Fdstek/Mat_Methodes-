@@ -23,6 +23,7 @@ from typing import Optional
 
 from mat_methode import SCHEMA_DONNEES
 from mat_methode.domain.models import Manip, Reglages, maintenant_iso
+from mat_methode.domain.texte import norm
 from mat_methode.storage.fusion import LISTES, fusionner
 
 log = logging.getLogger("mat_methode")
@@ -55,6 +56,19 @@ def _dumps(d) -> str:
     return json.dumps(d, ensure_ascii=False, indent=2)
 
 
+def etats_v5(etats: list) -> list:
+    """Ajoute « À faire » et « Lancée » (après le premier état) s'ils manquent."""
+    etats = list(etats)
+    noms = {norm(e.get("nom", "")) for e in etats if isinstance(e, dict)}
+    ids = {e.get("id") for e in etats if isinstance(e, dict)}
+    pos = 1 if etats else 0
+    for ident, nom, ton in (("afaire", "À faire", "neutre"), ("lancee", "Lancée", "info")):
+        if ident not in ids and norm(nom) not in noms:
+            etats.insert(pos, {"id": ident, "nom": nom, "ton": ton})
+            pos += 1
+    return etats
+
+
 def migrer(d: dict, chemin: Path) -> dict:
     """Vérifie le numéro de schéma ; sauvegarde puis migre les données anciennes."""
     s = d.get("schema", 1)
@@ -63,6 +77,8 @@ def migrer(d: dict, chemin: Path) -> dict:
     if s < SCHEMA_DONNEES:
         shutil.copy2(chemin, chemin.with_name(chemin.name + f".schema{s}.bak"))
         # 1 -> 2 : grandes étapes (champs nouveaux avec valeurs par défaut, rien à convertir)
+        if s < 5 and isinstance(d.get("etats"), list):  # Réglages, 4 -> 5 : états « À faire » et « Lancée » proposés
+            d["etats"] = etats_v5(d["etats"])
         d["schema"] = SCHEMA_DONNEES
     return d
 

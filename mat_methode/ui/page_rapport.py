@@ -17,12 +17,11 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import regles as R
-from mat_methode.domain.models import ARCHIVEE, NON_REALISEE
 from mat_methode.domain.texte import fmt_dt, fmt_vol
 from mat_methode.report.rapport import REPERE, construire, markdown, mention_modifiee
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
-from mat_methode.ui.widgets import InfoBar, Liste, badge, bouton, carte, etiquette, ligne, numero, pastille, vider
+from mat_methode.ui.widgets import InfoBar, badge, bouton, carte, etiquette, ligne, liste_etat, numero, pastille, vider
 
 
 def texte_riche(s: str) -> str:
@@ -62,12 +61,34 @@ def table(entetes: list[str], lignes: list[list[str]]) -> QTableWidget:
     return t
 
 
+LIBELLES_EMIS = {"rapport": "Rapport", "protocole": "Protocole", "ordre": "Protocole"}  # « ordre » : ancien nom du protocole
+
+
+def ligne_emis(m, types: tuple[str, ...], ouvrir, fin: list, vide: str = "Aucun document émis pour l’instant.") -> QWidget:
+    """« Ouvrir le dernier … émis » + menu « Tous » des documents émis de ces types (le plus récent d'abord)."""
+    from PySide6.QtWidgets import QMenu
+    emis = [r for r in reversed(m.rapports) if r.type in types]
+    if not emis:
+        return ligne(etiquette(vide, secondaire=True), "stretch", *fin)
+    d = emis[0]
+    quoi = LIBELLES_EMIS.get(d.type, d.type).lower()
+    dernier = bouton(f"Ouvrir le dernier {quoi} émis", lambda: ouvrir(d.chemin), tip=d.chemin)
+    tous = bouton("Tous  ▾", tip="Documents émis pour cette manip")
+    menu = QMenu(tous)
+    for r in emis[:15]:
+        menu.addAction(f"{LIBELLES_EMIS.get(r.type, r.type)} {r.fmt.upper()} · {fmt_dt(r.le)} · {r.par}", lambda c=r.chemin: ouvrir(c))
+    tous.setMenu(menu)
+    tous.setStyleSheet("QPushButton::menu-indicator{width:0;}")
+    info = etiquette(f"{d.fmt.upper()} · {fmt_dt(d.le)[:10]} · {d.par}", secondaire=True)
+    info.setToolTip(f"{LIBELLES_EMIS.get(d.type, d.type)} {d.fmt.upper()} émis le {fmt_dt(d.le)} par {d.par}")
+    return ligne(dernier, tous, info, "stretch", *fin)
+
+
 class PageRapport(QWidget):
     exporter_pdf = Signal()
     exporter_word = Signal()
     autres_formats = Signal()
     journal = Signal()
-    ordre = Signal()
     ouvrir_fichier = Signal(str)
     ouvrir_dossier = Signal()
 
@@ -84,19 +105,14 @@ class PageRapport(QWidget):
             return
         vider(self.lay)
         rap = construire(m, r)
-        etats = [e.id for e in r.etats] + [NON_REALISEE] + ([ARCHIVEE] if m.etat == ARCHIVEE else [])
-        etat = Liste(etats, m.etat, vide=None, libelles={**{e.id: e.nom for e in r.etats}, ARCHIVEE: "Archivée", NON_REALISEE: "Non réalisée"})
-        etat.setAccessibleName("État de la manip")
+        etat = liste_etat(m, r)
         etat.choisi.connect(lambda v: (setattr(m, "etat", v), self.ctrl.toucher(m)))
         etat.setEnabled(not self.ctrl.lecture_seule)
         self.lay.addWidget(ligne(bouton("Exporter en PDF", self.exporter_pdf.emit, accent=True, tip="Exporter en PDF (Ctrl+E pour les autres formats)"),
                                  bouton("Exporter en Word", self.exporter_word.emit, accent=True),
-                                 bouton("Ordre de manipulation (PDF)", self.ordre.emit, accent=True,
-                                        tip="Document de paillasse : cartouche, flux, contexte, réactifs, échantillons, place pour noter les numéros"),
                                  bouton("Copier le texte", self._copier), bouton("Autres formats…", self.autres_formats.emit),
                                  "stretch", bouton("Dossier de mes rapports", self.ouvrir_dossier.emit, lien=True)))
-        etat.setToolTip("État de la manip")
-        self.lay.addWidget(self._emis(m, [etat]))
+        self.lay.addWidget(ligne_emis(m, ("rapport",), self.ouvrir_fichier.emit, [etat], "Aucun rapport émis pour l’instant."))
         v = f"Version {m.rev} · enregistrée automatiquement le {fmt_dt(m.maj)}"
         if m.lancee:
             v += f" · lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}"
@@ -192,26 +208,6 @@ class PageRapport(QWidget):
             else:
                 self.lay.addWidget(pastille("Aucune modification depuis le lancement", "ok"))
         self.lay.addStretch(1)
-
-    def _emis(self, m, fin: list) -> QWidget:
-        """« Ouvrir le dernier rapport émis » + menu de tous les documents émis (le plus récent d'abord)."""
-        from PySide6.QtWidgets import QMenu
-        libelle = {"rapport": "Rapport", "ordre": "Ordre de manipulation"}
-        emis = list(reversed(m.rapports))
-        if not emis:
-            return ligne(etiquette("Aucun document émis pour l’instant.", secondaire=True), "stretch", *fin)
-        d = emis[0]
-        dernier = bouton("Ouvrir le dernier document émis", lambda: self.ouvrir_fichier.emit(d.chemin), tip=d.chemin)
-        tous = bouton("Tous  ▾", tip="Documents émis pour cette manip")
-        menu = QMenu(tous)
-        for r in emis[:15]:
-            menu.addAction(f"{libelle.get(r.type, r.type)} {r.fmt.upper()} · {fmt_dt(r.le)} · {r.par}", lambda c=r.chemin: self.ouvrir_fichier.emit(c))
-        tous.setMenu(menu)
-        tous.setStyleSheet("QPushButton::menu-indicator{width:0;}")
-        info = etiquette(f"{'Ordre' if d.type == 'ordre' else 'Rapport'} {d.fmt.upper()} · {fmt_dt(d.le)[:10]} · {d.par}", secondaire=True)
-        info.setToolTip(f"{libelle.get(d.type, d.type)} {d.fmt.upper()} émis le {fmt_dt(d.le)} par {d.par}")
-        return ligne(dernier, tous, info,
-                     "stretch", *fin)
 
     def _copier(self):
         m = self.ctrl.courante

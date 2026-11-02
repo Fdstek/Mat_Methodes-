@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtWidgets import QFrame  # noqa: E402
+from PySide6.QtWidgets import QFrame, QPushButton  # noqa: E402
 
 from mat_methode.storage.stockage import Stockage  # noqa: E402
 from mat_methode.ui import dialogues as D  # noqa: E402
@@ -325,7 +325,7 @@ def test_materiel_molette_et_titre(fen, qtbot):
     assert liste.currentIndex() == avant and not ev.isAccepted()
 
 
-def test_rapports_emis_par_personne_et_ordre(fen, monkeypatch):
+def test_rapports_emis_par_personne_et_protocole(fen, monkeypatch):
     from mat_methode.domain.models import Personne
     fen.ctrl.reglages.personnes.append(Personne(nom="Claire LACOUX", igg="PIERRE"))  # IGG du poste de test : « pierre »
     m = ethanol(fen)
@@ -333,12 +333,63 @@ def test_rapports_emis_par_personne_et_ordre(fen, monkeypatch):
     fen.aller("rapport")
     vus = {}
     monkeypatch.setattr("mat_methode.ui.fenetre.QFileDialog.getSaveFileName", lambda _p, _t, chemin, _f: (vus.setdefault("chemin", chemin), "")[0:2])
-    fen.exporter_fichier("ordre")
+    fen.exporter_fichier("protocole")
     chemin = vus["chemin"]
-    assert "Claire LACOUX" in chemin and chemin.endswith("DA-2026-0158 - Désacidification éthanol - Ordre de manipulation.pdf")
-    assert m.rapports and m.rapports[-1].type == "ordre" and m.rapports[-1].par == "Claire LACOUX"
+    assert "Claire LACOUX" in chemin and chemin.endswith("DA-2026-0158 - Désacidification éthanol - Protocole.pdf")
+    assert m.rapports and m.rapports[-1].type == "protocole" and m.rapports[-1].par == "Claire LACOUX"
     ouverts = []
     monkeypatch.setattr("PySide6.QtGui.QDesktopServices.openUrl", lambda url: ouverts.append(url.toLocalFile()))
     fen.ouvrir_fichier(m.rapports[-1].chemin)
     assert ouverts == [chemin]
     fen.p_rapport.rafraichir()
+
+
+def test_onglet_protocole_apercu(fen):
+    from mat_methode.domain.models import RapportEmis
+    m = ethanol(fen)
+    fen.ouvrir(m.id)
+    m.rapports.append(RapportEmis(type="ordre", chemin="x.pdf", le="2026-11-02T10:00:00", par="Pierre"))  # ancien nom
+    fen.aller("protocole")
+    assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {m.nom}"
+    assert fen.p_protocole.nb_pages >= 2
+    textes = [b.text() for b in fen.p_protocole.findChildren(QPushButton)]
+    assert "Exporter le protocole (PDF)" in textes and "Ouvrir le dernier protocole émis" in textes
+    fen.aller("rapport")
+    assert "Ouvrir le dernier protocole émis" not in [b.text() for b in fen.p_rapport.findChildren(QPushButton)]
+
+
+def test_etat_dans_ma_demande_et_lancement(fen, monkeypatch):
+    from mat_methode.ui.widgets import Liste
+    m = ethanol(fen)
+    m.lancee, m.journal = None, []
+    m.etat = "brouillon"
+    from mat_methode.domain.models import Etat
+    from mat_methode.storage.stockage import etats_v5
+    r = fen.ctrl.reglages
+    r.etats = [Etat(**e) for e in etats_v5([e.model_dump() for e in r.etats])]  # comme après la mise à jour des Réglages
+    fen.ouvrir(m.id, "def")
+    etat = next(x for x in fen.p_flux.findChildren(Liste) if x.accessibleName() == "État de la manip")
+    libelles = [etat.itemText(i) for i in range(etat.count())]
+    assert libelles[:3] == ["Brouillon", "À faire", "Lancée"] and "Non réalisée" in libelles
+    etat.choisi.emit("afaire")
+    assert m.etat == "afaire"
+    monkeypatch.setattr("mat_methode.ui.dialogues.confirmer", lambda *a, **k: True)
+    fen.p_flux._lancer()
+    assert m.lancee and m.etat == "lancee"
+
+
+def test_dupliquer_grande_etape_et_ordre_a_faire(fen, monkeypatch):
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import Tache
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    g = R.creer_groupe(m, "Degumming")
+    R.placer_dans_groupe(m, m.etapes[1].id, g.id)
+    R.placer_dans_groupe(m, m.etapes[2].id, g.id)
+    n, ne = len(m.etapes), len(m.prelevements)
+    monkeypatch.setattr("mat_methode.ui.dialogues.dupliquer_groupe", lambda *a: (2, True))
+    fen.p_flux._dupliquer_groupe(g)
+    assert len(m.etapes) == n + 4 and len(m.groupes) == 3 and [x.nom for x in m.groupes] == ["Degumming"] * 3
+    assert len(m.prelevements) > ne
+    m.a_faire = [Tache(texte="a"), Tache(texte="b")]
+    assert R.deplacer_tache(m, m.a_faire[1].id, -1) and [t.texte for t in m.a_faire] == ["b", "a"]

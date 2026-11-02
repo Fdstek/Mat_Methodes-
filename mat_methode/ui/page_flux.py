@@ -44,6 +44,7 @@ from mat_methode.ui.widgets import (
     flux_widgets,
     icone,
     ligne,
+    liste_etat,
     numero,
     pastille,
     vider,
@@ -252,6 +253,9 @@ class PageFlux(QWidget):
         if confirmer(self, "Lancer la manip ?", "À partir de maintenant, chaque modification (étapes, conditions, réactifs, échantillons, "
                      "demande) sera notée avec la date, l’heure et ton nom, et signalée dans le rapport.", "Lancer", danger=False):
             J.lancer(self.m, par=self.ctrl.operateur(self.m))
+            lancee = next((e.id for e in self.ctrl.reglages.etats if e.id == "lancee" or norm(e.nom) == "lancee"), None)
+            if lancee and self.m.etat in (self.ctrl.reglages.etat_initial(), "afaire"):
+                self.m.etat = lancee  # l'état suit le lancement
             self._toucher(True)
             self.ctrl.toast.emit("Manip lancée")
 
@@ -291,7 +295,12 @@ class PageFlux(QWidget):
         g.addWidget(champ("Type de demande", typ), 2, 0)
         op = ChampTexte(c.operateur, "Nom d’utilisateur Windows")
         op.modifie.connect(lambda v: (setattr(c, "operateur", v), self._toucher()))
-        g.addWidget(champ("Opérateur (nom d’utilisateur Windows)", op), 2, 1, 1, 2)
+        g.addWidget(champ("Opérateur (nom d’utilisateur Windows)", op), 2, 1)
+        etat = liste_etat(m, r)
+        etat.choisi.connect(lambda v: (setattr(m, "etat", v), self._toucher(True)))
+        etat.setEnabled(not self.ctrl.lecture_seule)
+        g.addWidget(champ("État", ligne(etat, bouton("Modifier la liste", lambda: self.voir_reglages.emit("etats"), lien=True,
+                                                    tip="Ajouter, renommer ou changer l’ordre des états (Réglages)"))), 2, 2)
         for k in range(3):
             g.setColumnStretch(k, 1)
         lay.addLayout(g)
@@ -334,8 +343,10 @@ class PageFlux(QWidget):
         x = Expander("À faire", f"{len(reste)} en cours · {len(m.a_faire) - len(reste)} fait{'s' if len(m.a_faire) - len(reste) > 1 else ''}"
                      if m.a_faire else "rien pour l’instant", ouvert=bool(reste) or getattr(self, "_a_faire_ouvert", False))
         x.tete.clicked.connect(lambda *_: setattr(self, "_a_faire_ouvert", x.ouvert))
-        x.ajouter(etiquette("Points à régler avant ou pendant la manip. Cette liste n’apparaît pas dans le rapport.", secondaire=True))
-        for t in sorted(m.a_faire, key=lambda t: t.fait):
+        x.ajouter(etiquette("Points à régler avant ou pendant la manip, dans l’ordre de réalisation (↑ ↓ pour le changer). "
+                            "Cette liste n’apparaît pas dans le rapport.", secondaire=True, wrap=True))
+        n = len(m.a_faire)
+        for k, t in enumerate(m.a_faire):
             case = QCheckBox()
             case.setChecked(t.fait)
             case.setAccessibleName(f"Fait : {t.texte}")
@@ -346,7 +357,12 @@ class PageFlux(QWidget):
                 txt.setStyleSheet(f"color:{p.texte2};text-decoration:line-through;")
             txt.modifie.connect(lambda v, t=t: (setattr(t, "texte", v), self._toucher()))
             qui = etiquette(f"{t.par} · {fmt_dt(t.le)[:10]}" if t.par else "", secondaire=True)
-            x.ajouter(ligne(case, cat, txt, qui, icone("✕", f"Supprimer : {t.texte}", lambda t=t: self._suppr_tache(t), danger=True)))
+            haut = icone("↑", f"Faire avant : {t.texte}", lambda t=t: (R.deplacer_tache(m, t.id, -1), self._toucher(True)))
+            haut.setEnabled(k > 0)
+            bas = icone("↓", f"Faire après : {t.texte}", lambda t=t: (R.deplacer_tache(m, t.id, 1), self._toucher(True)))
+            bas.setEnabled(k < n - 1)
+            x.ajouter(ligne(etiquette(f"{k + 1}.", secondaire=True), case, cat, txt, qui, haut, bas,
+                            icone("✕", f"Supprimer : {t.texte}", lambda t=t: self._suppr_tache(t), danger=True)))
         cats = self.ctrl.reglages.categories_a_faire
         cat = Liste(cats, cats[0] if cats else "", vide=None if cats else "Autre")
         cat.setAccessibleName("Catégorie")
@@ -507,12 +523,28 @@ class PageFlux(QWidget):
         bas.setEnabled(bool(idx) and idx[-1] < len(m.etapes) - 1)
         v.addWidget(ligne(titre, nom, "stretch", haut, bas,
                           bouton("+ Ajouter une sous-étape", lambda: self._viser_groupe(g.id)),
+                          icone("⧉", f"Dupliquer la grande étape {g.nom} (choix du nombre de copies)", lambda: self._dupliquer_groupe(g)),
                           bouton("Défaire", lambda: self._defaire_groupe(g), tip=f"Défaire la grande étape {g.nom} (ses étapes restent dans le flux)")))
         for i in idx:
             v.addWidget(self._ligne_etape(i, catalogue, dans_groupe=True))
         if not idx:
             v.addWidget(etiquette("Aucune sous-étape : choisis une opération ci-dessous.", secondaire=True))
         return f
+
+    def _dupliquer_groupe(self, g):
+        from mat_methode.ui.dialogues import dupliquer_groupe
+        m = self.m
+        ids = {e.id for e in m.etapes if e.groupe_id == g.id}
+        if not ids:
+            self.ctrl.toast.emit("Grande étape vide : rien à dupliquer")
+            return
+        choix = dupliquer_groupe(self, g.nom, len(ids), sum(1 for p in m.prelevements if p.etape_id in ids))
+        if choix is None:
+            return
+        self.ctrl.memoriser_manip()
+        n = len(R.dupliquer_groupe(m, g.id, *choix))
+        self._toucher(True)
+        self.ctrl.toast.emit(f"{g.nom} dupliquée {n} fois")
 
     def _choisir_cible(self, v: str):
         """Liste « Où ajouter l'étape ? » : hors grande étape, dans une existante, ou en commencer une."""

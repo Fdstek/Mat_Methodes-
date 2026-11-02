@@ -79,6 +79,8 @@ class ReactifInventaire(_Modele):
 
 
 ETATS_DEFAUT = [Etat(id="brouillon", nom="Brouillon", ton="warn"),
+                Etat(id="afaire", nom="À faire", ton="neutre"),
+                Etat(id="lancee", nom="Lancée", ton="info"),
                 Etat(id="encours", nom="En cours", ton="info"),
                 Etat(id="terminee", nom="Terminée", ton="ok")]
 TYPES_DEFAUT = ["Support", "R&D", "Technologique", "Test d’idée"]
@@ -267,8 +269,8 @@ class Tache(_Modele):
 
 
 class RapportEmis(_Modele):
-    """Document émis pour une manip (rapport PDF/Word, ordre de manipulation…) : où il a été enregistré, quand, par qui."""
-    type: str = "rapport"  # rapport | ordre
+    """Document émis pour une manip (rapport PDF/Word, protocole…) : où il a été enregistré, quand, par qui."""
+    type: str = "rapport"  # rapport | protocole (« ordre » : ancien nom du protocole)
     fmt: str = "pdf"
     chemin: str = ""
     le: str = ""
