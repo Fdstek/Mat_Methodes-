@@ -307,8 +307,8 @@ class PageFlux(QWidget):
         if autres:  # comme dans Excel : qui d'autre a cette manip ouverte
             h.addWidget(etiquette("aussi ouverte par", secondaire=True))
             for pr in autres:
-                h.addWidget(avatar(self.ctrl.initiales_de(pr.get("utilisateur", "")),
-                                   f"{self.ctrl.nom_de(pr.get('utilisateur', ''))} ({pr.get('pc', '')}) a cette manip ouverte",
+                h.addWidget(avatar(self.ctrl.initiales_de(pr.get("utilisateur", ""), pr),
+                                   f"{self.ctrl.nom_present(pr)} ({pr.get('pc', '')}) a cette manip ouverte",
                                    cle=pr.get("utilisateur", "")))
         if not self.ctrl.lecture_seule and m.etat != ARCHIVEE and (self.contexte == "protocole" or m.etat != BROUILLON):
             h.addWidget(bouton("Terminer la modification" if self.edition else "✎  Modifier", self.basculer_edition,

@@ -65,11 +65,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 23 ; la construction de l'exe sous Windows réussit (02/11).
-- Lot du 03/11 12h16 : défilement gardé (`Fenetre.rafraichir_sur_place`, `page._actualiser` / `sur_place`) ; S0 = prélevé
-  en amont, hors volume engagé (`Bilan.amont/total`, `pdf.volumes`, section Volumes du protocole) ; tri des tableaux et
-  couleurs des types (`ui/colonnes.py`) ; présence (`donnees\presence`, `Controleur.presents`, `widgets.avatar`) ;
-  Scirius lu en arrière-plan (`Controleur.precharger_scirius`, désactivé en test par MATMETHODE_SANS_SCIRIUS). Poussé sur la branche.
+- Lots livrés et fusionnés jusqu'à la PR n° 25 ; la construction de l'exe sous Windows réussit (02/11).
+- Retours du 03/11 15h (bandeaux de statut jamais détachés : `Fenetre._bandeau` les garde dans `zone_fixe` et les masque ;
+  carte « Manip ouverte » retirée ; bouton « ← » `Fenetre.quitter_manip` / `Controleur.fermer_manip` ; présence avec nom et
+  initiales envoyés par chaque poste ; types en `colonnes.Pilule` qui passe à la ligne ; objectif en entier) : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

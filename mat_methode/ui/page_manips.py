@@ -226,12 +226,9 @@ class PageManips(QWidget):
         gauche.setSpacing(3)
         gauche.addWidget(etiquette(m.nom, "titreCarte", wrap=True))  # titre complet, sur plusieurs lignes si besoin
         if m.contexte.objectif:
-            o = etiquette("", secondaire=True)
+            o = etiquette(m.contexte.objectif, secondaire=True, wrap=True)  # en entier, sur plusieurs lignes si besoin
             o.setStyleSheet("font-style:italic;")
-            o.setText(o.fontMetrics().elidedText(m.contexte.objectif, Qt.TextElideMode.ElideRight, 330))
-            o.setMinimumWidth(1)
-            o.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-            o.setToolTip(m.contexte.objectif)
+            o.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             gauche.addWidget(o)
         ne = len(m.etapes)
         info = etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch. · {fmt_dt(m.maj)[:10]} · v{m.rev}", secondaire=True)
@@ -247,8 +244,8 @@ class PageManips(QWidget):
             marques.append(pastille(f"Modifiée par {self.ctrl.nom_de(v.utilisateur)}", "info"))
         for pr in self.ctrl.presents_sur(m.id):  # comme dans Excel : initiales de qui a la manip ouverte
             if not (v and pr.get("utilisateur") == v.utilisateur):
-                marques.append(avatar(self.ctrl.initiales_de(pr.get("utilisateur", "")),
-                                      f"{self.ctrl.nom_de(pr.get('utilisateur', ''))} a cette manip ouverte", cle=pr.get("utilisateur", "")))
+                marques.append(avatar(self.ctrl.initiales_de(pr.get("utilisateur", ""), pr),
+                                      f"{self.ctrl.nom_present(pr)} a cette manip ouverte", cle=pr.get("utilisateur", "")))
         if marques:
             gauche.addWidget(flux_widgets(marques))
         cg = QWidget()
