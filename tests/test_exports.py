@@ -157,3 +157,25 @@ def test_import_ancien_mat_et_methode(tmp_path, reglages):
     m, _ = importer(res, reglages)
     assert len(m.etapes) == 3 and m.etapes[0].temperature_c == 60
     assert extraire_texte("") ["etapes"] == []
+
+
+def test_aucun_titre_seul_en_bas_de_page(exemples, tmp_path):
+    """PDF du protocole et du rapport : un titre de section n'est jamais la dernière ligne d'une page."""
+    from mat_methode.domain import regles as R
+    from mat_methode.exports.protocole import ecrire_protocole
+    r, ms = exemples
+    longue = R.dupliquer(ms[0], r, nom="Longue")
+    for _ in range(8):
+        e = R.ajouter_etape(longue, "lavage")
+        R.nouvel_echantillon(longue, r, e.id)
+        R.nouvel_echantillon(longue, r, e.id)
+    titres = {"Contexte", "Flux de prétraitement", "Réactifs", "Détail du flux par phase", "Détail par phase du flux", "Échantillons",
+              "Modifications après lancement", "Matériel et méthodes"}
+    for m in ms + [longue]:
+        for k, ecrire in enumerate((ecrire_protocole, ecrire_pdf)):
+            f = tmp_path / f"{m.id}-{k}.pdf"
+            ecrire(exporter(m, r), f)
+            with pdfplumber.open(f) as pdf:
+                for p in pdf.pages:
+                    lignes = [x.strip() for x in (p.extract_text() or "").splitlines() if x.strip()][:-1]  # sans le pied de page
+                    assert not lignes or (lignes[-1] not in titres and not lignes[-1].startswith("Pour chaque phase")), (m.nom, lignes[-1])
