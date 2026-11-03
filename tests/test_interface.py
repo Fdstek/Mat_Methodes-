@@ -455,7 +455,7 @@ def test_tags_en_liste_et_section_volumes(fen):
     tag.valide.emit(choix[0])
     assert choix[0] in m.tags
     x = fen.p_flux._volumes_x
-    assert "1\u202f000 mL engagés · 325 mL prélevés · 675 mL restants" in x.tete.text()
+    assert "50 mL en amont · 1\u202f000 mL engagés · 275 mL prélevés · 725 mL restants" in x.tete.text()
     textes = [w.text() for w in fen.p_flux._volumes.findChildren(type(fen.titre))]
     assert "ENGAGÉ" in textes and "RESTANT" in textes and "S5b" in " ".join(textes)
 
@@ -500,5 +500,36 @@ def test_tag_cree_dans_les_reglages_et_ordre_des_cartes(fen, monkeypatch):
     fen.p_reglages._deplacer_carte(premiere, 1)
     assert fen.p_reglages._sections_ordonnees()[1][0] == premiere
     fen.aller("manips")
-    textes = [w.text() for w in fen.p_manips.findChildren(type(fen.titre))]
-    assert {"DONNEUR D’ORDRE", "TYPE", "TAGS", "STATUT"} <= set(textes)
+    from PySide6.QtWidgets import QPushButton
+    textes = [w.text() for w in fen.p_manips.findChildren(type(fen.titre))] + [b.text() for b in fen.p_manips.findChildren(QPushButton)]
+    assert {"DONNEUR D’ORDRE ⇅", "TYPE ⇅", "TAGS", "STATUT"} <= set(textes)  # en-têtes triables : flèche
+
+
+def test_tri_couleur_des_types_presence_et_defilement(fen, qtbot, tmp_path):
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.storage.stockage import Stockage
+    r = fen.ctrl.reglages
+    c = O.couleur_type(r, "R&D")
+    assert O.couleur_type_suivante(r, "R&D") != c and O.couleur_type(r, "r&d") != c
+    fen.aller("manips")
+    fen.p_manips._trier("type")
+    types = [m.contexte.type for m in fen.p_manips._visibles()]
+    assert types == sorted(types, key=lambda t: t.lower())
+    fen.p_manips._trier("type")
+    assert [m.contexte.type for m in fen.p_manips._visibles()] == sorted(types, key=lambda t: t.lower(), reverse=True)
+    # présence : un autre poste a la manip ouverte -> pastille aux initiales
+    m = ethanol(fen)
+    Stockage(fen.ctrl.st.racine, "CLAIRE", "PC2").signaler_presence(m.id)
+    fen.ctrl.actualiser_presence()
+    assert fen.ctrl.presents_sur(m.id) and fen.presents.isVisible()
+    # défilement : ajouter un échantillon ne fait pas remonter la page
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "comp")
+    fen.p_flux.aller(m.etapes[2].id)
+    qtbot.wait(200)
+    sb = fen.defilements["flux"].verticalScrollBar()
+    sb.setValue(sb.maximum() - 20)
+    pos = sb.value()
+    fen.p_flux._ajouter_ech(m.etapes[2])
+    qtbot.wait(300)
+    assert sb.value() == pos

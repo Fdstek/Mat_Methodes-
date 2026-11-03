@@ -1,17 +1,24 @@
-"""Colonnes communes des tableaux de manips (Définition, Archivées, Protocole, Rapport) : donneur d'ordre, type, tags."""
+"""Colonnes communes des tableaux de manips (Définition, Archivées, Protocole, Rapport) : donneur d'ordre, type, tags.
+
+Colonnes centrées ; un clic sur l'en-tête « Donneur d'ordre » ou « Type » (ou sur un nom dans une ligne) trie le tableau
+(croissant, puis décroissant, puis ordre d'origine)."""
 from __future__ import annotations
 
 from typing import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
+from mat_methode.domain.texte import norm
 from mat_methode.ui import theme
-from mat_methode.ui.widgets import bouton, etiquette, flux_widgets, pastille, pastille_couleur
+from mat_methode.ui.widgets import bouton, etiquette, flux_widgets
 
-LARG_DONNEUR, LARG_TYPE, LARG_TAGS = 125, 95, 150
+LARG_DONNEUR, LARG_TYPE, LARG_TAGS = 145, 100, 150
 COMMUNES = (("DONNEUR D’ORDRE", LARG_DONNEUR), ("TYPE", LARG_TYPE), ("TAGS", LARG_TAGS))
+TRIABLES = {"DONNEUR D’ORDRE": "donneur", "TYPE": "type"}
+Tri = tuple[str, bool] | None  # (« donneur » ou « type », croissant)
 
 
 def fixe(w: QWidget, largeur: int) -> QWidget:
@@ -19,54 +26,104 @@ def fixe(w: QWidget, largeur: int) -> QWidget:
     return w
 
 
-def boite(contenu: QWidget, largeur: int) -> QWidget:
-    """Contenu aligné à gauche dans une colonne de largeur fixe."""
+def boite(contenu: QWidget, largeur: int, centre: bool = True) -> QWidget:
+    """Contenu dans une colonne de largeur fixe (centré par défaut)."""
     b = QWidget()
     v = QVBoxLayout(b)
     v.setContentsMargins(0, 0, 0, 0)
-    v.addWidget(contenu)
+    v.addWidget(contenu, 0, Qt.AlignmentFlag.AlignHCenter if centre else Qt.AlignmentFlag.AlignLeft)
     return fixe(b, largeur)
 
 
-def cellule_donneur(m, r) -> QWidget:
+# ------------------------------------------------------------------ tri
+def basculer_tri(tri: Tri, cle: str) -> Tri:
+    """Croissant -> décroissant -> sans tri."""
+    if not tri or tri[0] != cle:
+        return (cle, True)
+    return (cle, False) if tri[1] else None
+
+
+def trier_manips(manips: list, tri: Tri) -> list:
+    if not tri:
+        return list(manips)
+    cle, croissant = tri
+    valeur = (lambda m: norm(m.contexte.donneur)) if cle == "donneur" else (lambda m: norm(m.contexte.type))
+    vides = [m for m in manips if not valeur(m)]  # sans donneur / type : toujours à la fin
+    pleins = sorted((m for m in manips if valeur(m)), key=valeur, reverse=not croissant)
+    return pleins + vides
+
+
+# ------------------------------------------------------------------ cellules
+def pilule(texte: str, couleur: str, clic: Callable | None = None, tip: str = "") -> QPushButton:
+    """Nom en couleur (donneur d'ordre, type, tag), cliquable si `clic` est donné."""
+    p = theme.P
+    b = bouton(texte, clic or (lambda: None), tip=tip)
+    c = QColor(couleur)
+    fg = c.lighter(160).name() if p.sombre else c.name()
+    b.setStyleSheet(f"QPushButton{{background:rgba({c.red()},{c.green()},{c.blue()},{40 if p.sombre else 28});color:{fg};"
+                    f"border:1px solid {c.name()};border-radius:10px;padding:2px 9px;font-size:9pt;font-weight:600;text-align:center;}}")
+    if not clic:
+        b.setCursor(Qt.CursorShape.ArrowCursor)
+    return b
+
+
+def _court(b: QPushButton, largeur: int) -> QPushButton:
+    """Texte raccourci (…) s'il dépasse la colonne ; le nom complet reste dans l'info-bulle."""
+    texte = b.text().replace("&&", "&")
+    court = b.fontMetrics().elidedText(texte, Qt.TextElideMode.ElideRight, largeur - 24)
+    if court != texte:
+        b.setText(court.replace("&", "&&"))
+        b.setToolTip(f"{texte} — {b.toolTip()}" if b.toolTip() else texte)
+    return b
+
+
+def cellule_donneur(m, r, trier: Callable[[str], None] | None = None) -> QWidget:
     if not m.contexte.donneur:
         return boite(etiquette("—", secondaire=True), LARG_DONNEUR)
-    p = pastille_couleur(m.contexte.donneur, O.couleur_donneur(r, m.contexte.donneur))
-    p.setWordWrap(True)
-    p.setMaximumWidth(LARG_DONNEUR)
-    return boite(p, LARG_DONNEUR)
+    b = pilule(m.contexte.donneur, O.couleur_donneur(r, m.contexte.donneur), (lambda: trier("donneur")) if trier else None,
+               "Trier par donneur d’ordre" if trier else "")
+    return boite(_court(b, LARG_DONNEUR), LARG_DONNEUR)
 
 
-def cellule_type(m) -> QWidget:
+def cellule_type(m, r, trier: Callable[[str], None] | None = None) -> QWidget:
     if not m.contexte.type:
         return boite(etiquette("—", secondaire=True), LARG_TYPE)
-    p = pastille(m.contexte.type)
-    if isinstance(p, QLabel):
-        p.setWordWrap(True)
-    p.setMaximumWidth(LARG_TYPE)
-    return boite(p, LARG_TYPE)
+    b = pilule(m.contexte.type, O.couleur_type(r, m.contexte.type), (lambda: trier("type")) if trier else None,
+               "Trier par type" if trier else "")
+    return boite(_court(b, LARG_TYPE), LARG_TYPE)
 
 
 def bouton_tag(t: str, r, clic: Callable | None = None):
     """Tag en couleur, cliquable (filtre) si `clic` est donné."""
-    p = theme.P
-    b = bouton(f"#{t}", clic or (lambda: None), tip=f"Filtrer sur le tag {t}" if clic else "")
-    c = QColor(O.couleur_tag(r, t))
-    fg = c.lighter(160).name() if p.sombre else c.name()
-    b.setStyleSheet(f"QPushButton{{background:rgba({c.red()},{c.green()},{c.blue()},{40 if p.sombre else 28});color:{fg};"
-                    f"border:1px solid {c.name()};border-radius:4px;padding:2px 8px;font-size:9pt;font-weight:600;}}")
+    b = pilule(f"#{t}", O.couleur_tag(r, t), clic, f"Filtrer sur le tag {t}" if clic else "")
+    b.setStyleSheet(b.styleSheet().replace("border-radius:10px", "border-radius:4px"))
     return b
 
 
 def cellule_tags(m, r, clic: Callable[[str], None] | None = None) -> QWidget:
     if not m.tags:
         return boite(etiquette("—", secondaire=True), LARG_TAGS)
-    return fixe(flux_widgets([bouton_tag(t, r, (lambda t=t: clic(t)) if clic else None) for t in m.tags]), LARG_TAGS)
+    return fixe(flux_widgets([bouton_tag(t, r, (lambda t=t: clic(t)) if clic else None) for t in m.tags], centre=True), LARG_TAGS)
 
 
-def cellules_communes(m, r, clic_tag: Callable[[str], None] | None = None) -> list[QWidget]:
-    return [cellule_donneur(m, r), cellule_type(m), cellule_tags(m, r, clic_tag)]
+def cellules_communes(m, r, clic_tag: Callable[[str], None] | None = None, trier: Callable[[str], None] | None = None) -> list[QWidget]:
+    return [cellule_donneur(m, r, trier), cellule_type(m, r, trier), cellule_tags(m, r, clic_tag)]
 
 
-def entetes_communes() -> list[QWidget]:
-    return [fixe(etiquette(t, "etiquetteChamp"), lg) for t, lg in COMMUNES]
+# ------------------------------------------------------------------ en-têtes
+def entetes_communes(tri: Tri = None, trier: Callable[[str], None] | None = None) -> list[QWidget]:
+    """En-têtes centrés ; « Donneur d'ordre » et « Type » sont cliquables pour trier quand `trier` est donné."""
+    out = []
+    for t, lg in COMMUNES:
+        cle = TRIABLES.get(t)
+        if cle and trier:
+            fleche = (" ▲" if tri[1] else " ▼") if tri and tri[0] == cle else " ⇅"
+            b = bouton(t + fleche, lambda cle=cle: trier(cle), tip=f"Trier par {t.lower()} (croissant, décroissant, sans tri)")
+            b.setStyleSheet(f"QPushButton{{border:none;background:transparent;padding:0;font-size:9.5pt;"
+                            f"color:{theme.P.accent if tri and tri[0] == cle else theme.P.texte2};}}")
+            out.append(boite(b, lg))
+        else:
+            lab = etiquette(t, "etiquetteChamp")
+            lab.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            out.append(fixe(lab, lg))
+    return out

@@ -29,6 +29,11 @@ from mat_methode.ui.widgets import (
 
 
 class PageReglages(QWidget):
+
+    def _actualiser(self):
+        """Reconstruit la page sans la faire remonter (position gardée par la fenêtre)."""
+        f = getattr(self, "sur_place", None)
+        f() if f else self.rafraichir()
     def __init__(self, ctrl: Controleur):
         super().__init__()
         self.ctrl = ctrl
@@ -124,7 +129,7 @@ class PageReglages(QWidget):
         p = self.ctrl.st.lire_preferences()
         p["ordre_reglages"] = cles
         self.ctrl.st.ecrire_preferences(p)
-        self.rafraichir()
+        self._actualiser()
 
     def _carte(self, cle, titre, desc, compte, k: int = 0, n: int = 1) -> QWidget:
         f = QFrame()
@@ -160,8 +165,9 @@ class PageReglages(QWidget):
     def _types(self):
         self._liste_simple("Types de demande", self.r.types_demande, lambda v: self.r.types_demande.remove(v),
                            lambda v: O.ajouter_simple(self.r.types_demande, v), "Nouveau type",
-                           "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ».",
-                           renommer=self._ren(O.renommer_type, lambda: self.r.types_demande))
+                           "Dans une manip, on choisit seulement dans cette liste. « Idée testée » apparaît pour un type contenant « test ». ● change la couleur du type (tableaux).",
+                           renommer=self._ren(O.renommer_type, lambda: self.r.types_demande),
+                           couleur=lambda t: O.couleur_type(self.r, t), changer_couleur=lambda t: O.couleur_type_suivante(self.r, t))
 
     def _materiel(self):
         self._liste_simple("Matériel", self.r.materiels, lambda v: self.r.materiels.remove(v),
@@ -213,7 +219,7 @@ class PageReglages(QWidget):
                 return
             self.r.personnes.append(Personne(nom=nom, initiales=initiales_de(nom), igg=nigg.text().strip().upper()))
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
         nouveau.returnPressed.connect(ajout)
         nigg.returnPressed.connect(ajout)
@@ -235,7 +241,7 @@ class PageReglages(QWidget):
         ch = O.renommer_donneur(self.r, self.ctrl.manips, p.nom, nouveau)
         if p.nom != nouveau:
             self.ctrl.toast.emit("Impossible : cette personne existe déjà")
-            self.rafraichir()
+            self._actualiser()
             return
         self._changer(ch)
         self.ctrl.toast.emit(f"Renommée ({len(ch)} manip{'s' if len(ch) > 1 else ''} mise{'s' if len(ch) > 1 else ''} à jour)")
@@ -245,7 +251,7 @@ class PageReglages(QWidget):
                      "Les manips existantes gardent ce nom.", "Retirer"):
             self.r.personnes = [x for x in self.r.personnes if x is not p]
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
     # ------------------------------------------------------------ fichier Scirius
     def _scirius(self):
@@ -264,12 +270,12 @@ class PageReglages(QWidget):
             if f:
                 self.r.scirius_fichier = f
                 self._changer()
-                self.rafraichir()
+                self._actualiser()
 
         def auto():
             self.r.scirius_fichier = ""
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
         resultat = etiquette("", secondaire=True, wrap=True)
 
@@ -286,7 +292,7 @@ class PageReglages(QWidget):
         x.ajouter(resultat)
         x.ajouter(etiquette("Noms des destinataires affichés par défaut dans la recherche (format Scirius, ex. P.BURGUN). "
                             "Une case dans la fenêtre de recherche permet de tout afficher.", secondaire=True, wrap=True))
-        x.ajouter(flux_widgets([ChipSupprimable(n, lambda n=n: (self.r.scirius_noms.remove(n), self._changer(), self.rafraichir()),
+        x.ajouter(flux_widgets([ChipSupprimable(n, lambda n=n: (self.r.scirius_noms.remove(n), self._changer(), self._actualiser()),
                                                 f"Retirer {n}") for n in self.r.scirius_noms]) if self.r.scirius_noms
                   else etiquette("Aucun : toutes les lignes sont affichées", secondaire=True))
         nom = ChampTexte("", "ex. P.BURGUN")
@@ -296,7 +302,7 @@ class PageReglages(QWidget):
             if v and v not in self.r.scirius_noms:
                 self.r.scirius_noms.append(v)
                 self._changer()
-                self.rafraichir()
+                self._actualiser()
 
         nom.returnPressed.connect(ajout_nom)
         x.ajouter(ligne(champ("Nouveau nom", nom), bouton("Ajouter", ajout_nom), "stretch"))
@@ -315,9 +321,9 @@ class PageReglages(QWidget):
             part = ChampTexte(o.participe, f"ex. {o.nom[:-3] + 'é' if o.nom.endswith('age') else 'traité'}")
             part.modifie.connect(lambda v, o=o: (setattr(o, "participe", v), self.ctrl.toucher_reglages()))
             nb = sum(1 for m in self.ctrl.manips for e in m.etapes if norm(e.operation) == norm(o.nom))
-            haut = icone("↑", f"Monter {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, -1), self._changer(), self.rafraichir()))
+            haut = icone("↑", f"Monter {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, -1), self._changer(), self._actualiser()))
             haut.setEnabled(i > 0)
-            bas = icone("↓", f"Descendre {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, 1), self._changer(), self.rafraichir()))
+            bas = icone("↓", f"Descendre {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, 1), self._changer(), self._actualiser()))
             bas.setEnabled(i < n - 1)
             x.ajouter(ligne(champ("Opération", nom), champ("Participe passé (texte)", part),
                             etiquette(f"{nb} étape{'s' if nb > 1 else ''}", secondaire=True), "stretch", haut, bas,
@@ -328,7 +334,7 @@ class PageReglages(QWidget):
         def ajout():
             if O.ajouter_operation(self.r, nouveau.text(), npart.text()):
                 self._changer()
-                self.rafraichir()
+                self._actualiser()
             elif nouveau.text().strip():
                 self.ctrl.toast.emit("Cette opération existe déjà")
 
@@ -341,7 +347,7 @@ class PageReglages(QWidget):
         x = self._section("Volumes d’échantillon", f"{len(vs)}")
         x.ajouter(etiquette("Volumes proposés pour chaque échantillon et pour le volume par défaut des laboratoires. "
                             "Retirer un volume ne change pas les échantillons existants.", secondaire=True, wrap=True))
-        x.ajouter(flux_widgets([ChipSupprimable(libelle_volume(v), lambda v=v: (O.supprimer_volume(self.r, v), self._changer(), self.rafraichir()),
+        x.ajouter(flux_widgets([ChipSupprimable(libelle_volume(v), lambda v=v: (O.supprimer_volume(self.r, v), self._changer(), self._actualiser()),
                                                 f"Retirer {libelle_volume(v)}") for v in vs]) if vs else etiquette("Aucun", secondaire=True))
         nouveau = NumberBox(None, "mL", "ex. 1000 pour 1 L")
         nouveau.setMaximumWidth(200)
@@ -349,7 +355,7 @@ class PageReglages(QWidget):
         def ajout():
             if O.ajouter_volume(self.r, nouveau.lire()):
                 self._changer()
-                self.rafraichir()
+                self._actualiser()
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ("Nouveau volume", nouveau), bouton("Ajouter", ajout), "stretch"))
@@ -362,7 +368,7 @@ class PageReglages(QWidget):
         ch = O.renommer_operation(self.r, self.ctrl.manips, ancien, nouveau)
         if o.nom == ancien:
             self.ctrl.toast.emit("Impossible : cette opération existe déjà")
-            self.rafraichir()
+            self._actualiser()
             return
         self._changer(ch)
         self.ctrl.toast.emit(f"Opération renommée ({len(ch)} manip{'s' if len(ch) > 1 else ''} mise{'s' if len(ch) > 1 else ''} à jour)")
@@ -372,7 +378,7 @@ class PageReglages(QWidget):
                      "Les étapes existantes qui l’utilisent ne changent pas.", "Retirer"):
             O.supprimer_operation(self.r, o.nom)
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
     # ------------------------------------------------------------ laboratoires
     def _laboratoires(self):
@@ -406,7 +412,7 @@ class PageReglages(QWidget):
             v.addWidget(champ("Analyses possibles (proposées et cochées sur un nouvel échantillon)", flux_widgets(an)))
             x.ajouter(f)
         nouveau = ChampTexte("", "Nouveau laboratoire")
-        ajout = lambda: O.ajouter_laboratoire(self.r, nouveau.text()) and (self._changer(), self.rafraichir())
+        ajout = lambda: O.ajouter_laboratoire(self.r, nouveau.text()) and (self._changer(), self._actualiser())
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ("Nouveau laboratoire", nouveau), bouton("Ajouter", ajout), "stretch"))
 
@@ -422,26 +428,30 @@ class PageReglages(QWidget):
         if confirmer(self, "Supprimer ce laboratoire ?", f"« {nom} » disparaît de la liste. Les échantillons existants gardent ce nom.", "Supprimer"):
             O.supprimer_laboratoire(self.r, nom)
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
     # ------------------------------------------------------------ listes simples
-    def _liste_simple(self, titre, items, supprimer, ajouter, libelle, aide="", renommer=None, ordre: list | None = None):
+    def _liste_simple(self, titre, items, supprimer, ajouter, libelle, aide="", renommer=None, ordre: list | None = None,
+                      couleur=None, changer_couleur=None):
         """`ordre` : la liste des Réglages à réordonner (◂ ▸) ; par défaut `items` lui-même."""
         ordre = items if ordre is None else ordre
         x = self._section(titre, f"{len(items)}")
         x.ajouter(etiquette((aide + " " if aide else "") + "◂ ▸ : changer l’ordre (c’est l’ordre des listes déroulantes).",
                             secondaire=True, wrap=True))
         n = len(items)
-        x.ajouter(flux_widgets([ChipSupprimable(a, lambda a=a: (supprimer(a), self._changer(), self.rafraichir()), f"Supprimer {a}",
+        x.ajouter(flux_widgets([ChipSupprimable(a, lambda a=a: (supprimer(a), self._changer(), self._actualiser()), f"Supprimer {a}",
                                                 renommer=(lambda a=a: self._renommer(titre, a, renommer)) if renommer else None,
-                                                deplacer=lambda sens, i=i: self._deplacer(ordre, i, sens), bornes=(i == 0, i == n - 1))
+                                                deplacer=lambda sens, i=i: self._deplacer(ordre, i, sens), bornes=(i == 0, i == n - 1),
+                                                couleur=couleur(a) if couleur else None,
+                                                changer_couleur=(lambda a=a: (changer_couleur(a), self._changer(), self._actualiser()))
+                                                if changer_couleur else None)
                                 for i, a in enumerate(items)]) if items else etiquette("Aucun pour l’instant", secondaire=True))
         nouveau = ChampTexte("", libelle)
 
         def ajout():
             if ajouter(nouveau.text()):
                 self._changer()
-                self.rafraichir()
+                self._actualiser()
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ(libelle, nouveau), bouton("Ajouter", ajout), "stretch"))
@@ -449,7 +459,7 @@ class PageReglages(QWidget):
     def _deplacer(self, liste: list, i: int, sens: int) -> None:
         if O.deplacer_dans(liste, i, sens):
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
     def _renommer(self, titre: str, ancien: str, fn, tag=False) -> None:
         """Renomme une entrée et met à jour toutes les manips qui l'utilisent."""
@@ -468,7 +478,7 @@ class PageReglages(QWidget):
             self.ctrl.toucher_reglages()
         n = len(ch)
         self.ctrl.toast.emit(f"Renommé en « {nouveau} »" + (f" ({n} manip{'s' if n > 1 else ''} mise{'s' if n > 1 else ''} à jour)" if n else ""))
-        self.rafraichir()
+        self._actualiser()
 
     def _ren(self, fn, liste_apres):
         """Adapte une fonction de reglages_ops : None si le renommage a été refusé."""
@@ -506,7 +516,7 @@ class PageReglages(QWidget):
                                          tip_renommer=f"Renommer le tag {t} dans toutes les manips",
                                          deplacer=lambda sens, t=t: self._deplacer_tag(t, sens), bornes=(i == 0, i == n - 1),
                                          couleur=O.couleur_tag(self.r, t),
-                                         changer_couleur=lambda t=t: (O.couleur_tag_suivante(self.r, t), self._changer(), self.rafraichir())))
+                                         changer_couleur=lambda t=t: (O.couleur_tag_suivante(self.r, t), self._changer(), self._actualiser())))
         x.ajouter(flux_widgets(chips) if chips else etiquette("Aucun tag pour l’instant", secondaire=True))
         nouveau = ChampTexte("", "Nouveau tag")
 
@@ -516,7 +526,7 @@ class PageReglages(QWidget):
                 return
             self.r.ordre_tags = tous_les_tags(self.ctrl.manips, self.r.ordre_tags) + [t]  # proposé dans les listes déroulantes de tags
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ("Nouveau tag", nouveau), bouton("Ajouter", ajout), "stretch"))
@@ -536,7 +546,7 @@ class PageReglages(QWidget):
     def _deplacer_tag(self, t: str, sens: int):
         if deplacer_tag(self.ctrl.manips, self.r, t, sens):
             self._changer()
-            self.rafraichir()
+            self._actualiser()
 
     def _retirer_tag(self, t):
         if confirmer(self, "Retirer ce tag ?", f"#{t} sera retiré de toutes les manips et de la liste des tags.", "Retirer"):
@@ -545,5 +555,5 @@ class PageReglages(QWidget):
             for m in O.retirer_tag_partout(self.ctrl.manips, t):
                 self.ctrl.toucher(m)
             self.ctrl.toast.emit("Tag retiré de toutes les manips")
-            self.rafraichir()
+            self._actualiser()
 

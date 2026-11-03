@@ -183,6 +183,24 @@ class Liste(SansMolette, QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i) or ""))
 
 
+COULEURS_AVATARS = ["#2F6FB8", "#0F7B6C", "#B26B00", "#7A4EB0", "#B8366B", "#4E7D1E", "#1F7A99", "#A34A28"]
+
+
+def avatar(initiales: str, tip: str = "", cle: str = "") -> QLabel:
+    """Pastille ronde aux initiales d'une personne présente (comme dans Excel)."""
+    import zlib
+    couleur = COULEURS_AVATARS[zlib.crc32((cle or initiales).encode("utf-8")) % len(COULEURS_AVATARS)]
+    lab = QLabel(initiales[:3])
+    lab.setObjectName("avatar")
+    lab.setFixedSize(26, 26)
+    lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lab.setStyleSheet(f"QLabel#avatar{{background:{couleur};color:white;border-radius:13px;font-weight:700;font-size:8pt;"
+                      f"border:2px solid {theme.P.fond};}}")
+    lab.setToolTip(tip)
+    lab.setAccessibleName(tip or initiales)
+    return lab
+
+
 def figer(racine: QWidget) -> None:
     """Vue en lecture : les champs passent en lecture seule et les boutons sont grisés, sauf l'ouverture des cartes
     repliables et les widgets (ou leurs enfants) marqués `garder`."""
@@ -460,10 +478,11 @@ class ChipSupprimable(QFrame):
 class FlowLayout(QLayout):
     """Dispose les widgets en lignes qui passent à la ligne (pastilles, tags)."""
 
-    def __init__(self, parent=None, espace=6):
+    def __init__(self, parent=None, espace=6, centre=False):
         super().__init__(parent)
         self._items = []
         self._esp = espace
+        self._centre = centre  # chaque ligne centrée (colonnes des tableaux)
         self.setContentsMargins(0, 0, 0, 0)
 
     def addItem(self, item):
@@ -502,22 +521,36 @@ class FlowLayout(QLayout):
 
     def _placer(self, r, test):
         x, y, h = r.x(), r.y(), 0
+        ligne_ = []  # (item, x, taille) de la ligne en cours
+
+        def poser():
+            if test or not ligne_:
+                return
+            decal = 0
+            if self._centre:
+                fin = ligne_[-1][1] + ligne_[-1][2].width()
+                decal = max(0, (r.right() - fin) // 2)
+            for it, xx, s in ligne_:
+                it.setGeometry(QRect(QPoint(xx + decal, y), s))
+
         for it in self._items:
             if it.widget() and not it.widget().isVisibleTo(it.widget().parentWidget()):
                 continue
             s = it.sizeHint()
             if x + s.width() > r.right() and h > 0:
+                poser()
+                ligne_ = []
                 x, y, h = r.x(), y + h + self._esp, 0
-            if not test:
-                it.setGeometry(QRect(QPoint(x, y), s))
+            ligne_.append((it, x, s))
             x += s.width() + self._esp
             h = max(h, s.height())
+        poser()
         return y + h - r.y()
 
 
-def flux_widgets(widgets: list[QWidget]) -> QWidget:
+def flux_widgets(widgets: list[QWidget], centre: bool = False) -> QWidget:
     w = QWidget()
-    fl = FlowLayout(w)
+    fl = FlowLayout(w, centre=centre)
     for x in widgets:
         fl.addWidget(x)
     return w

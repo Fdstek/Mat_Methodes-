@@ -14,6 +14,7 @@ from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.widgets import (
     InfoBar,
     Liste,
+    avatar,
     bouton,
     bouton_tag_couleur,
     etiquette,
@@ -31,6 +32,11 @@ class PageManips(QWidget):
     importer_mm = Signal()
     exporter = Signal(str)
 
+    def _actualiser(self):
+        """Reconstruit la page sans la faire remonter (position gardée par la fenêtre)."""
+        f = getattr(self, "sur_place", None)
+        f() if f else self.rafraichir()
+
     def __init__(self, ctrl: Controleur):
         super().__init__()
         self.ctrl = ctrl
@@ -38,6 +44,7 @@ class PageManips(QWidget):
         self.f_donneur = ""
         self.f_type = ""
         self.f_tag = ""
+        self.tri = None  # (« donneur » | « type », croissant) : clic sur l'en-tête de colonne
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(14)
@@ -52,7 +59,7 @@ class PageManips(QWidget):
         self.recherche.setAccessibleName("Rechercher une manip (Ctrl+F)")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.setMinimumWidth(180)
-        self.recherche.textChanged.connect(lambda *_: self.rafraichir())
+        self.recherche.textChanged.connect(lambda *_: self._actualiser())
         lay.addLayout(barre)
 
         self.pivot = QHBoxLayout()
@@ -78,7 +85,7 @@ class PageManips(QWidget):
         bas = QHBoxLayout()
         bas.addWidget(etiquette("Modifier le flux, Dupliquer, Exporter, Archiver : menu « … » de chaque ligne.", secondaire=True, wrap=True), 1)
         bas.addStretch(1)
-        bas.addWidget(bouton("Actualiser", self._actualiser))
+        bas.addWidget(bouton("Actualiser", self._recharger))
         bas.addWidget(bouton("Restaurer les exemples", self._exemples))
         lay.addLayout(bas)
         lay.addStretch(1)
@@ -88,7 +95,7 @@ class PageManips(QWidget):
         self.archives = archives
         self.rafraichir()
 
-    def _actualiser(self):
+    def _recharger(self):
         self.ctrl.actualiser()
         self.ctrl.toast.emit("Liste actualisée")
 
@@ -98,7 +105,7 @@ class PageManips(QWidget):
                      "d’exemple sont ajoutés. Tes autres manips ne sont pas touchées.", "Restaurer"):
             self.ctrl.restaurer_exemples()
             self.ctrl.toast.emit("Exemples restaurés")
-            self.rafraichir()
+            self._actualiser()
 
     def _visibles(self):
         q = norm(self.recherche.text())
@@ -116,11 +123,15 @@ class PageManips(QWidget):
             if self.f_tag and not any(norm(t) == norm(self.f_tag) for t in m.tags):
                 continue
             out.append(m)
-        return sorted(out, key=lambda m: m.maj, reverse=True)
+        return C.trier_manips(sorted(out, key=lambda m: m.maj, reverse=True), self.tri)
+
+    def _trier(self, cle: str):
+        self.tri = C.basculer_tri(self.tri, cle)
+        self._actualiser()
 
     def _filtre_donneur(self, nom: str):
         self.f_donneur = "" if nom == self.f_donneur else nom
-        self.rafraichir()
+        self._actualiser()
 
     # ------------------------------------------------------------ affichage
     def rafraichir(self):
@@ -197,7 +208,7 @@ class PageManips(QWidget):
         self._grille(g)
         g.setContentsMargins(14, 8, 14, 8)
         g.addWidget(etiquette("MANIP", "etiquetteChamp"), 0, 0)
-        for k, x in enumerate(C.entetes_communes(), start=1):
+        for k, x in enumerate(C.entetes_communes(self.tri, self._trier), start=1):
             g.addWidget(x, 0, k)
         g.addWidget(self._fixe(etiquette("STATUT", "etiquetteChamp"), 4), 0, 4)
         for k in (5, 6):
@@ -234,13 +245,17 @@ class PageManips(QWidget):
         v = self.ctrl.st.verrou_autre(m.id)
         if v:
             marques.append(pastille(f"Modifiée par {self.ctrl.nom_de(v.utilisateur)}", "info"))
+        for pr in self.ctrl.presents_sur(m.id):  # comme dans Excel : initiales de qui a la manip ouverte
+            if not (v and pr.get("utilisateur") == v.utilisateur):
+                marques.append(avatar(self.ctrl.initiales_de(pr.get("utilisateur", "")),
+                                      f"{self.ctrl.nom_de(pr.get('utilisateur', ''))} a cette manip ouverte", cle=pr.get("utilisateur", "")))
         if marques:
             gauche.addWidget(flux_widgets(marques))
         cg = QWidget()
         cg.setLayout(gauche)
         gauche.setContentsMargins(0, 0, 0, 0)
         g.addWidget(cg, 0, 0)
-        for k, x in enumerate(C.cellules_communes(m, r, lambda t: (setattr(self, "f_tag", t), self.rafraichir())), start=1):
+        for k, x in enumerate(C.cellules_communes(m, r, lambda t: (setattr(self, "f_tag", t), self._actualiser()), self._trier), start=1):
             g.addWidget(x, 0, k)
         if m.etat == ARCHIVEE:
             g.addWidget(self._fixe(etiquette("Archivée", secondaire=True), 4), 0, 4)
@@ -271,7 +286,7 @@ class PageManips(QWidget):
     def _dupliquer(self, ident):
         c = self.ctrl.dupliquer(ident)
         self.ctrl.toast.emit(f"Copie créée : {c.nom}")
-        self.rafraichir()
+        self._actualiser()
 
     def _archiver(self, m):
         if self.ctrl.st.verrou_autre(m.id):
@@ -286,7 +301,7 @@ class PageManips(QWidget):
         self.ctrl.toucher(m)
         self.ctrl.enregistrer_tout()
         self.ctrl.toast.emit("Archivée" if a else "Restaurée")
-        self.rafraichir()
+        self._actualiser()
 
     def _statut(self, m, statut: str):
         msg = self.ctrl.changer_statut(m, statut)
@@ -294,7 +309,7 @@ class PageManips(QWidget):
             self.ctrl.toast.emit(msg)
         elif statut == "validee":
             self.ctrl.toast.emit("Validée : elle apparaît maintenant dans Protocole")
-        self.rafraichir()
+        self._actualiser()
 
     def _supprimer(self, m):
         from mat_methode.ui.dialogues import confirmer
@@ -302,7 +317,7 @@ class PageManips(QWidget):
                      "Ctrl+Z annule tant que l’application est ouverte.", "Supprimer"):
             self.ctrl.supprimer(m.id)
             self.ctrl.toast.emit("Manip supprimée (Ctrl+Z pour annuler)")
-            self.rafraichir()
+            self._actualiser()
 
     def tous_tags(self):
         return tous_les_tags(self.ctrl.manips, self.ctrl.reglages.ordre_tags)

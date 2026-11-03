@@ -71,10 +71,16 @@ class PageProtocoles(QWidget):
     """Liste des protocoles : « À réaliser » (Validée, En cours) dans l'ordre de réalisation, et « Clôturés »."""
     ouvrir = Signal(str)
 
+    def _actualiser(self):
+        """Reconstruit la page sans la faire remonter (position gardée par la fenêtre)."""
+        f = getattr(self, "sur_place", None)
+        f() if f else self.rafraichir()
+
     def __init__(self, ctrl: Controleur):
         super().__init__()
         self.ctrl = ctrl
         self.clotures = False
+        self.tri = None  # tri par donneur d'ordre ou type (clic sur l'en-tête)
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
@@ -102,7 +108,10 @@ class PageProtocoles(QWidget):
             "Les manips réalisées ou annulées. Une manip réalisée apparaît dans Rapport." if self.clotures else
             "Les manips validées dans « Définition Mat & Méthode », dans l’ordre de réalisation (↑ ↓ pour le changer). "
             "Passe le statut à « En cours » au démarrage, puis à « Réalisée » : elle part dans Rapport.", secondaire=True, wrap=True))
-        liste = clos if self.clotures else a_faire
+        liste = C.trier_manips(clos if self.clotures else a_faire, self.tri)
+        if self.tri and not self.clotures and liste:
+            self.lay.addWidget(etiquette("Tableau trié : ↑ ↓ (ordre de réalisation) sont désactivées. Clique de nouveau l’en-tête "
+                                         "pour revenir à l’ordre de réalisation.", secondaire=True, wrap=True))
         f, v = _cadre_liste()
         if not liste:
             vide = etiquette("Aucun protocole clôturé." if self.clotures else
@@ -122,7 +131,7 @@ class PageProtocoles(QWidget):
         return debut + [None] + [lg for _, lg in C.COMMUNES] + fin
 
     def _entete(self) -> QWidget:
-        cel = ([] if self.clotures else [_titre("N°")]) + [_titre("PROTOCOLE")] + C.entetes_communes() + [_titre("STATUT")]
+        cel = ([] if self.clotures else [_titre("N°")]) + [_titre("PROTOCOLE")] + C.entetes_communes(self.tri, self._trier) + [_titre("STATUT")]
         cel += ([] if self.clotures else [QWidget(), QWidget()]) + [QWidget()]
         return _rangee(cel, self._largeurs(), False, entete=True)
 
@@ -131,7 +140,7 @@ class PageProtocoles(QWidget):
         cel = [] if self.clotures else [C.boite(numero(i + 1), 30)]
         cel.append(_resume(m, f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch."
                            + (f" · lancée le {fmt_dt(m.lancee.le)[:10]}" if m.lancee else "")))
-        cel += C.cellules_communes(m, self.ctrl.reglages)
+        cel += C.cellules_communes(m, self.ctrl.reglages, trier=self._trier)
         st = liste_statut(m, STATUTS_PROTOCOLE)
         st.setMinimumWidth(0)
         st.setMinimumContentsLength(6)
@@ -139,12 +148,16 @@ class PageProtocoles(QWidget):
         cel.append(st)
         if not self.clotures:
             haut = icone("↑", f"Réaliser avant : {m.nom}", lambda m=m: self.ctrl.deplacer_protocole(m, -1))
-            haut.setEnabled(i > 0)
+            haut.setEnabled(i > 0 and not self.tri)
             bas = icone("↓", f"Réaliser après : {m.nom}", lambda m=m: self.ctrl.deplacer_protocole(m, 1))
-            bas.setEnabled(i < n - 1)
+            bas.setEnabled(i < n - 1 and not self.tri)
             cel += [haut, bas]
         cel.append(bouton("Ouvrir", lambda m=m: self.ouvrir.emit(m.id), accent=True, tip=f"Voir et modifier le protocole de {m.nom}"))
         return _rangee(cel, self._largeurs(), i == n - 1)
+
+    def _trier(self, cle: str):
+        self.tri = C.basculer_tri(self.tri, cle)
+        self._actualiser()
 
     def _statut(self, m, statut: str):
         msg = self.ctrl.changer_statut(m, statut)
@@ -152,12 +165,17 @@ class PageProtocoles(QWidget):
             self.ctrl.toast.emit(msg)
         elif statut == REALISEE:
             self.ctrl.toast.emit("Réalisée : le rapport est maintenant dans Rapport")
-        self.rafraichir()
+        self._actualiser()
 
 
 class PageRapports(QWidget):
     """Liste des rapports : seulement les protocoles clôturés comme « Réalisée »."""
     ouvrir = Signal(str)
+
+    def _actualiser(self):
+        """Reconstruit la page sans la faire remonter (position gardée par la fenêtre)."""
+        f = getattr(self, "sur_place", None)
+        f() if f else self.rafraichir()
 
     def __init__(self, ctrl: Controleur):
         super().__init__()
@@ -166,9 +184,13 @@ class PageRapports(QWidget):
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
 
+    def _trier(self, cle: str):
+        self.tri = C.basculer_tri(getattr(self, "tri", None), cle)
+        self._actualiser()
+
     def rafraichir(self):
         vider(self.lay)
-        liste = R.rapports_clotures(self.ctrl.manips)
+        liste = C.trier_manips(R.rapports_clotures(self.ctrl.manips), getattr(self, "tri", None))
         self.lay.addWidget(etiquette("Les manips réalisées (protocoles clôturés dans Protocole), la plus récente d’abord.",
                                      secondaire=True, wrap=True))
         f, v = _cadre_liste()
@@ -178,12 +200,13 @@ class PageRapports(QWidget):
             v.addWidget(vide)
         largeurs = [None] + [lg for _, lg in C.COMMUNES] + [125]
         if liste:
-            v.addWidget(_rangee([_titre("RAPPORT")] + C.entetes_communes() + [QWidget()], largeurs, False, entete=True))
+            v.addWidget(_rangee([_titre("RAPPORT")] + C.entetes_communes(getattr(self, "tri", None), self._trier) + [QWidget()], largeurs,
+                                False, entete=True))
         for i, m in enumerate(liste):
             emis = [x for x in m.rapports if x.type == "rapport"]
             marques = [pastille(f"Modifiée après lancement ({len(m.journal)})", "warn")] if m.journal else []
             cel = [_resume(m, f"modifiée le {fmt_dt(m.maj)[:10]} · {len(emis)} rapport{'s' if len(emis) > 1 else ''} émis", marques=marques)]
-            cel += C.cellules_communes(m, self.ctrl.reglages)
+            cel += C.cellules_communes(m, self.ctrl.reglages, trier=self._trier)
             cel.append(bouton("Voir le rapport", lambda m=m: self.ouvrir.emit(m.id), accent=True, tip=f"Rapport de {m.nom}"))
             v.addWidget(_rangee(cel, largeurs, i == len(liste) - 1))
         self.lay.addWidget(f)

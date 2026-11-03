@@ -144,6 +144,20 @@ def test_migration_etats_a_faire_et_lancee(tmp_path):
     f = tmp_path / "reglages.json"
     f.write_text("{}", encoding="utf-8")
     d = migrer({"schema": 4, "etats": [{"id": "brouillon", "nom": "Brouillon"}, {"id": "x", "nom": "lancée"}]}, f)
-    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée", "Réalisée"] and d["schema"] == 9
+    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée", "Réalisée"] and d["schema"] == 10
     d = migrer({"schema": 5, "etats": [{"id": "encours", "nom": "En cours"}, {"id": "terminee", "nom": "Terminée"}]}, f)
     assert [e["nom"] for e in d["etats"]] == ["En cours", "Réalisée", "Terminée"]
+
+
+def test_presence_des_autres(tmp_path):
+    from mat_methode.storage.stockage import Stockage
+    moi, autre = Stockage(tmp_path, "pierre", "PC1"), Stockage(tmp_path, "CLAIRE", "PC2")
+    for s in (moi, autre):
+        s.initialiser()
+    autre.signaler_presence("m1")
+    moi.signaler_presence(None)
+    assert [(p["utilisateur"], p["manip"]) for p in moi.presences_autres()] == [("CLAIRE", "m1")]
+    plus_tard = datetime.now(timezone.utc) + timedelta(minutes=5)
+    assert moi.presences_autres(plus_tard) == []  # plus de battement depuis 3 min : absente
+    autre.retirer_presence()
+    assert moi.presences_autres() == []

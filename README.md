@@ -84,7 +84,23 @@ un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans le
 **Volumes** : section « Volumes » sous « Ma demande » : volume engagé (départ), prélevé (total des échantillons), restant,
 la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (en rouge en cas de dépassement).
 
-**Tableaux** : Définition (et Archivées), Protocole et Rapport ont les colonnes Donneur d'ordre, Type et Tags.
+**Tableaux** : Définition (et Archivées), Protocole et Rapport ont les colonnes Donneur d'ordre, Type et Tags, centrées.
+Un clic sur l'en-tête « Donneur d'ordre » ou « Type » (ou sur un nom dans une ligne) trie le tableau : croissant,
+décroissant, puis ordre d'origine. Chaque type a une couleur (Réglages › Types : ● pour la changer).
+
+**Présence** : comme dans Excel, une pastille aux initiales montre qui d'autre a l'application ouverte (en haut à
+droite), qui a une manip ouverte (dans la liste) et qui regarde la même manip (bandeau de statut). Chaque poste
+signale sa présence toutes les 30 s dans `donnees\presence` ; sans signe depuis 3 min, la pastille disparaît.
+
+**Volumes** : les échantillons pris avant traitement (S0) sont prélevés EN AMONT, en plus du volume de départ :
+section Volumes (écran et PDF du protocole) avec En amont, Engagé, Prélevé (pendant le flux), Restant et À prévoir
+(amont + engagé) ; le texte 2.1 et les légendes du flux le disent aussi.
+
+**Fichier Scirius** : lu en arrière-plan 3 s après l'ouverture, sans bloquer l'application ; la recherche Scirius est
+ensuite immédiate (cache de 30 min).
+
+**Défilement** : ajouter ou modifier un échantillon (ou toute autre action qui reconstruit la page) ne fait plus
+remonter la page.
 
 **Lot** : plus de champ ni de mention « lot » dans l'application et les documents (seule la recherche Scirius l'affiche).
 

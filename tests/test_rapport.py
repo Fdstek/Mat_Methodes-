@@ -29,7 +29,8 @@ def test_seules_les_corrections_attendues_different_du_prototype(ethanol, reglag
 
 def test_une_idee_par_ligne(ethanol, reglages):
     s = construire(ethanol, reglages).sections
-    assert s[0].texte.split("\n")[0].startswith("Demande :") and len(s[0].texte.split("\n")) == 6
+    assert s[0].texte.split("\n")[0].startswith("Demande :") and len(s[0].texte.split("\n")) == 7  # + prélèvement en amont
+    assert "Prélèvement en amont : 50 mL avant traitement (1 échantillon, hors volume de départ), soit 1\u202f050 mL de charge à prévoir." in s[0].texte
     assert s[1].texte.split("\n")[1].startswith("Réactifs :")
     assert [x[:8] for x in s[2].texte.split("\n")] == [f"Étape {i} " for i in range(1, 6)]
     assert len(s[3].texte.split("\n")) == 6

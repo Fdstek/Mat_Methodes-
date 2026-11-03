@@ -6,7 +6,9 @@ from mat_methode.domain.models import Etape, Manip, Prelevement
 
 def test_crit1_manip_exemple(ethanol):
     b = R.bilan(ethanol)
-    assert (len(ethanol.etapes), b.n, b.preleve, b.restant, b.numeros_a_saisir) == (5, 6, 325, 675, 8)
+    # S0 (avant traitement) est prélevé en amont, hors volume engagé
+    assert (len(ethanol.etapes), b.n, b.preleve, b.restant, b.numeros_a_saisir) == (5, 5, 275, 725, 8)
+    assert (b.amont, b.n_amont, b.total) == (50, 1, 1050)
 
 
 def test_crit3_etiquettes(ethanol):
@@ -38,7 +40,10 @@ def test_suivi_des_volumes():
     m.contexte.volume_depart_ml = 500
     e = R.ajouter_etape(m, "chauffage")
     m.prelevements = [Prelevement(volume_ml=50), Prelevement(etape_id=e.id, moment="pendant", temps_min=10, volume_ml=120)]
-    assert R.suivi_volumes(m) == [("S0", "avant traitement", 50, 450), ("S1", "étape 1 (chauffage) · pendant · à 10 min", 120, 330)]
+    assert R.suivi_volumes(m) == [("S0", "en amont, avant traitement (hors volume engagé)", 50, None),
+                                  ("S1", "étape 1 (chauffage) · pendant · à 10 min", 120, 380)]
+    b = R.bilan(m)
+    assert (b.amont, b.preleve, b.restant, b.total) == (50, 120, 380, 550)
 
 
 def test_code_badge():

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from xml.sax.saxutils import escape
 
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -16,6 +17,7 @@ from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table, TableStyl
 
 from mat_methode.domain.texte import fmt_vol
 from mat_methode.exports.pdf import (
+    INK,
     LINE,
     TEAL_L,
     Flux,
@@ -26,6 +28,7 @@ from mat_methode.exports.pdf import (
     moment_texte,
     styles,
     table_reactifs,
+    volumes,
 )
 
 
@@ -87,6 +90,49 @@ def phases_a_remplir(data: dict, s: dict) -> list:
     return blocs
 
 
+def bloc_volumes(data: dict, s: dict) -> list:
+    """Section « Volumes » comme à l'écran : cases (en amont, engagé, prélevé, restant, à prévoir), puis le détail par échantillon."""
+    v = volumes(data)
+    if v["depart"] is None and not v["suivi"]:
+        return []
+    cell, petit = s["cell"], s["petit"]
+    grand = ParagraphStyle("grandVol", parent=cell, fontName=s["h2"].fontName, fontSize=13, leading=16, textColor=INK)
+    vert = ParagraphStyle("vertVol", parent=grand, textColor=colors.HexColor("#0F7B0F"))
+    rouge = ParagraphStyle("rougeVol", parent=grand, textColor=colors.HexColor("#C42B1C"))
+    gris = "<font color='#566360' size='7'>"
+    cases = []
+    if v["n_amont"]:
+        cases.append(("EN AMONT", f"{fmt_vol(v['amont'])} mL", f"{v['n_amont']} éch. avant traitement, hors manip", grand))
+    cases += [("ENGAGÉ", f"{fmt_vol(v['depart'])} mL" if v["depart"] is not None else "—", "volume de départ de la manip", grand),
+              ("PRÉLEVÉ", f"{fmt_vol(v['preleve'])} mL", f"{v['n']} éch. pendant le flux", grand),
+              ("RESTANT", f"{fmt_vol(v['restant'])} mL", "dépassement !" if v["restant"] < 0 else "à la fin du flux",
+               rouge if v["restant"] < 0 else vert)]
+    if v["n_amont"]:
+        cases.append(("À PRÉVOIR", f"{fmt_vol(v['total'])} mL", "charge totale (amont + engagé)", grand))
+    larg = 174 * mm / len(cases)
+    tuiles = Table([[[Paragraph(f"{gris}{t}</font>", cell), Paragraph(val, st), Paragraph(f"{gris}{d}</font>", cell)]
+                     for t, val, d, st in cases]], colWidths=[larg] * len(cases))
+    tuiles.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.5, LINE),
+                                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F4F6F5")), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    bloc = [Paragraph("Volumes", s["h2"]), tuiles, Spacer(1, 2 * mm)]
+    if v["suivi"]:
+        lignes = [[Paragraph(f"<b>{h}</b>", cell) for h in ("Éch.", "Où et quand", "Prélevé", "Reste ensuite")]]
+        for p, reste in v["suivi"]:
+            ou = "en amont, avant traitement (hors volume engagé)" if reste is None else \
+                f"étape {p['apres_etape']} · {moment_texte(p)}"
+            lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell), Paragraph(escape(ou), cell),
+                           Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL", cell),
+                           Paragraph("—" if reste is None else (f"<font color='#C42B1C'><b>{fmt_vol(reste)} mL</b></font>" if reste < 0
+                                                                 else f"{fmt_vol(reste)} mL"), cell)])
+        t = Table(lignes, colWidths=[16 * mm, 102 * mm, 26 * mm, 30 * mm], repeatRows=1)
+        t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
+                               ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+        bloc.append(t)
+    else:
+        bloc.append(Paragraph("Aucun échantillon prévu : tout le volume engagé reste disponible.", petit))
+    return bloc
+
+
 def ecrire_protocole(data: dict, chemin) -> None:
     s = styles()
     h1, h2, corps, petit = s["h1"], s["h2"], s["corps"], s["petit"]
@@ -106,6 +152,9 @@ def ecrire_protocole(data: dict, chemin) -> None:
         story.append(KeepTogether(bloc))
     story.append(KeepTogether([Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
                                Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]))
+    vol = bloc_volumes(data, s)
+    if vol:
+        story.append(KeepTogether(vol))
     tab = table_reactifs(data, s)
     if tab is not None:
         story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
