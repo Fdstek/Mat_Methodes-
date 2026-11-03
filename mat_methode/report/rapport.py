@@ -85,6 +85,7 @@ class Phase:
     reactifs: list[LigneReactif]
     echantillons: list[LigneEchantillon]
     groupe: str = ""  # grande étape (ex. « Degumming »)
+    remarque: str = ""  # remarque de l'étape (Flux)
     groupe_plage: str = ""  # « étapes 2 à 4 »
     debut_groupe: bool = False  # première phase de sa grande étape
 
@@ -272,7 +273,8 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
         phases.append(Phase(i + 1, f"{i + 1} · {cap(e.operation)}", conditions_phase(e), list(e.equipements), rs,
                             [ligne_ech(p) for p in ech if p.etape_id == e.id], groupe=g.nom if g else "",
-                            groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1))
+                            groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1,
+                            remarque=e.remarque.strip()))
     return Rapport(sections, tab_reac, tab_ech, phases)
 
 

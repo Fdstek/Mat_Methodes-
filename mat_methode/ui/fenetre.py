@@ -116,6 +116,10 @@ class Fenetre(QMainWindow):
         self.enregistrement.setAccessibleName("État de l’enregistrement")
         tete.addWidget(self.enregistrement, 0, Qt.AlignmentFlag.AlignTop)
         cv.addLayout(tete)
+        self.zone_fixe = QWidget()  # bandeau de statut de Flux / Édition : ne défile pas avec la page
+        zf = QVBoxLayout(self.zone_fixe)
+        zf.setContentsMargins(36, 4, 36 + 16, 4)
+        cv.addWidget(self.zone_fixe)
         self.pile = QStackedWidget()
         cv.addWidget(self.pile, 1)
         h.addWidget(contenu, 1)
@@ -173,9 +177,9 @@ class Fenetre(QMainWindow):
         self.p_rapport.autres_formats.connect(lambda: self.autres_formats())
         self.p_protocole.exporter_pdf.connect(lambda: self.exporter_fichier("protocole"))
         self.p_protocole.ouvrir_fichier.connect(self.ouvrir_fichier)
-        self.p_protocole.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_rapports())))
+        self.p_protocole.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents(protocole=True))))
         self.p_rapport.ouvrir_fichier.connect(self.ouvrir_fichier)
-        self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_rapports())))
+        self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents())))
         self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante))
 
         for seq, f in (("Ctrl+N", self.nouvelle), ("Ctrl+F", self._recherche), ("Ctrl+E", lambda: self.autres_formats()),
@@ -286,6 +290,7 @@ class Fenetre(QMainWindow):
                 b.setToolTip(f"{b.accessibleName()} : {self.choisie(k).nom}" if ok else aides[k])
             b.style().unpolish(b)
             b.style().polish(b)
+        self._bandeau()
         self._carte()
         sous = self.sous_titre.layout()
         vider(sous)
@@ -301,6 +306,20 @@ class Fenetre(QMainWindow):
             self.pages[self.page].rafraichir()
         self._statut(self._texte_statut() if not ctrl.st.lecture_seule else "Non enregistré : dossier inaccessible",
                      ctrl.st.lecture_seule)
+
+    def _bandeau(self):
+        """Place le bandeau de statut de la page (Flux ou Protocole › Édition) dans la zone fixe."""
+        lay = self.zone_fixe.layout()
+        voulu = {"flux": self.p_flux.bandeau, "protocole": self.p_protocole.flux.bandeau}.get(self.page) \
+            if self.ctrl.courante is not None else None
+        while lay.count():
+            w = lay.takeAt(0).widget()
+            if w is not None and w is not voulu:
+                w.setParent(None)
+        if voulu is not None:
+            lay.addWidget(voulu)
+            voulu.show()
+        self.zone_fixe.setVisible(voulu is not None)
 
     def _carte(self):
         m = self.ctrl.courante
@@ -405,9 +424,9 @@ class Fenetre(QMainWindow):
                 msg += f" À relire : étape{'s' if len(res['a_verifier']) > 1 else ''} {', '.join(map(str, res['a_verifier']))} (plusieurs opérations détectées)."
             D.informer(self, "Manip importée", msg + " Vérifie chaque étape : l’extraction repose sur des mots-clés.")
 
-    def dossier_rapports(self) -> Path:
-        """Dossier des documents de la personne qui édite : donnees\\exports\\<Prénom NOM>."""
-        d = self.ctrl.st.d_exports / nom_fichier(self.ctrl.nom_utilisateur())
+    def dossier_documents(self, protocole: bool = False) -> Path:
+        """Dossier partagé des documents : donnees\\exports\\Protocoles ou donnees\\exports\\Rapports (pas de dossier par personne)."""
+        d = self.ctrl.st.d_exports / ("Protocoles" if protocole else "Rapports")
         try:
             d.mkdir(parents=True, exist_ok=True)
         except OSError:
@@ -425,7 +444,7 @@ class Fenetre(QMainWindow):
                "html": "Page HTML (*.html)", "json": "Données JSON (*.json)"}[fmt]
         base = nom_fichier(f"{m.contexte.ref} - {m.nom}" if m.contexte.ref.strip() else m.nom)
         nom = f"{base} - Protocole.pdf" if fmt == "protocole" else f"{base}.{fmt}"
-        f, _ = QFileDialog.getSaveFileName(self, "Enregistrer sous", str(self.dossier_rapports() / nom), ext)
+        f, _ = QFileDialog.getSaveFileName(self, "Enregistrer sous", str(self.dossier_documents(fmt == "protocole") / nom), ext)
         if not f:
             return
         try:
@@ -451,6 +470,8 @@ class Fenetre(QMainWindow):
             del m.rapports[:-30]
             self.ctrl.toucher(m, structure=self.page in ("rapport", "protocole"))
         self.toast.montrer(f"Fichier enregistré : {Path(f).name}")
+        if fmt in ("pdf", "docx", "protocole"):
+            self.ouvrir_fichier(str(f))  # le document s'ouvre tout de suite
 
     def ouvrir_fichier(self, chemin: str) -> None:
         from PySide6.QtCore import QUrl

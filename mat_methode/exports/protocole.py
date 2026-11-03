@@ -49,7 +49,8 @@ def phases_a_remplir(data: dict, s: dict) -> list:
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
             info = escape(ph.get("conditions") or "conditions à compléter") + (
-                f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "")
+                f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
+                f"<br/><b>Remarque :</b> {escape(ph['remarque'])}" if ph.get("remarque") else "")
             if ph.get("reactifs"):
                 info += "<br/>" + "<br/>".join(
                     f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
@@ -62,16 +63,21 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         ps = [p for p in pre if p["apres_etape"] == n]
         if ps:
             lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis"]]]
+            fusions = []  # lignes « Commentaire », sur toute la largeur
             for p in ps:
                 lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell),
-                               Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}"
-                                         + (f"<br/><i>{escape(p['commentaire'])}</i>" if p.get("commentaire") else ""), cell),
+                               Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}", cell),
                                Paragraph(f"{escape(p.get('labo') or '')}<br/><font color='#566360'>{escape(', '.join(p.get('analyses', [])))}</font>", cell),
                                _case(p.get("scirius"), cell), _case(p.get("aramis"), cell)])
+                if p.get("commentaire"):
+                    fusions.append(len(lignes))
+                    lignes.append([Paragraph(f"<b>Commentaire {escape(p['id'])} :</b> {escape(p['commentaire'])}", cell), "", "", "", ""])
             t = Table(lignes, colWidths=[14 * mm, 38 * mm, 64 * mm, 29 * mm, 29 * mm], repeatRows=1)
             t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
                                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                                   ("TOPPADDING", (0, 1), (-1, -1), 9), ("BOTTOMPADDING", (0, 1), (-1, -1), 9)]))
+                                   ("TOPPADDING", (0, 1), (-1, -1), 9), ("BOTTOMPADDING", (0, 1), (-1, -1), 9)]
+                                  + [c for k in fusions for c in (("SPAN", (0, k), (-1, k)), ("TOPPADDING", (0, k), (-1, k), 3),
+                                                                   ("BOTTOMPADDING", (0, k), (-1, k), 3))]))
             contenu.append(t)
         else:
             contenu.append(Paragraph("Aucun prélèvement prévu.", petit))

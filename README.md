@@ -84,7 +84,10 @@ un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans le
 **Volumes** : section « Volumes » sous « Ma demande » : volume engagé (départ), prélevé (total des échantillons), restant,
 la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (en rouge en cas de dépassement).
 
-**Échantillons** : un échantillon ajouté prend la lettre suivante de son étape (S3a, S3b, puis S3c), quel que soit son
+**Remarques et commentaires** : la remarque d'une étape et le commentaire d'un échantillon sont repris dans le PDF du
+protocole, le PDF et le Word du rapport (détail par phase).
+
+**Échantillons** : ⧉ duplique un échantillon (nombre de copies au choix, sans les n° Scirius / Aramis) ; un échantillon ajouté prend la lettre suivante de son étape (S3a, S3b, puis S3c), quel que soit son
 moment : les étiquettes déjà notées ne changent pas. Chaque échantillon a une ligne « Commentaire », reprise dans le
 protocole et le détail du Rapport.
 
@@ -115,10 +118,10 @@ Seules les manips annulées ou archivées peuvent être supprimées (menu « …
 Les sous-sections (Flux, Édition, Rapport de la manip) ne s'ouvrent qu'après un choix dans la liste de leur section
 (« Ouvrir » dans Définition, Protocole ou Rapport) ; elles se ferment si la manip quitte cette liste (statut changé).
 
-Dans Flux, le bandeau du haut donne le statut et propose Brouillon / Validée / Annulée ; une manip validée (ou plus)
-s'affiche en lecture, « ✎ Modifier » la rend modifiable. Protocole › Édition montre la même vue, en lecture, avec
-« ✎ Modifier », les statuts (Validée, En cours, Réalisée, Annulée) puis « Exporter le protocole (PDF) ». « En cours »
-lance la manip (journal des modifications).
+Dans Flux et Protocole › Édition, le bandeau de statut reste visible en haut quand on fait défiler la page : statut en
+liste déroulante (Flux : Brouillon / Validée / Annulée ; Protocole : Validée / En cours / Réalisée / Annulée), « ✎ Modifier »
+(une manip validée, ou plus, s'affiche en lecture) et, dans Protocole, « Exporter le protocole (PDF) » et le dossier des
+protocoles. « En cours » lance la manip (journal des modifications).
 
 **Ordre des listes** : dans Réglages, ◂ ▸ sur chaque pastille (types, analyses, matériel, réactifs, grandes étapes,
 catégories « À faire », tags) et ↑ ↓ sur chaque ligne (personnes, laboratoires, opérations) changent l'ordre ; c'est
@@ -128,9 +131,10 @@ l'ordre des listes déroulantes.
 puis le détail par phase avec, dans chaque phase, le tableau de ses échantillons (commentaire compris) et des cases vides
 pour noter à la main les n° Scirius / Aramis.
 
-**Documents émis** : les PDF, Word et protocoles sont proposés dans `donnees\exports\<Prénom NOM>\`
+**Documents émis** : rangés dans deux dossiers partagés, `donnees\exports\Rapports` et `donnees\exports\Protocoles`
+(plus de sous-dossier par personne) ; le PDF (ou le Word) s'ouvre dès qu'il est enregistré. Les PDF, Word et protocoles sont proposés dans `donnees\exports\<Prénom NOM>\`
 (la personne qui édite), nommés `<référence> - <nom>`. Chaque document émis est noté sur la manip : « Ouvrir le dernier
-rapport émis » et « Tous ▾ » dans l'onglet Rapport (idem pour les protocoles dans l'onglet Protocole), « Dossier de mes rapports » ouvre le dossier.
+rapport émis » et « Tous ▾ » dans l'onglet Rapport (idem pour les protocoles dans l'onglet Protocole), « Dossier des rapports » / « Dossier des protocoles » ouvrent ces dossiers.
 
 **Manip non réalisée** : menu « … » > « Marquer comme non réalisée » (avec confirmation). Elle peut ensuite être archivée
 ou supprimée (confirmation à chaque fois), ou remise comme réalisée.

@@ -108,7 +108,8 @@ class PageRapport(QWidget):
         self.lay.addWidget(ligne(bouton("Exporter en PDF", self.exporter_pdf.emit, accent=True, tip="Exporter en PDF (Ctrl+E pour les autres formats)"),
                                  bouton("Exporter en Word", self.exporter_word.emit, accent=True),
                                  bouton("Copier le texte", self._copier), bouton("Autres formats…", self.autres_formats.emit),
-                                 "stretch", bouton("Dossier de mes rapports", self.ouvrir_dossier.emit, lien=True)))
+                                 "stretch", bouton("Dossier des rapports", self.ouvrir_dossier.emit, lien=True,
+                                                   tip="Ouvrir le dossier partagé des rapports (donnees\\exports\\Rapports)")))
         self.lay.addWidget(ligne_emis(m, ("rapport",), self.ouvrir_fichier.emit, [], "Aucun rapport émis pour l’instant."))
         v = f"Version {m.rev} · enregistrée automatiquement le {fmt_dt(m.maj)}"
         if m.lancee:

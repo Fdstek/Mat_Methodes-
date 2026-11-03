@@ -275,7 +275,8 @@ def ecrire_docx(data: dict, chemin) -> None:
             entete = (f"{ctx.get('matiere') or ''} (lot {manque(ctx.get('lot'))}" + (f", n° Scirius {ctx['scirius']}" if ctx.get("scirius") else "")
                       + (f", fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "") + ")") + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
         else:
-            entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "")
+            entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
+                f"\nRemarque : {ph['remarque']}" if ph.get("remarque") else "")
         lignes = [((ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"], entete)]
         if i:
             lignes.append(("Réactifs", "\n".join(
@@ -284,7 +285,8 @@ def ecrire_docx(data: dict, chemin) -> None:
                 for r in ph["reactifs"]) or "aucun"))
         lignes.append(("Échantillons", "\n".join(
             f"{x['id']} · {fmt_vol(x['volume'] or 0)} mL · {x['moment']} · {x.get('labo', '')} · {', '.join(x.get('analyses', [])) or 'aucune analyse'} — "
-            f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}" for x in ph["echantillons"]) or "aucun"))
+            f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}"
+            + (f"\nCommentaire : {x['commentaire']}" if x.get("commentaire") else "") for x in ph["echantillons"]) or "aucun"))
         tab = doc.add_table(rows=len(lignes), cols=2)
         tab.style = "Table Grid"
         tab.autofit = False

@@ -297,7 +297,8 @@ def blocs_phases(data: dict, corps) -> list:
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
             sous = escape(ph.get("conditions") or "conditions à compléter") + (
-                f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "")
+                f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
+                f"<br/><i>Remarque : {escape(ph['remarque'])}</i>" if ph.get("remarque") else "")
         tete = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
         lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
         if i:
@@ -311,6 +312,7 @@ def blocs_phases(data: dict, corps) -> list:
             f"<b>{escape(x['id'])}</b> · {fmt_vol(x['volume'] or 0)} mL · {escape(x['moment'])} · {escape(x.get('labo') or '')}"
             f" · {escape(', '.join(x.get('analyses', [])) or 'aucune analyse')}"
             f"<br/><font color='#566360'>n° Scirius</font> {_ou(x.get('scirius'))} · <font color='#566360'>n° Aramis</font> {_ou(x.get('aramis'))}"
+            + (f"<br/><i>Commentaire : {escape(x['commentaire'])}</i>" if x.get("commentaire") else "")
             for x in ph["echantillons"]) or "aucun"
         lignes.append([Paragraph("Échantillons", petit), Paragraph(txt, petit)])
         t = Table(lignes, colWidths=[34 * mm, 140 * mm])
