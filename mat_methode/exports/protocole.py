@@ -95,21 +95,25 @@ def ecrire_protocole(data: dict, chemin) -> None:
     largeur = A4[0] - 36 * mm - 12
     story = [Paragraph(f"Protocole : {escape(titre)}", h1), cartouche(data, s)]
     contexte = next((b for b in data.get("sous_sections", []) if b.get("titre", "").startswith("2.1")), None)
+    # chaque section reste entière sur une page (titre compris) quand elle tient sur une page
     if contexte:
-        story.append(Paragraph("Contexte", h2))
+        bloc = [Paragraph("Contexte", h2)]
         puce = ParagraphStyle("puce", parent=corps, leftIndent=12, bulletIndent=2, spaceAfter=1)
         for x in (x for x in contexte["texte"].split("\n") if x):  # « Demande : … » -> puce, titre en gras
             x = avec_reperes(x.replace(", décrites en 2.3", ""))
             titre, sep, reste = x.partition(" : ")
-            story.append(Paragraph(f"<b>{titre} :</b> {reste}" if sep else x, puce, bulletText="•"))
-    story += [Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
-              Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
+            bloc.append(Paragraph(f"<b>{titre} :</b> {reste}" if sep else x, puce, bulletText="•"))
+        story.append(KeepTogether(bloc))
+    story.append(KeepTogether([Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
+                               Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]))
     tab = table_reactifs(data, s)
     if tab is not None:
         story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
-    story.append(Paragraph("Détail du flux par phase", h2))
-    story.append(Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros Scirius / Aramis à noter à la main).", petit))
-    story += phases_a_remplir(data, s)
+    phases = phases_a_remplir(data, s)
+    entete = [Paragraph("Détail du flux par phase", h2),
+              Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros Scirius / Aramis à noter à la main).", petit)]
+    story.append(KeepTogether(entete + phases[:1]))  # le titre reste avec la première phase
+    story += phases[1:]
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
 
 

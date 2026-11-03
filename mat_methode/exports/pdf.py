@@ -344,8 +344,9 @@ def styles() -> dict:
         "font": font, "fontb": fontb, "corps": corps, "cell": cell,
         "petit": ParagraphStyle("petit", parent=corps, fontSize=8, leading=11, textColor=MUTED),
         "h1": ParagraphStyle("h1", parent=st["Title"], fontName=fontb, fontSize=18, alignment=0, textColor=INK, spaceAfter=4),
-        "h2": ParagraphStyle("h2", parent=st["Heading2"], fontName=fontb, fontSize=12, textColor=TEAL, spaceBefore=10, spaceAfter=5),
-        "h3": ParagraphStyle("h3", parent=corps, fontName=fontb, spaceBefore=5, spaceAfter=2),
+        "h2": ParagraphStyle("h2", parent=st["Heading2"], fontName=fontb, fontSize=12, textColor=TEAL, spaceBefore=10, spaceAfter=5,
+                             keepWithNext=1),  # un titre ne reste jamais seul en bas de page
+        "h3": ParagraphStyle("h3", parent=corps, fontName=fontb, spaceBefore=5, spaceAfter=2, keepWithNext=1),
         "cellb": ParagraphStyle("cb", parent=cell, fontName=fontb),
     }
 
@@ -462,16 +463,21 @@ def ecrire_pdf(data: dict, chemin) -> None:
     doc, pied = document(chemin, titre)
     largeur = A4[0] - 36 * mm - 12
     lanc, jr = data.get("lancee"), data.get("journal") or []
-    story = [Paragraph(escape(titre), h1), cartouche(data, s), Paragraph("Flux de prétraitement", h2), Flux(etapes, pre, largeur),
-             Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
+    story = [Paragraph(escape(titre), h1), cartouche(data, s),
+             KeepTogether([Paragraph("Flux de prétraitement", h2), Flux(etapes, pre, largeur), Spacer(1, 3 * mm),
+                           Paragraph(escape(legende_flux(data)), petit)])]
 
-    story.append(Paragraph("Matériel et méthodes", h2))
+    # chaque sous-section reste entière quand elle tient sur une page ; un titre n'est jamais seul en bas de page
+    premiere = True
     for b in data.get("sous_sections", []):
         if b.get("texte"):
-            story += [Paragraph(escape(b["titre"]), h3)] + [Paragraph(avec_reperes(x), corps) for x in b["texte"].split("\n") if x]
+            bloc = ([Paragraph("Matériel et méthodes", h2)] if premiere else []) + [Paragraph(escape(b["titre"]), h3)]
+            story.append(KeepTogether(bloc + [Paragraph(avec_reperes(x), corps) for x in b["texte"].split("\n") if x]))
+            premiere = False
 
-    story.append(Paragraph("Détail par phase du flux", h2))
-    story += blocs_phases(data, corps)
+    phases = blocs_phases(data, corps)
+    story.append(KeepTogether([Paragraph("Détail par phase du flux", h2)] + phases[:1]))
+    story += phases[1:]
     tab = table_reactifs(data, s)
     if tab is not None:
         story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
@@ -480,7 +486,7 @@ def ecrire_pdf(data: dict, chemin) -> None:
         story.append(KeepTogether([Paragraph("Échantillons", h2), tab]))
 
     if lanc:
-        story.append(Paragraph("Modifications après lancement", h2))
+        story.append(Paragraph("Modifications après lancement", h2))  # keepWithNext : suit le tableau
         if jr:
             lignes = [[Paragraph("<b>Date et heure</b>", cell), Paragraph("<b>Par</b>", cell), Paragraph("<b>Modification</b>", cell)]]
             lignes += [[Paragraph(fmt_dt(j["t"]), cell), Paragraph(escape(j["par"]), cell), Paragraph(escape(j["txt"]), cell)] for j in jr]
