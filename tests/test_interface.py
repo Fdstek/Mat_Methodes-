@@ -61,6 +61,7 @@ def test_crit29_enregistrement_automatique(fen, qtbot):
 def test_crit30_31_journal_une_ligne_par_saisie(fen, qtbot):
     m = ethanol(fen)
     fen.ouvrir(m.id)
+    fen.p_flux.basculer_edition()  # manip en cours : en lecture tant qu'on n'appuie pas sur « Modifier »
     fen.p_flux.aller(m.etapes[2].id)
     n = len(m.journal)
     boites = [b for b in fen.p_flux.findChildren(NumberBox) if b.text() == "25"]
@@ -90,14 +91,13 @@ def test_parcours_nouvelle_manip(fen, qtbot, monkeypatch):
     assert m.prelevements[0].labo == "Labo interne" and m.prelevements[0].moment == "effluent"
     fen.p_flux.suivante()
     fen.p_flux.suivante()
-    assert fen.page == "protocole"  # brouillon : la dernière étape mène à l'aperçu du protocole, pas au rapport
-    assert not fen.nav["rapport"].isEnabled()
-    fen.aller("rapport")
-    assert fen.page == "protocole"
-    monkeypatch.setattr(D, "confirmer", lambda *a, **k: True)
-    fen.ouvrir(m.id, "def")
-    fen.p_flux._valider()
+    assert fen.page == "flux"  # brouillon : ni protocole ni rapport tant qu'elle n'est pas validée
+    assert not fen.nav["rapport"].isEnabled() and not fen.nav["protocole"].isEnabled()
+    fen.p_flux._statut("validee")  # bouton « Validée » du bandeau
     assert m.etat == "validee" and m.id in fen.ctrl.reglages.ordre_protocoles
+    assert fen.p_flux.consultation  # validée : en lecture, sauf « Modifier »
+    fen.p_flux.suivante()
+    assert fen.page == "protocole"
     qtbot.waitUntil(lambda: (fen.ctrl.st.d_manips / f"{m.id}.json").exists(), timeout=2000)
 
 
@@ -352,16 +352,27 @@ def test_rapports_emis_par_personne_et_protocole(fen, monkeypatch):
 
 
 def test_onglet_protocole_apercu(fen):
+    from PySide6.QtWidgets import QLineEdit
+
     from mat_methode.domain.models import RapportEmis
     m = ethanol(fen)
     fen.ouvrir(m.id)
-    m.rapports.append(RapportEmis(type="ordre", chemin="x.pdf", le="2026-11-02T10:00:00", par="Pierre"))  # ancien nom
+    assert not fen.nav["protocole"].isEnabled()  # rien de choisi dans la liste Protocole
     fen.aller("protocole")
-    assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {m.nom}"
-    assert fen.p_protocole.nb_pages >= 2
+    assert fen.page == "flux"
+    m.rapports.append(RapportEmis(type="ordre", chemin="x.pdf", le="2026-11-02T10:00:00", par="Pierre"))  # ancien nom
+    fen.ouvrir_protocole(m.id)
+    assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {m.nom}" and fen.nav["protocole"].isEnabled()
+    nom = next(x for x in fen.p_protocole.flux.findChildren(QLineEdit) if x.text() == m.nom)
+    assert nom.isReadOnly()  # même vue que Flux, en lecture
     textes = [b.text() for b in fen.p_protocole.findChildren(QPushButton)]
-    assert "Exporter le protocole (PDF)" in textes and "Ouvrir le dernier protocole émis" in textes
-    fen.aller("rapport")
+    assert {"✎  Modifier", "En cours", "Annulée", "Réalisée", "Exporter le protocole (PDF)", "Ouvrir le dernier protocole émis"} <= set(textes)
+    assert textes.index("✎  Modifier") < textes.index("En cours") < textes.index("Exporter le protocole (PDF)")
+    fen.p_protocole._mode("modifier")
+    nom = next(x for x in fen.p_protocole.flux.findChildren(QLineEdit) if x.text() == m.nom)
+    assert not nom.isReadOnly()
+    fen.p_protocole._statut("realisee")
+    fen.ouvrir_rapport(m.id)
     assert "Ouvrir le dernier protocole émis" not in [b.text() for b in fen.p_rapport.findChildren(QPushButton)]
 
 
@@ -386,9 +397,9 @@ def test_parcours_definition_protocole_rapport(fen, monkeypatch):
     assert R.protocoles(ctrl.manips, ctrl.reglages.ordre_protocoles)[:2] == [a, b]
     assert ctrl.changer_statut(a, ENCOURS) == "" and a.lancee is not None
     fen.ouvrir_protocole(a.id)
-    assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {a.nom}" and fen.p_protocole.nb_pages >= 1
+    assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {a.nom}" and fen.p_protocole.flux.consultation
     fen.p_protocole._mode("modifier")
-    assert fen.p_protocole.flux.isVisibleTo(fen.p_protocole) and not fen.p_protocole.apercu.isVisibleTo(fen.p_protocole)
+    assert not fen.p_protocole.flux.consultation
     fen.p_protocole._mode("apercu")
     fen.aller("rapports")
     assert a not in R.rapports_clotures(ctrl.manips)

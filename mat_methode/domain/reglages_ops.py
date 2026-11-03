@@ -291,6 +291,24 @@ def archiver_ou_restaurer(r: Reglages, m: Manip) -> bool:
 PALETTE_DONNEURS = ["#0F7B6C", "#2F6FB8", "#B26B00", "#7A4EB0", "#B8366B", "#4E7D1E"]  # 6 teintes, se répète
 
 
+PALETTE_TAGS = ["#2F6FB8", "#0F7B6C", "#B26B00", "#7A4EB0", "#B8366B", "#4E7D1E", "#1F7A99", "#A34A28", "#5B5FC7", "#8A6D00"]
+
+
+def couleur_tag(r: Reglages, tag: str) -> str:
+    """Couleur d'un tag : celle choisie dans les Réglages, sinon une couleur fixe tirée de son nom."""
+    import zlib
+    cle = norm(tag)
+    return r.couleurs_tags.get(cle) or PALETTE_TAGS[zlib.crc32(cle.encode("utf-8")) % len(PALETTE_TAGS)]
+
+
+def couleur_tag_suivante(r: Reglages, tag: str) -> str:
+    """Passe le tag à la couleur suivante de la palette (Réglages › Tags)."""
+    actuelle = couleur_tag(r, tag)
+    i = PALETTE_TAGS.index(actuelle) if actuelle in PALETTE_TAGS else -1
+    r.couleurs_tags = {**r.couleurs_tags, norm(tag): PALETTE_TAGS[(i + 1) % len(PALETTE_TAGS)]}
+    return r.couleurs_tags[norm(tag)]
+
+
 def couleur_donneur(r: Reglages, nom: str) -> str:
     """Couleur attribuée par le rang dans la liste des Réglages (ne change pas quand on filtre)."""
     try:

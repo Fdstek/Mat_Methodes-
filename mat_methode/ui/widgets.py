@@ -183,6 +183,28 @@ class Liste(SansMolette, QComboBox):
         self.activated.connect(lambda i: self.choisi.emit(self.itemData(i) or ""))
 
 
+def figer(racine: QWidget) -> None:
+    """Vue en lecture : les champs passent en lecture seule et les boutons sont grisés, sauf l'ouverture des cartes
+    repliables et les widgets (ou leurs enfants) marqués `garder`."""
+    from PySide6.QtWidgets import QAbstractButton, QAbstractSpinBox, QComboBox, QLineEdit, QPlainTextEdit, QTextEdit
+    tetes = {x.tete for x in racine.findChildren(Expander)}
+
+    def garde(w):
+        while w is not None and w is not racine:
+            if w.property("garder"):
+                return True
+            w = w.parentWidget()
+        return False
+
+    for w in racine.findChildren(QWidget):
+        if w in tetes or garde(w):
+            continue
+        if isinstance(w, (QLineEdit, QPlainTextEdit, QTextEdit)):
+            w.setReadOnly(True)
+        elif isinstance(w, (QComboBox, QAbstractSpinBox, QAbstractButton)):
+            w.setEnabled(False)
+
+
 def liste_statut(m, choix: list[str]) -> Liste:
     """Liste déroulante du statut d'une manip (choix proposés + statut actuel s'il n'en fait pas partie)."""
     from mat_methode.domain.models import ARCHIVEE, STATUTS
@@ -379,10 +401,19 @@ class ChipSupprimable(QFrame):
     (`deplacer(-1)` : avant, `deplacer(1)` : après ; `bornes` = (premier, dernier) pour griser la flèche inutile)."""
 
     def __init__(self, texte: str, retirer: Callable, tip: str = "", renommer: Callable | None = None, tip_renommer: str = "",
-                 deplacer: Callable | None = None, bornes: tuple[bool, bool] = (False, False)):
+                 deplacer: Callable | None = None, bornes: tuple[bool, bool] = (False, False), couleur: str | None = None,
+                 changer_couleur: Callable | None = None):
         super().__init__()
         self.setObjectName("chip")
-        self.setStyleSheet(f"QFrame#chip{{background:{theme.P.bouton};border:1px solid {theme.P.trait};border-radius:4px;}}")
+        if couleur:  # tag en couleur
+            c = QColor(couleur)
+            fond = QColor(c)
+            fond.setAlpha(40 if theme.P.sombre else 28)
+            fg = c.lighter(160).name() if theme.P.sombre else c.name()
+            self.setStyleSheet(f"QFrame#chip{{background:rgba({fond.red()},{fond.green()},{fond.blue()},{fond.alpha()});"
+                               f"border:1px solid {c.name()};border-radius:4px;}} QFrame#chip QLabel{{color:{fg};font-weight:600;}}")
+        else:
+            self.setStyleSheet(f"QFrame#chip{{background:{theme.P.bouton};border:1px solid {theme.P.trait};border-radius:4px;}}")
         lay = QHBoxLayout(self)
         lay.setContentsMargins(8, 2, 2, 2)
         lay.setSpacing(4)
@@ -404,6 +435,10 @@ class ChipSupprimable(QFrame):
         lay.addWidget(l)
         if deplacer is not None:
             lay.addWidget(petit("▸", f"Placer « {texte} » après", lambda: deplacer(1), not bornes[1]))
+        if changer_couleur is not None:
+            lay.addWidget(petit("●", f"Changer la couleur de « {texte} »", changer_couleur))
+            lay.itemAt(lay.count() - 1).widget().setStyleSheet(
+                f"QPushButton{{border:none;background:transparent;padding:2px 3px;font-size:11pt;color:{couleur or theme.P.accent};}}")
         if renommer is not None:
             r = QPushButton("✎")
             r.setCursor(Qt.CursorShape.PointingHandCursor)

@@ -471,7 +471,7 @@ class PageReglages(QWidget):
         ts = tous_les_tags(self.ctrl.manips, self.r.ordre_tags)
         x = self._section("Tags utilisés", f"{len(ts)}")
         x.ajouter(etiquette("Les tags se créent dans la manip (carte « Ma demande »). Ici, on peut en renommer (✎) ou en retirer (✕) un "
-                            "dans toutes les manips, et changer leur ordre (◂ ▸ : c’est l’ordre des listes déroulantes).",
+                            "dans toutes les manips, changer leur ordre (◂ ▸ : c’est l’ordre des listes déroulantes) et leur couleur (●).",
                             secondaire=True, wrap=True))
         chips = []
         n = len(ts)
@@ -480,13 +480,17 @@ class PageReglages(QWidget):
             chips.append(ChipSupprimable(f"#{t}  {nb}", lambda t=t: self._retirer_tag(t), f"Retirer {t} de toutes les manips",
                                          renommer=lambda t=t: self._renommer("Tags", t, self._renommer_tag, tag=True),
                                          tip_renommer=f"Renommer le tag {t} dans toutes les manips",
-                                         deplacer=lambda sens, t=t: self._deplacer_tag(t, sens), bornes=(i == 0, i == n - 1)))
+                                         deplacer=lambda sens, t=t: self._deplacer_tag(t, sens), bornes=(i == 0, i == n - 1),
+                                         couleur=O.couleur_tag(self.r, t),
+                                         changer_couleur=lambda t=t: (O.couleur_tag_suivante(self.r, t), self._changer(), self.rafraichir())))
         x.ajouter(flux_widgets(chips) if chips else etiquette("Aucun tag pour l’instant", secondaire=True))
 
     def _renommer_tag(self, a: str, b: str):
         ch = O.renommer_tag(self.ctrl.manips, a, b)
         if ch:  # l'ordre choisi suit le nouveau nom
             self.r.ordre_tags = [b if norm(x) == norm(a) else x for x in self.r.ordre_tags]
+            if norm(a) in self.r.couleurs_tags:
+                self.r.couleurs_tags = {**{k: v for k, v in self.r.couleurs_tags.items() if k != norm(a)}, norm(b): self.r.couleurs_tags[norm(a)]}
             self.ctrl.toucher_reglages()
         return ch or None
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QSizePolicy, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
@@ -28,6 +29,7 @@ class PageManips(QWidget):
     ouvrir = Signal(str, str)  # id, mode (« comp » / « def »)
     nouvelle = Signal()
     importer = Signal()
+    importer_mm = Signal()
     exporter = Signal(str)
 
     def __init__(self, ctrl: Controleur):
@@ -43,15 +45,15 @@ class PageManips(QWidget):
 
         barre = QHBoxLayout()
         barre.addWidget(bouton("+  Nouvelle manip", self.nouvelle.emit, accent=True, tip="Nouvelle manip (Ctrl+N)"))
-        barre.addWidget(bouton("Importer un ancien rapport", self.importer.emit))
+        barre.addWidget(bouton("Importer un ancien rapport", self.importer.emit, tip="Rapport PDF ou fichier JSON exporté"))
+        barre.addWidget(bouton("Importer un ancien Mat & Méthode", self.importer_mm.emit, tip="Fichier Word ou texte, ou texte collé"))
         barre.addStretch(1)
-        self.recherche = QLineEdit()
+        self.recherche = QLineEdit()  # placée à droite des onglets Manips / Archivées
         self.recherche.setPlaceholderText("Rechercher une manip, un tag, un objectif…")
         self.recherche.setAccessibleName("Rechercher une manip (Ctrl+F)")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.setMinimumWidth(180)
         self.recherche.textChanged.connect(lambda *_: self.rafraichir())
-        barre.addWidget(self.recherche)
         lay.addLayout(barre)
 
         self.pivot = QHBoxLayout()
@@ -61,6 +63,7 @@ class PageManips(QWidget):
             b.setProperty("pivot", True)
             self.pivot.addWidget(b)
         self.pivot.addStretch(1)
+        self.pivot.addWidget(self.recherche)
         lay.addLayout(self.pivot)
 
         self.filtres = QHBoxLayout()
@@ -218,7 +221,10 @@ class PageManips(QWidget):
             tags.append(pastille(m.contexte.type))
         for t in m.tags:
             b = bouton(f"#{t}", lambda t=t: (setattr(self, "f_tag", t), self.rafraichir()), tip=f"Filtrer sur le tag {t}")
-            b.setStyleSheet(f"QPushButton{{background:{p.selection};border:none;border-radius:4px;padding:2px 8px;font-size:9pt;}}")
+            c = QColor(O.couleur_tag(r, t))
+            fg = c.lighter(160).name() if p.sombre else c.name()
+            b.setStyleSheet(f"QPushButton{{background:rgba({c.red()},{c.green()},{c.blue()},{40 if p.sombre else 28});color:{fg};"
+                            f"border:1px solid {c.name()};border-radius:4px;padding:2px 8px;font-size:9pt;font-weight:600;}}")
             tags.append(b)
         reste = sum(1 for t in m.a_faire if not t.fait)
         if reste:

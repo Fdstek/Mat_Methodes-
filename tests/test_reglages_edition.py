@@ -133,3 +133,11 @@ def test_materiel_dans_les_reglages(exemples):
     ch = O.renommer_materiel(r, manips, "Étuve", "Étuve ventilée 105 °C")
     assert ch and "Étuve ventilée 105 °C" in r.materiels
     assert all("Étuve" not in e.equipements for m in manips for e in m.etapes)
+
+
+def test_couleur_des_tags():
+    r = Reglages()
+    c = O.couleur_tag(r, "FFA")
+    assert c in O.PALETTE_TAGS and O.couleur_tag(r, "ffa") == c  # stable, sans casse
+    nouvelle = O.couleur_tag_suivante(r, "FFA")
+    assert nouvelle != c and O.couleur_tag(r, "Ffa") == nouvelle

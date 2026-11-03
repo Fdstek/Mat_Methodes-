@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\<Prénom NOM>\` : un dossier par personne éditrice. On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 8` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 9` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -53,21 +53,22 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   - statuts fixes dans `domain/models.py` (`STATUTS`, `STATUTS_DEFINITION`, `STATUTS_PROTOCOLE`, anciens états convertis à la lecture) ;
     `regles.protocoles / changer_statut / deplacer_protocole / rapports_clotures` ; `Controleur.changer_statut` (« En cours » lance la manip) ;
   - `page_manips.py` : liste « Définition Mat & Méthode » (colonne Statut) ;
-  - `page_flux.py` : édition du flux, Scirius, réactifs, matériel, « À faire » ;
+  - `page_flux.py` : édition du flux, Scirius, réactifs, matériel, « À faire » ; `contexte` (definition / protocole), `consultation`
+    (vue en lecture via `widgets.figer`, sauf `edition` = « Modifier »), bandeau de statut ;
+  - `Fenetre.choix` : manip choisie par section ; une sous-section n'est active qu'après « Ouvrir » dans sa liste (`choisie`) ;
   - `page_rapport.py` : exports, dernier rapport émis (`ligne_emis`) ;
-  - `page_protocole.py` : aperçu du protocole (rendu PDF par pypdfium2), export, dernier protocole émis ;
+  - `page_protocole.py` : même vue que Flux en lecture (2e `PageFlux`, contexte protocole), « Modifier », statuts, export ;
   - `page_reglages.py` : cartes des Réglages ;
   - `widgets.py` : `SansMolette`, `ListeSaisie`, `ChipSupprimable`, `Expander` ;
   - `dialogues.py`, `controleur.py`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 16 ; la construction de l'exe sous Windows réussit (02/11).
-- Lot du 02/11 soir (rapport seulement pour une manip réalisée, ordre ◂ ▸ / ↑ ↓ des listes des Réglages et des tags,
-  bouton « Valider le Mat & Méthode » à la place de « Lancer la manip ») : poussé sur la branche, PR à ouvrir sur demande.
+- Lots livrés et fusionnés jusqu'à la PR n° 18 ; la construction de l'exe sous Windows réussit (02/11).
+- Lot du 02/11 20h55 (sous-sections après choix, statuts dans Flux + « Modifier », protocole = vue Flux en lecture,
+  import d'un ancien Mat & Méthode .docx/.txt, couleurs des tags, icône posée par WM_SETICON) : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
-  - l'icône dans la barre des tâches ;
+  - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
-  - la police Segoe UI dans les PDF ;
-  - l'aperçu du protocole dans l'exe (pdfium.dll embarquée par le `.spec`).
+  - la police Segoe UI dans les PDF.
 - L'utilisateur envoie ses demandes sous forme de fichiers markdown « Correctifs à faire ». Les traiter point par point, envoyer des captures ou des PDF d'exemple, puis proposer la PR.

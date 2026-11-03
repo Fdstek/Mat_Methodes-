@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from mat_methode import NOM_APPLICATION
 from mat_methode.domain import reglages_ops as O
-from mat_methode.domain.models import ARCHIVEE, REALISEE
+from mat_methode.domain.models import ARCHIVEE, REALISEE, STATUTS_PROTOCOLE
 from mat_methode.domain.texte import nom_fichier
 from mat_methode.exports.echange import ImportInvalide, importer
 from mat_methode.exports.echange import exporter as exporter_json
@@ -63,6 +63,7 @@ class Fenetre(QMainWindow):
         self.setMinimumSize(min(1100, lw - 40), min(700, lh - 60))
         self.resize(min(1360, lw), min(860, lh))
         self.page = "manips"
+        self.choix: dict[str, str | None] = {"flux": None, "protocole": None, "rapport": None}  # manip choisie par section
         racine = QWidget()
         racine.setObjectName("racine")
         h = QHBoxLayout(racine)
@@ -156,6 +157,7 @@ class Fenetre(QMainWindow):
         self.p_manips.ouvrir.connect(self.ouvrir)
         self.p_manips.nouvelle.connect(self.nouvelle)
         self.p_manips.importer.connect(self.importer)
+        self.p_manips.importer_mm.connect(lambda: self.importer(mm=True))
         self.p_manips.exporter.connect(lambda i: self.autres_formats(i))
         self.p_flux.voir_rapport.connect(self._apres_flux)
         self.p_flux.voir_reglages.connect(lambda section: self.aller("reglages", section))
@@ -198,12 +200,29 @@ class Fenetre(QMainWindow):
         return b
 
     # ------------------------------------------------------------ navigation
+    def choisie(self, page: str):
+        """Manip choisie dans la liste de cette section (Flux : Définition ; Édition : Protocole ; Rapport de la manip : Rapport),
+        si elle y est toujours."""
+        m = self.ctrl.manip(self.choix.get(page)) if self.choix.get(page) else None
+        if m is None:
+            return None
+        if page == "protocole" and m.etat not in STATUTS_PROTOCOLE:
+            return None
+        if page == "rapport" and m.etat != REALISEE:
+            return None
+        return m
+
     def aller(self, page: str, section: str | None = None):
-        if page in PAGES_MANIP and self.ctrl.courante is None:
-            return
-        if page == "rapport" and self.ctrl.courante.etat != REALISEE:
-            self.toast.montrer("Le rapport est disponible quand le protocole est « Réalisée » (Protocole)")
-            return
+        if page in PAGES_MANIP:
+            m = self.choisie(page)
+            if m is None:  # une sous-section ne s'ouvre qu'après un choix dans sa liste
+                return
+            if self.ctrl.courante_id != m.id:
+                self.ctrl.ouvrir(m.id)
+                if page == "flux":
+                    self.p_flux.ouvrir("comp" if m.etapes else "def")
+                elif page == "protocole":
+                    self.p_protocole.ouvrir()
         if page == "reglages":
             self.p_reglages.section = section  # le menu ramène aux cartes ; un lien ouvre directement la bonne carte
         self.ctrl.journaliser()
@@ -213,6 +232,7 @@ class Fenetre(QMainWindow):
         self.defilements[page].verticalScrollBar().setValue(0)
 
     def ouvrir(self, ident: str, mode: str = "comp"):
+        self.choix["flux"] = ident
         self.ctrl.ouvrir(ident)
         m = self.ctrl.courante
         self.p_flux.ouvrir(mode if m and m.etapes else "def")
@@ -225,18 +245,22 @@ class Fenetre(QMainWindow):
         if m is None:
             return
         if m.etat == REALISEE:
-            self.aller("rapport")
-        else:
+            self.ouvrir_rapport(m.id)
+        elif m.etat in STATUTS_PROTOCOLE:
             self.ouvrir_protocole(m.id)
+        else:
+            self.toast.montrer("Passe la manip « Validée » (bandeau du haut) pour la retrouver dans Protocole")
 
     def ouvrir_protocole(self, ident: str, mode: str = "apercu"):
         """Protocole › Édition de cette manip."""
+        self.choix["protocole"] = ident
         self.ctrl.ouvrir(ident)
         self.p_protocole.ouvrir(mode)
         self.aller("protocole")
         self._memoriser(ident)
 
     def ouvrir_rapport(self, ident: str):
+        self.choix["rapport"] = ident
         self.ctrl.ouvrir(ident)
         self.aller("rapport")
         self._memoriser(ident)
@@ -248,14 +272,18 @@ class Fenetre(QMainWindow):
 
     def rafraichir(self):
         m, ctrl = self.ctrl.courante, self.ctrl
-        if self.page == "rapport" and (m is None or m.etat != REALISEE):
-            self.page = "rapports"  # plus de rapport tant que le protocole n'est pas réalisé
-            self.pile.setCurrentIndex(list(self.pages).index("rapports"))
+        listes = {"flux": "manips", "protocole": "protocoles", "rapport": "rapports"}
+        if self.page in PAGES_MANIP and self.choisie(self.page) is None:
+            self.page = listes[self.page]  # la manip a quitté la liste de la section (statut changé, supprimée…)
+            self.pile.setCurrentIndex(list(self.pages).index(self.page))
+        aides = {"flux": "Choisis une manip dans Définition Mat & Méthode", "protocole": "Ouvre un protocole dans la liste Protocole",
+                 "rapport": "Ouvre un rapport dans la liste Rapport (manips réalisées)"}
         for k, b in self.nav.items():
             b.setProperty("actif", k == self.page)
-            b.setEnabled(k not in PAGES_MANIP or (m is not None and (k != "rapport" or m.etat == REALISEE)))
-            if k == "rapport":
-                b.setToolTip("Rapport de la manip ouverte" if b.isEnabled() else "Disponible quand le protocole de la manip est « Réalisée »")
+            ok = k not in PAGES_MANIP or self.choisie(k) is not None
+            b.setEnabled(ok)
+            if k in PAGES_MANIP:
+                b.setToolTip(f"{b.accessibleName()} : {self.choisie(k).nom}" if ok else aides[k])
             b.style().unpolish(b)
             b.style().polish(b)
         self._carte()
@@ -355,7 +383,7 @@ class Fenetre(QMainWindow):
         self.toast.montrer(f"Copie créée : {c.nom}")
         self.ouvrir(c.id)
 
-    def importer(self):
+    def importer(self, mm: bool = False):
         res = {}
 
         def traiter(data) -> str:
@@ -369,7 +397,7 @@ class Fenetre(QMainWindow):
             res.update(m=m, a_verifier=a_verifier, alertes=data.get("alertes", []) if isinstance(data, dict) else [])
             return ""
 
-        if D.importer(self, str(self.ctrl.st.d_exports), traiter):
+        if (D.importer_mm if mm else D.importer)(self, str(self.ctrl.st.d_exports), traiter):
             m = res["m"]
             self.ouvrir(m.id, "comp")
             msg = f"{len(m.etapes)} étape{'s' if len(m.etapes) > 1 else ''} importée{'s' if len(m.etapes) > 1 else ''}. Les réactifs trouvés ont été ajoutés aux Réglages."

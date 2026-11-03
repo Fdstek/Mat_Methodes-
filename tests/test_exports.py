@@ -134,3 +134,20 @@ def test_commentaire_echantillon(ethanol, reglages, tmp_path):
     ecrire_protocole(d, tmp_path / "p.pdf")
     with pdfplumber.open(tmp_path / "p.pdf") as pdf:
         assert "flacon ambré" in " ".join(p.extract_text() for p in pdf.pages)
+
+
+def test_import_ancien_mat_et_methode(tmp_path, reglages):
+    import docx
+
+    from mat_methode.extraction.extract_mm import extraire_texte, lire_texte
+    texte = ("La graisse a été chauffée à 60 °C pendant 30 min, puis filtrée sous vide sur membrane de 5 µm. "
+             "Elle a ensuite été désacidifiée à l’éthanol 96 %.")
+    d = docx.Document()
+    d.add_paragraph("2.3 Méthodes")
+    d.add_paragraph(texte)
+    d.save(str(tmp_path / "mm.docx"))
+    res = extraire_texte(lire_texte(tmp_path / "mm.docx"), "mm.docx")
+    assert [e["operation"] for e in res["etapes"]] == ["chauffage", "filtration", "désacidification"]
+    m, _ = importer(res, reglages)
+    assert len(m.etapes) == 3 and m.etapes[0].temperature_c == 60
+    assert extraire_texte("") ["etapes"] == []

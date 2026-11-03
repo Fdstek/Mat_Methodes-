@@ -88,7 +88,14 @@ la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (e
 moment : les étiquettes déjà notées ne changent pas. Chaque échantillon a une ligne « Commentaire », reprise dans le
 protocole et le détail du Rapport.
 
-**Tags** : liste déroulante des tags déjà utilisés (on peut aussi en taper un nouveau, Entrée).
+**Tags** : liste déroulante des tags déjà utilisés (on peut aussi en taper un nouveau, Entrée). Chaque tag a une couleur
+(fixe, tirée de son nom) ; Réglages › Tags : ● change la couleur.
+
+**Importer un ancien Mat & Méthode** (Définition) : fichier Word (.docx) ou texte (.txt), ou texte collé ; les étapes
+sont reconnues par mots-clés, comme pour « Importer un ancien rapport » (PDF ou JSON).
+
+**Icône** : l'application pose aussi l'icône de MatMethode.exe sur sa fenêtre (barre des tâches) ; le résultat est noté
+dans `donnees\logs`. Si Windows montre encore l'ancienne icône : désépingler puis réépingler l'application.
 
 **Listes déroulantes** : la molette de la souris ne change jamais une liste fermée (elle fait défiler la page).
 
@@ -105,9 +112,13 @@ gardé dans les Réglages partagés (`ordre_protocoles`) : le changer ne modifie
 automatiquement : À faire → Validée, Lancée / En cours → En cours, Terminée / Réalisée → Réalisée, Non réalisée → Annulée.
 Seules les manips annulées ou archivées peuvent être supprimées (menu « … »).
 
-Dans Flux, le bandeau du haut propose « ✔ Valider le Mat & Méthode » (Brouillon → Validée : la manip passe dans
-Protocole) ; la manip est lancée en passant son statut à « En cours » dans Protocole. « Rapport de la manip » n'est
-accessible que pour une manip réalisée ; sinon « Étape suivante » sur la dernière étape mène à l'aperçu du protocole.
+Les sous-sections (Flux, Édition, Rapport de la manip) ne s'ouvrent qu'après un choix dans la liste de leur section
+(« Ouvrir » dans Définition, Protocole ou Rapport) ; elles se ferment si la manip quitte cette liste (statut changé).
+
+Dans Flux, le bandeau du haut donne le statut et propose Brouillon / Validée / Annulée ; une manip validée (ou plus)
+s'affiche en lecture, « ✎ Modifier » la rend modifiable. Protocole › Édition montre la même vue, en lecture, avec
+« ✎ Modifier », les statuts (Validée, En cours, Réalisée, Annulée) puis « Exporter le protocole (PDF) ». « En cours »
+lance la manip (journal des modifications).
 
 **Ordre des listes** : dans Réglages, ◂ ▸ sur chaque pastille (types, analyses, matériel, réactifs, grandes étapes,
 catégories « À faire », tags) et ↑ ↓ sur chaque ligne (personnes, laboratoires, opérations) changent l'ordre ; c'est

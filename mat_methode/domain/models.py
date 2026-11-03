@@ -130,6 +130,7 @@ class Reglages(_Modele):
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
     ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)
     ordre_tags: list[str] = Field(default_factory=list)  # ordre choisi des tags (Réglages › Tags) ; les autres suivent, par ordre alphabétique
+    couleurs_tags: dict[str, str] = Field(default_factory=dict)  # tag (sans casse ni accents) -> couleur choisie ; sinon couleur automatique
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
