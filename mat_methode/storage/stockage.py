@@ -371,6 +371,7 @@ class Stockage:
         try:
             self.d_presence.mkdir(parents=True, exist_ok=True)
             ecrire_atomique(self._f_presence(), _dumps({"utilisateur": self.utilisateur, "pc": self.pc, "manip": manip or "",
+                                                        "nom": getattr(self, "nom_affiche", ""), "initiales": getattr(self, "initiales", ""),
                                                         "battement": maintenant_iso()}))
         except OSError:
             pass

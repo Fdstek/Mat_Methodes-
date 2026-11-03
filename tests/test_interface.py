@@ -533,3 +533,25 @@ def test_tri_couleur_des_types_presence_et_defilement(fen, qtbot, tmp_path):
     fen.p_flux._ajouter_ech(m.etapes[2])
     qtbot.wait(300)
     assert sb.value() == pos
+
+
+def test_retour_liste_sans_fenetre_en_trop_et_initiales(fen, qapp):
+    from mat_methode.storage.stockage import Stockage
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "comp")
+    fen.ouvrir_protocole(m.id)
+    fen.aller("flux")
+    fen.aller("protocole")
+    assert [w for w in qapp.topLevelWidgets() if w.isVisible()] == [fen]  # le bandeau ne devient jamais une fenêtre à part
+    assert fen.retour.isVisible()
+    fen.quitter_manip()  # « ← » dans Protocole › Édition
+    assert fen.page == "protocoles" and not fen.nav["protocole"].isEnabled() and fen.nav["flux"].isEnabled()
+    fen.aller("flux")
+    fen.quitter_manip()
+    assert fen.page == "manips" and fen.ctrl.courante is None and not fen.retour.isVisible()
+    autre = Stockage(fen.ctrl.st.racine, "J0034240", "PC2")
+    autre.nom_affiche, autre.initiales = "Alice LIMOGES", "AL"
+    autre.signaler_presence(m.id)
+    fen.ctrl.actualiser_presence()
+    p = fen.ctrl.presents[0]
+    assert fen.ctrl.initiales_de(p["utilisateur"], p) == "AL" and fen.ctrl.nom_present(p) == "Alice LIMOGES"

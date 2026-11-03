@@ -8,7 +8,7 @@ from typing import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.texte import norm
@@ -54,8 +54,34 @@ def trier_manips(manips: list, tri: Tri) -> list:
 
 
 # ------------------------------------------------------------------ cellules
+class Pilule(QLabel):
+    """Nom en couleur (donneur d'ordre, type), cliquable ; passe à la ligne au lieu d'être coupé."""
+
+    def __init__(self, texte: str, couleur: str, clic: Callable | None = None, tip: str = "", largeur: int = 0):
+        super().__init__(texte)
+        p = theme.P
+        c = QColor(couleur)
+        fg = c.lighter(160).name() if p.sombre else c.name()
+        self.setObjectName("pilule")
+        self.setStyleSheet(f"QLabel#pilule{{background:rgba({c.red()},{c.green()},{c.blue()},{40 if p.sombre else 28});color:{fg};"
+                           f"border:1px solid {c.name()};border-radius:10px;padding:2px 9px;font-size:9pt;font-weight:600;}}")
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if largeur and self.fontMetrics().horizontalAdvance(texte) + 26 > largeur:
+            self.setWordWrap(True)  # trop long pour la colonne : sur plusieurs lignes, sur toute la largeur
+            self.setFixedWidth(largeur)
+        self.setToolTip(tip)
+        self._clic = clic
+        if clic:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mousePressEvent(self, e):
+        if self._clic and e.button() == Qt.MouseButton.LeftButton:
+            self._clic()
+        super().mousePressEvent(e)
+
+
 def pilule(texte: str, couleur: str, clic: Callable | None = None, tip: str = "") -> QPushButton:
-    """Nom en couleur (donneur d'ordre, type, tag), cliquable si `clic` est donné."""
+    """Tag en couleur (bouton), cliquable si `clic` est donné."""
     p = theme.P
     b = bouton(texte, clic or (lambda: None), tip=tip)
     c = QColor(couleur)
@@ -67,30 +93,20 @@ def pilule(texte: str, couleur: str, clic: Callable | None = None, tip: str = ""
     return b
 
 
-def _court(b: QPushButton, largeur: int) -> QPushButton:
-    """Texte raccourci (…) s'il dépasse la colonne ; le nom complet reste dans l'info-bulle."""
-    texte = b.text().replace("&&", "&")
-    court = b.fontMetrics().elidedText(texte, Qt.TextElideMode.ElideRight, largeur - 24)
-    if court != texte:
-        b.setText(court.replace("&", "&&"))
-        b.setToolTip(f"{texte} — {b.toolTip()}" if b.toolTip() else texte)
-    return b
-
-
 def cellule_donneur(m, r, trier: Callable[[str], None] | None = None) -> QWidget:
     if not m.contexte.donneur:
         return boite(etiquette("—", secondaire=True), LARG_DONNEUR)
-    b = pilule(m.contexte.donneur, O.couleur_donneur(r, m.contexte.donneur), (lambda: trier("donneur")) if trier else None,
-               "Trier par donneur d’ordre" if trier else "")
-    return boite(_court(b, LARG_DONNEUR), LARG_DONNEUR)
+    b = Pilule(m.contexte.donneur, O.couleur_donneur(r, m.contexte.donneur), (lambda: trier("donneur")) if trier else None,
+               "Trier par donneur d’ordre" if trier else "", LARG_DONNEUR)
+    return boite(b, LARG_DONNEUR)
 
 
 def cellule_type(m, r, trier: Callable[[str], None] | None = None) -> QWidget:
     if not m.contexte.type:
         return boite(etiquette("—", secondaire=True), LARG_TYPE)
-    b = pilule(m.contexte.type, O.couleur_type(r, m.contexte.type), (lambda: trier("type")) if trier else None,
-               "Trier par type" if trier else "")
-    return boite(_court(b, LARG_TYPE), LARG_TYPE)
+    b = Pilule(m.contexte.type, O.couleur_type(r, m.contexte.type), (lambda: trier("type")) if trier else None,
+               "Trier par type" if trier else "", LARG_TYPE)
+    return boite(b, LARG_TYPE)
 
 
 def bouton_tag(t: str, r, clic: Callable | None = None):

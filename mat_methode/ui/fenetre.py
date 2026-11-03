@@ -89,6 +89,7 @@ class Fenetre(QMainWindow):
         cm.addWidget(self.cm_nom)
         cm.addWidget(self.cm_info)
         v.addWidget(self.carte_manip)
+        self.carte_manip.hide()  # carte « Manip ouverte » retirée (le titre de la page donne déjà la manip)
         v.addSpacing(8)
         self.nav = {}
         pi = police_icones()
@@ -106,6 +107,12 @@ class Fenetre(QMainWindow):
         tete.setContentsMargins(36, 22, 36, 6)
         titres = QVBoxLayout()
         self.titre = etiquette("", "titrePage", wrap=True)
+        # « ← » : quitter la manip choisie et revenir à la liste de la section (Flux, Édition, Rapport de la manip)
+        self.retour = bouton("←", self.quitter_manip, tip="Revenir à la liste (quitter cette manip)")
+        self.retour.setAccessibleName("Revenir à la liste")
+        self.retour.setFixedSize(36, 36)
+        self.retour.setStyleSheet("QPushButton{font-size:14pt;padding:0;}")
+        tete.addWidget(self.retour, 0, Qt.AlignmentFlag.AlignTop)
         self.sous_titre = QWidget()
         QHBoxLayout(self.sous_titre).setContentsMargins(0, 0, 0, 0)
         titres.addWidget(self.titre)
@@ -138,6 +145,7 @@ class Fenetre(QMainWindow):
         self.p_rapports = PageRapports(ctrl)
         self.pages = {"manips": self.p_manips, "flux": self.p_flux, "protocoles": self.p_protocoles, "protocole": self.p_protocole,
                       "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages}
+        self._bandeau()  # les bandeaux de statut entrent tout de suite dans la fenêtre (jamais de fenêtre à part)
         for k, page in self.pages.items():  # actions dans une page : reconstruction sans remonter en haut
             page.sur_place = lambda k=k: self._sur_place(k)
         self.p_protocole.flux.sur_place = lambda: self._sur_place("protocole")
@@ -278,6 +286,16 @@ class Fenetre(QMainWindow):
         self.aller("rapport")
         self._memoriser(ident)
 
+    def quitter_manip(self):
+        """Ferme la manip de la sous-section (Flux, Édition ou Rapport de la manip) et revient à sa liste."""
+        listes = {"flux": "manips", "protocole": "protocoles", "rapport": "rapports"}
+        if self.page not in listes:
+            return
+        self.choix[self.page] = None
+        if not any(self.choix.values()):  # plus aucune section ne l'utilise : on la libère (verrou, présence)
+            self.ctrl.fermer_manip()
+        self.aller(listes[self.page])
+
     def _memoriser(self, ident: str):
         p = self.ctrl.st.lire_preferences()
         p["derniere_manip"] = ident
@@ -301,6 +319,7 @@ class Fenetre(QMainWindow):
             b.style().polish(b)
         self._bandeau()
         self._carte()
+        self.retour.setVisible(self.page in PAGES_MANIP)
         sous = self.sous_titre.layout()
         vider(sous)
         if self.page in TITRES:
@@ -322,9 +341,9 @@ class Fenetre(QMainWindow):
         vider(lay)
         noms = {m.id: m.nom for m in self.ctrl.manips}
         for p in self.ctrl.presents:
-            qui = self.ctrl.nom_de(p.get("utilisateur", ""))
+            qui = self.ctrl.nom_present(p)
             ou = noms.get(p.get("manip") or "", "")
-            lay.addWidget(avatar(self.ctrl.initiales_de(p.get("utilisateur", "")),
+            lay.addWidget(avatar(self.ctrl.initiales_de(p.get("utilisateur", ""), p),
                                  f"{qui} ({p.get('pc', '')}) est dans l’application" + (f" · manip ouverte : {ou}" if ou else ""),
                                  cle=p.get("utilisateur", "")))
         self.presents.setVisible(bool(self.ctrl.presents))
@@ -334,22 +353,21 @@ class Fenetre(QMainWindow):
             {"flux": self.p_flux, "protocole": self.p_protocole.flux}[self.page]._remplir_lancement()
 
     def _bandeau(self):
-        """Place le bandeau de statut de la page (Flux ou Protocole › Édition) dans la zone fixe."""
+        """Montre le bandeau de statut de la page (Flux ou Protocole › Édition) dans la zone fixe. Les deux bandeaux
+        restent toujours dans la fenêtre (jamais détachés : un widget sans parent deviendrait une fenêtre à part)."""
         lay = self.zone_fixe.layout()
-        voulu = {"flux": self.p_flux.bandeau, "protocole": self.p_protocole.flux.bandeau}.get(self.page) \
-            if self.ctrl.courante is not None else None
-        while lay.count():
-            w = lay.takeAt(0).widget()
-            if w is not None and w is not voulu:
-                w.setParent(None)
-        if voulu is not None:
-            lay.addWidget(voulu)
-            voulu.show()
+        bandeaux = {"flux": self.p_flux.bandeau, "protocole": self.p_protocole.flux.bandeau}
+        for w in bandeaux.values():
+            if w.parentWidget() is not self.zone_fixe:
+                lay.addWidget(w)
+        voulu = bandeaux.get(self.page) if self.ctrl.courante is not None else None
+        for w in bandeaux.values():
+            w.setVisible(w is voulu)
         self.zone_fixe.setVisible(voulu is not None)
 
     def _carte(self):
         m = self.ctrl.courante
-        self.carte_manip.setVisible(m is not None)
+        self.carte_manip.setVisible(False)
         if m is None:
             return
         self.cm_nom.setText(m.nom)
@@ -426,7 +444,7 @@ class Fenetre(QMainWindow):
         super().resizeEvent(e)
         etroit = self.width() < 1000  # volet replié en icônes
         self.volet.setFixedWidth(64 if etroit else 272)
-        self.carte_manip.setVisible(not etroit and self.ctrl.courante is not None)
+        self.carte_manip.setVisible(False)
         for b in self.nav.values():
             b.setText(b._textes[1] if etroit else b._textes[0])
 

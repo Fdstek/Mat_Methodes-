@@ -88,6 +88,9 @@ la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (e
 Un clic sur l'en-tête « Donneur d'ordre » ou « Type » (ou sur un nom dans une ligne) trie le tableau : croissant,
 décroissant, puis ordre d'origine. Chaque type a une couleur (Réglages › Types : ● pour la changer).
 
+**Retour à la liste** : dans Flux, Édition et Rapport de la manip, le bouton « ← » à gauche du titre quitte la manip
+et revient à la liste de la section.
+
 **Présence** : comme dans Excel, une pastille aux initiales montre qui d'autre a l'application ouverte (en haut à
 droite), qui a une manip ouverte (dans la liste) et qui regarde la même manip (bandeau de statut). Chaque poste
 signale sa présence toutes les 30 s dans `donnees\presence` ; sans signe depuis 3 min, la pastille disparaît.

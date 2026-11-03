@@ -146,6 +146,17 @@ class Controleur(QObject):
                     pass
         self.modifie.emit(True)
 
+    def fermer_manip(self) -> None:
+        """Quitte la manip ouverte (bouton « ← ») : enregistrement, verrou libéré, présence sans manip."""
+        if not self.courante_id:
+            return
+        self.journaliser()
+        self.enregistrer_tout()
+        self.st.liberer_verrou(self.courante_id)
+        self.courante_id = None
+        self.verrou_autre = None
+        self.st.signaler_presence(None)
+
     def fermer(self) -> None:
         self.journaliser()
         self.enregistrer_tout()
@@ -153,8 +164,17 @@ class Controleur(QObject):
             self.st.liberer_verrou(self.courante_id)
         self.st.retirer_presence()
 
+    def _identite(self) -> None:
+        """Nom et initiales écrits dans le signal de présence : les autres postes affichent mes initiales, pas mon IGG."""
+        from mat_methode.domain.models import initiales_de
+        nom = self.nom_utilisateur()
+        p = self.reglages.personne_igg(self.st.utilisateur) or self.reglages.personne(nom)
+        self.st.nom_affiche = nom
+        self.st.initiales = p.sigle() if p else initiales_de(nom)
+
     def actualiser_presence(self) -> None:
         """Signale ma présence et relit celle des autres (pastilles aux initiales, comme dans Excel)."""
+        self._identite()
         self.st.signaler_presence(self.courante_id)
         avant = [(p.get("utilisateur"), p.get("pc"), p.get("manip")) for p in self.presents]
         self.presents = self.st.presences_autres()
@@ -164,9 +184,18 @@ class Controleur(QObject):
     def presents_sur(self, ident: str | None) -> list[dict]:
         return [p for p in self.presents if ident and p.get("manip") == ident]
 
-    def initiales_de(self, igg: str) -> str:
+    def initiales_de(self, igg: str, presence: dict | None = None) -> str:
+        """Initiales d'une personne présente : celles de ses Réglages ici, sinon celles que son poste a envoyées."""
         p = self.reglages.personne_igg(igg)
-        return p.sigle() if p else (igg or "?")[:2].upper()
+        if p:
+            return p.sigle()
+        if presence and presence.get("initiales"):
+            return str(presence["initiales"])[:3].upper()
+        return (igg or "?")[:2].upper()
+
+    def nom_present(self, presence: dict) -> str:
+        p = self.reglages.personne_igg(presence.get("utilisateur", ""))
+        return p.nom if p else (presence.get("nom") or self.nom_de(presence.get("utilisateur", "")))
 
     def _battement(self) -> None:
         self.actualiser_presence()
