@@ -108,7 +108,8 @@ class PageRapport(QWidget):
         self.lay.addWidget(ligne(bouton("Exporter en PDF", self.exporter_pdf.emit, accent=True, tip="Exporter en PDF (Ctrl+E pour les autres formats)"),
                                  bouton("Exporter en Word", self.exporter_word.emit, accent=True),
                                  bouton("Copier le texte", self._copier), bouton("Autres formats…", self.autres_formats.emit),
-                                 "stretch", bouton("Dossier de mes rapports", self.ouvrir_dossier.emit, lien=True)))
+                                 "stretch", bouton("Dossier des rapports", self.ouvrir_dossier.emit, lien=True,
+                                                   tip="Ouvrir le dossier partagé des rapports (donnees\\exports\\Rapports)")))
         self.lay.addWidget(ligne_emis(m, ("rapport",), self.ouvrir_fichier.emit, [], "Aucun rapport émis pour l’instant."))
         v = f"Version {m.rev} · enregistrée automatiquement le {fmt_dt(m.maj)}"
         if m.lancee:
@@ -170,8 +171,7 @@ class PageRapport(QWidget):
                 col_r.addWidget(etiquette(f"<b>{escape(x.nom)}</b>{' · ' + escape(x.quantite) if x.quantite else ''}<br>"
                                           f"<span style='color:{theme.P.texte2}'>n° Scirius</span> {a_saisir(x.scirius)} · "
                                           f"<span style='color:{theme.P.texte2}'>emplacement</span> {a_saisir(x.emplacement)}<br>"
-                                          f"<span style='color:{theme.P.texte2}'>fournisseur</span> {a_saisir(x.fournisseur)} · "
-                                          f"<span style='color:{theme.P.texte2}'>lot</span> {a_saisir(x.lot)}", wrap=True))
+                                          f"<span style='color:{theme.P.texte2}'>fournisseur</span> {a_saisir(x.fournisseur)}", wrap=True))
             col_r.addStretch(1)
             col_e = QVBoxLayout()
             col_e.addWidget(etiquette("Échantillons", "etiquetteChamp"))
@@ -192,8 +192,8 @@ class PageRapport(QWidget):
 
         if rap.reactifs:
             self.lay.addWidget(etiquette("Réactifs", "sousTitre"))
-            self.lay.addWidget(table(["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Lot", "Étape"],
-                                     [[x.nom, x.scirius, x.emplacement, x.fournisseur, x.lot, ", ".join(map(str, x.etapes))] for x in rap.reactifs]))
+            self.lay.addWidget(table(["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Étape"],
+                                     [[x.nom, x.scirius, x.emplacement, x.fournisseur, ", ".join(map(str, x.etapes))] for x in rap.reactifs]))
         if rap.echantillons:
             self.lay.addWidget(etiquette("Échantillons", "sousTitre"))
             self.lay.addWidget(table(["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Laboratoire", "Analyses"],

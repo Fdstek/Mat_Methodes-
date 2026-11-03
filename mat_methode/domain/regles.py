@@ -285,6 +285,21 @@ def dupliquer_groupe(m: Manip, groupe_id: str, fois: int = 1, echantillons: bool
     return nouveaux
 
 
+def dupliquer_echantillon(m: Manip, ech_id: str, fois: int = 1) -> list[Prelevement]:
+    """Recopie un échantillon (moment, volume, labo, analyses, commentaire) « fois » fois, sans ses n° Scirius / Aramis.
+    Les copies prennent les lettres suivantes de la même étape."""
+    p = m.prelevement(ech_id)
+    if p is None or fois < 1:
+        return []
+    copies = []
+    for _ in range(fois):
+        q = p.model_copy(deep=True)
+        q.id, q.scirius, q.aramis = nouvel_id(), "", ""
+        copies.append(q)
+    m.prelevements = m.prelevements + copies
+    return copies
+
+
 def dupliquer_etape(m: Manip, etape_id: str) -> Etape:
     i = [e.id for e in m.etapes].index(etape_id)
     c = m.etapes[i].model_copy(deep=True)
@@ -458,8 +473,8 @@ def rapports_clotures(manips: list[Manip]) -> list[Manip]:
 
 # ------------------------------------------------------------------ tags (§8.7 bis)
 def tous_les_tags(manips: list[Manip], ordre: list[str] | None = None) -> list[str]:
-    """Tags utilisés, dans l'ordre choisi dans les Réglages (`ordre`), puis les autres par ordre alphabétique."""
-    out: list[str] = []
+    """Tags utilisés et tags créés dans les Réglages (`ordre`), dans l'ordre choisi, puis les autres par ordre alphabétique."""
+    out: list[str] = [t for t in (ordre or []) if t.strip()]
     for m in manips:
         for t in m.tags:
             if not any(norm(x) == norm(t) for x in out):

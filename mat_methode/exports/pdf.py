@@ -106,7 +106,7 @@ def avec_reperes(texte: str) -> str:
 class Flux(Flowable):
     """Cartes d'étapes reliées par des flèches ; badges sur la frise ; noms des échantillons sous les cartes."""
 
-    PAR_LIGNE, GAP, CARTE_MIN, ESPACE, PAS, TETE = 5, 6 * mm, 40 * mm, 9 * mm, 9.6 * mm, 12 * mm
+    PAR_LIGNE, GAP, CARTE_MIN, ESPACE, PAS, TETE = 5, 6 * mm, 40 * mm, 9 * mm, 12.4 * mm, 15 * mm
 
     def __init__(self, etapes, prelevements, largeur):
         super().__init__()
@@ -156,13 +156,17 @@ class Flux(Flowable):
         c.setFont(self.fontb, 6)
         c.drawCentredString(x, y - 0.75 * mm, code)
 
-    def pastille(self, c, x, y, ligne1, ligne2="", code=None):
+    def pastille(self, c, x, y, ligne1, ligne2="", code=None, labo=""):
+        """Pastille d'échantillon : nom et volume, moment, puis le laboratoire (petite étiquette)."""
         decal = 6 * mm if code else 2 * mm
-        w = max(stringWidth(ligne1, self.fontb, 7), stringWidth(ligne2, self.font, 6.3)) + decal + 2 * mm
+        h = 10.8 * mm if labo else 8 * mm
+        y0 = y - (h - 8 * mm)  # la pastille grandit vers le bas
+        w = max(stringWidth(ligne1, self.fontb, 7), stringWidth(ligne2, self.font, 6.3),
+                stringWidth(labo, self.fontb, 5.8) + 2 * mm) + decal + 2 * mm
         c.setFillColor(AMBER_L)
         c.setStrokeColor(AMBER)
         c.setLineWidth(0.8)
-        c.roundRect(x, y, w, 8 * mm, 1.6 * mm, stroke=1, fill=1)
+        c.roundRect(x, y0, w, h, 1.6 * mm, stroke=1, fill=1)
         if code:
             self.badge(c, x + 3.2 * mm, y + 4 * mm, code)
         c.setFillColor(AMBER)
@@ -170,6 +174,15 @@ class Flux(Flowable):
         c.drawString(x + decal, y + 4.7 * mm, ligne1)
         c.setFont(self.font, 6.3)
         c.drawString(x + decal, y + 1.7 * mm, ligne2)
+        if labo:  # étiquette du laboratoire
+            lw = stringWidth(labo, self.fontb, 5.8) + 2 * mm
+            c.setFillColor(TEAL_L)
+            c.setStrokeColor(TEAL)
+            c.setLineWidth(0.5)
+            c.roundRect(x + decal, y0 + 0.6 * mm, lw, 2.6 * mm, 0.8 * mm, stroke=1, fill=1)
+            c.setFillColor(TEAL)
+            c.setFont(self.fontb, 5.8)
+            c.drawString(x + decal + 1 * mm, y0 + 1.25 * mm, labo)
         return w
 
     def fleche(self, c, points, sens):
@@ -192,7 +205,7 @@ class Flux(Flowable):
         c.drawPath(t, stroke=0, fill=1)
 
     def etiquette(self, p):
-        return f"{p['id']} · {fmt_vol(p['volume_ml'] or 0)} mL", moment_texte(p), code_badge(p["id"])
+        return f"{p['id']} · {fmt_vol(p['volume_ml'] or 0)} mL", moment_texte(p), code_badge(p["id"]), p.get("labo") or ""
 
     def draw(self):
         c, w = self.canv, self.carte_w
@@ -201,7 +214,7 @@ class Flux(Flowable):
         c.drawString(0, self.haut - 4 * mm, "ENTRÉE")
         x = stringWidth("ENTRÉE", self.fontb, 7.5) + 3 * mm
         for pre in self.par_apres.get(0, []):
-            x += self.pastille(c, x, self.haut - self.TETE + 1.2 * mm, *self.etiquette(pre)) + 1.5 * mm
+            x += self.pastille(c, x, self.haut - self.TETE + 4 * mm, *self.etiquette(pre)) + 1.5 * mm
 
         positions = []
         for i, e in enumerate(self.etapes):
@@ -291,26 +304,28 @@ def blocs_phases(data: dict, corps) -> list:
     for i, ph in enumerate(data.get("phases", [])):
         if i == 0:
             ctx = data.get("contexte", {})
-            sous = escape(f"{ctx.get('matiere') or ''}") + f" (lot {_ou(ctx.get('lot'))}" + (
-                f", n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
-                f", fournisseur {escape(ctx['fournisseur'])}" if ctx.get("fournisseur") else "") + ")" + (
+            sous = escape(f"{ctx.get('matiere') or ''}") + (
+                f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
+                f" · fournisseur {escape(ctx['fournisseur'])}" if ctx.get("fournisseur") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
             sous = escape(ph.get("conditions") or "conditions à compléter") + (
-                f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "")
+                f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
+                f"<br/><i>Remarque : {escape(ph['remarque'])}</i>" if ph.get("remarque") else "")
         tete = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
         lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
         if i:
             txt = "<br/>".join(
                 f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
                 f"<br/><font color='#566360'>n° Scirius</font> {_ou(r.get('scirius'))} · <font color='#566360'>emplacement</font> {_ou(r.get('emplacement'))} · "
-                f"<font color='#566360'>fournisseur</font> {_ou(r.get('fournisseur'))} · <font color='#566360'>lot</font> {_ou(r.get('lot'))}"
+                f"<font color='#566360'>fournisseur</font> {_ou(r.get('fournisseur'))}"
                 for r in ph["reactifs"]) or "aucun"
             lignes.append([Paragraph("Réactifs", petit), Paragraph(txt, petit)])
         txt = "<br/>".join(
             f"<b>{escape(x['id'])}</b> · {fmt_vol(x['volume'] or 0)} mL · {escape(x['moment'])} · {escape(x.get('labo') or '')}"
             f" · {escape(', '.join(x.get('analyses', [])) or 'aucune analyse')}"
             f"<br/><font color='#566360'>n° Scirius</font> {_ou(x.get('scirius'))} · <font color='#566360'>n° Aramis</font> {_ou(x.get('aramis'))}"
+            + (f"<br/><i>Commentaire : {escape(x['commentaire'])}</i>" if x.get("commentaire") else "")
             for x in ph["echantillons"]) or "aucun"
         lignes.append([Paragraph("Échantillons", petit), Paragraph(txt, petit)])
         t = Table(lignes, colWidths=[34 * mm, 140 * mm])
@@ -406,12 +421,12 @@ def table_reactifs(data: dict, s: dict) -> Table | None:
                 x[1].append(str(e["n"]))
     if not noms:
         return None
-    lignes = [[Paragraph(h, cellb) for h in ["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Lot", "Étape"]]]
+    lignes = [[Paragraph(h, cellb) for h in ["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Étape"]]]
     for nom, ns in noms:
         f = inv.get(nom.lower(), {})
-        lignes.append([Paragraph(f"<b>{escape(nom)}</b>", cell)] + [Paragraph(_ou(f.get(k)), cell) for k in ("scirius", "emplacement", "fournisseur", "lot")]
+        lignes.append([Paragraph(f"<b>{escape(nom)}</b>", cell)] + [Paragraph(_ou(f.get(k)), cell) for k in ("scirius", "emplacement", "fournisseur")]
                       + [Paragraph(", ".join(ns), cell)])
-    tab = Table(lignes, colWidths=[30 * mm, 22 * mm, 52 * mm, 30 * mm, 20 * mm, 20 * mm], repeatRows=1)
+    tab = Table(lignes, colWidths=[34 * mm, 24 * mm, 60 * mm, 36 * mm, 20 * mm], repeatRows=1)
     tab.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
     return tab
 

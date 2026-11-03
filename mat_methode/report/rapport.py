@@ -85,6 +85,7 @@ class Phase:
     reactifs: list[LigneReactif]
     echantillons: list[LigneEchantillon]
     groupe: str = ""  # grande étape (ex. « Degumming »)
+    remarque: str = ""  # remarque de l'étape (Flux)
     groupe_plage: str = ""  # « étapes 2 à 4 »
     debut_groupe: bool = False  # première phase de sa grande étape
 
@@ -202,8 +203,9 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     l21 = [f"Demande : {c.donneur or ph('donneur d’ordre')}{', type ' + c.type if c.type else ''} (réf. {c.ref or ph('n°')}).",
            phrase("Objectif", c.objectif).strip(), (phrase("Idée testée", c.idee).strip() if est_test(c.type) else ""),
            phrase("Contexte", c.precisions).strip(),
-           f"Matière étudiée : {c.matiere or ph('matière')} (lot {c.lot or ph('n°')}"
-           + (f", n° Scirius {c.scirius}" if c.scirius else "") + (f", fournisseur {c.fournisseur}" if c.fournisseur else "") + ").",
+           f"Matière étudiée : {c.matiere or ph('matière')}"
+           + (" (" + ", ".join(x for x in (f"n° Scirius {c.scirius}" if c.scirius else "", f"fournisseur {c.fournisseur}" if c.fournisseur else "") if x)
+              + ")" if c.scirius or c.fournisseur else "") + ".",
            "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
            + (f", dont {fmt_vol(total_preleve(m))} mL prélevés sous forme de {ns} échantillon{'s' if ns > 1 else ''}" if ns else "") + ".",
            (f"Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else ""),
@@ -225,7 +227,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     reac_txt = []
     for nom, et in reacs:
         f = _inv(reglages, nom)
-        reac_txt.append(f"{minuscule_initiale(nom)} ({etapes_txt(et)}, fournisseur {f.get('fournisseur') or ph('nom')}, lot {f.get('lot') or ph('n°')})")
+        reac_txt.append(f"{minuscule_initiale(nom)} ({etapes_txt(et)}, fournisseur {f.get('fournisseur') or ph('nom')})")
     t22 = ("Matériel : " + (", ".join(f"{minuscule_initiale(x)} ({etapes_txt(materiel_etapes[norm(x)])})" for x in materiel) if materiel else ph("matériel"))
            + "." + (f"\nRéactifs : {' ; '.join(reac_txt)}." if reac_txt else ""))
     sections.append(Section("2.2 Matériel et réactifs", t22))
@@ -272,7 +274,8 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
         phases.append(Phase(i + 1, f"{i + 1} · {cap(e.operation)}", conditions_phase(e), list(e.equipements), rs,
                             [ligne_ech(p) for p in ech if p.etape_id == e.id], groupe=g.nom if g else "",
-                            groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1))
+                            groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1,
+                            remarque=e.remarque.strip()))
     return Rapport(sections, tab_reac, tab_ech, phases)
 
 
@@ -324,14 +327,14 @@ def markdown(m: Manip, reglages: Reglages) -> str:
         if p.n:
             ln.append(f"- Réactifs : {'' if p.reactifs else 'aucun'}")
             ln += [f"  - {x.nom}{' · ' + x.quantite if x.quantite else ''} · n° Scirius {a_saisir(x.scirius)} · emplacement {a_saisir(x.emplacement)}"
-                   f" · fournisseur {a_saisir(x.fournisseur)} · lot {a_saisir(x.lot)}" for x in p.reactifs]
+                   f" · fournisseur {a_saisir(x.fournisseur)}" for x in p.reactifs]
         ln.append(f"- Échantillons : {'' if p.echantillons else 'aucun'}")
         ln += [f"  - {x.id} · {fmt_vol(x.volume or 0)} mL · {x.moment} · {x.labo} · {', '.join(x.analyses) or 'aucune analyse'}"
                f" · n° Scirius {a_saisir(x.scirius)} · n° Aramis {a_saisir(x.aramis)}" for x in p.echantillons]
         ln.append("")
     if r.reactifs:
-        ln += ["### Réactifs", "", "| Réactif | N° Scirius | Emplacement | Fournisseur | Lot | Étape |", "|---|---|---|---|---|---|"]
-        ln += [f"| {x.nom} | {a_saisir(x.scirius)} | {a_saisir(x.emplacement)} | {a_saisir(x.fournisseur)} | {a_saisir(x.lot)} | {', '.join(map(str, x.etapes))} |"
+        ln += ["### Réactifs", "", "| Réactif | N° Scirius | Emplacement | Fournisseur | Étape |", "|---|---|---|---|---|"]
+        ln += [f"| {x.nom} | {a_saisir(x.scirius)} | {a_saisir(x.emplacement)} | {a_saisir(x.fournisseur)} | {', '.join(map(str, x.etapes))} |"
                for x in r.reactifs]
         ln.append("")
     if r.echantillons:

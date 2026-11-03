@@ -28,7 +28,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 ## Données (à côté de l'exe, sans base SQLite)
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
-- `exports\<Prénom NOM>\` : un dossier par personne éditrice. On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
+- `exports\Rapports\` et `exports\Protocoles\` (partagés, pas de dossier par personne ; le document s'ouvre après l'export). On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
 - `SCHEMA_DONNEES = 9` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
@@ -57,16 +57,18 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
     (vue en lecture via `widgets.figer`, sauf `edition` = « Modifier »), bandeau de statut ;
   - `Fenetre.choix` : manip choisie par section ; une sous-section n'est active qu'après « Ouvrir » dans sa liste (`choisie`) ;
   - `page_rapport.py` : exports, dernier rapport émis (`ligne_emis`) ;
-  - `page_protocole.py` : même vue que Flux en lecture (2e `PageFlux`, contexte protocole), « Modifier », statuts, export ;
-  - `page_reglages.py` : cartes des Réglages ;
+  - `page_protocole.py` : même vue que Flux en lecture (2e `PageFlux`, contexte protocole) ; Modifier, statut et export dans le bandeau fixe ;
+  - `page_reglages.py` : cartes des Réglages (ordre par personne : préférence `ordre_reglages`) ;
+  - `colonnes.py` : colonnes communes des tableaux (donneur d'ordre, type, tags) ;
   - `widgets.py` : `SansMolette`, `ListeSaisie`, `ChipSupprimable`, `Expander` ;
   - `dialogues.py`, `controleur.py`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 18 ; la construction de l'exe sous Windows réussit (02/11).
-- Lot du 02/11 20h55 (sous-sections après choix, statuts dans Flux + « Modifier », protocole = vue Flux en lecture,
-  import d'un ancien Mat & Méthode .docx/.txt, couleurs des tags, icône posée par WM_SETICON) : poussé sur la branche.
+- Lots livrés et fusionnés jusqu'à la PR n° 21 ; la construction de l'exe sous Windows réussit (02/11).
+- Lot du 03/11 10h55 (plus de lot dans l'appli et les documents ; nouveau tag dans Réglages (`ordre_tags`) ; colonnes
+  Donneur / Type / Tags via `ui/colonnes.py` dans Définition, Protocole, Rapport ; contexte du protocole en puces ;
+  étiquette du labo des échantillons dans le schéma du flux ; ordre des cartes des Réglages dans les préférences) : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

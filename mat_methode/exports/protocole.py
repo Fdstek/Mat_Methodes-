@@ -10,6 +10,7 @@ from __future__ import annotations
 from xml.sax.saxutils import escape
 
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table, TableStyle
 
@@ -44,12 +45,13 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         titre = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + \
             f"<b>{escape(ph['titre'])}</b>"
         if i == 0:
-            info = escape(ctx.get("matiere") or "") + (f" · lot {escape(ctx['lot'])}" if ctx.get("lot") else " · lot : ……………") + (
+            info = escape(ctx.get("matiere") or "") + "" + (
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
             info = escape(ph.get("conditions") or "conditions à compléter") + (
-                f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "")
+                f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
+                f"<br/><b>Remarque :</b> {escape(ph['remarque'])}" if ph.get("remarque") else "")
             if ph.get("reactifs"):
                 info += "<br/>" + "<br/>".join(
                     f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
@@ -62,16 +64,21 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         ps = [p for p in pre if p["apres_etape"] == n]
         if ps:
             lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis"]]]
+            fusions = []  # lignes « Commentaire », sur toute la largeur
             for p in ps:
                 lignes.append([Paragraph(f"<b>{escape(p['id'])}</b>", cell),
-                               Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}"
-                                         + (f"<br/><i>{escape(p['commentaire'])}</i>" if p.get("commentaire") else ""), cell),
+                               Paragraph(f"{fmt_vol(p['volume_ml'] or 0)} mL<br/>{escape(moment_texte(p))}", cell),
                                Paragraph(f"{escape(p.get('labo') or '')}<br/><font color='#566360'>{escape(', '.join(p.get('analyses', [])))}</font>", cell),
                                _case(p.get("scirius"), cell), _case(p.get("aramis"), cell)])
+                if p.get("commentaire"):
+                    fusions.append(len(lignes))
+                    lignes.append([Paragraph(f"<b>Commentaire {escape(p['id'])} :</b> {escape(p['commentaire'])}", cell), "", "", "", ""])
             t = Table(lignes, colWidths=[14 * mm, 38 * mm, 64 * mm, 29 * mm, 29 * mm], repeatRows=1)
             t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
                                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                                   ("TOPPADDING", (0, 1), (-1, -1), 9), ("BOTTOMPADDING", (0, 1), (-1, -1), 9)]))
+                                   ("TOPPADDING", (0, 1), (-1, -1), 9), ("BOTTOMPADDING", (0, 1), (-1, -1), 9)]
+                                  + [c for k in fusions for c in (("SPAN", (0, k), (-1, k)), ("TOPPADDING", (0, k), (-1, k), 3),
+                                                                   ("BOTTOMPADDING", (0, k), (-1, k), 3))]))
             contenu.append(t)
         else:
             contenu.append(Paragraph("Aucun prélèvement prévu.", petit))
@@ -90,7 +97,11 @@ def ecrire_protocole(data: dict, chemin) -> None:
     contexte = next((b for b in data.get("sous_sections", []) if b.get("titre", "").startswith("2.1")), None)
     if contexte:
         story.append(Paragraph("Contexte", h2))
-        story += [Paragraph(avec_reperes(x.replace(", décrites en 2.3", "")), corps) for x in contexte["texte"].split("\n") if x]
+        puce = ParagraphStyle("puce", parent=corps, leftIndent=12, bulletIndent=2, spaceAfter=1)
+        for x in (x for x in contexte["texte"].split("\n") if x):  # « Demande : … » -> puce, titre en gras
+            x = avec_reperes(x.replace(", décrites en 2.3", ""))
+            titre, sep, reste = x.partition(" : ")
+            story.append(Paragraph(f"<b>{titre} :</b> {reste}" if sep else x, puce, bulletText="•"))
     story += [Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
               Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
     tab = table_reactifs(data, s)

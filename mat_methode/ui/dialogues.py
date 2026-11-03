@@ -135,6 +135,24 @@ def dupliquer_groupe(parent, nom: str, nb_etapes: int, nb_echantillons: int) -> 
     return int(nb.currentData() or 1), ech.isChecked()
 
 
+def demander_nombre(parent, titre: str, aide: str, libelle: str = "Nombre de copies", maxi: int = 10) -> int | None:
+    """Petite fenêtre « combien ? » (1 à maxi). None si annulé."""
+    d = Dialogue(parent, titre)
+    if aide:
+        d.lay.addWidget(etiquette(aide, secondaire=True, wrap=True))
+    nb = Liste([str(k) for k in range(1, maxi + 1)], "1", vide=None)
+    nb.setAccessibleName(libelle)
+    d.lay.addWidget(champ(libelle, nb))
+    d.boutons.addWidget(bouton("Annuler", d.reject))
+    ok = bouton("Dupliquer", d.accept, accent=True)
+    ok.setDefault(True)
+    d.boutons.addWidget(ok)
+    d.finir()
+    if d.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return int(nb.currentData() or 1)
+
+
 def chercher_scirius(parent, lire, requete: str = "", pour: str = "", noms: list[str] | None = None) -> dict | None:
     """Recherche dans le fichier Scirius de SharePoint. `lire(forcer, etape)` retourne une Lecture.
     Retourne la ligne choisie (dict) ou None (on saisit alors à la main)."""

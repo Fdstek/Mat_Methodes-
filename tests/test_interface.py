@@ -332,7 +332,7 @@ def test_materiel_molette_et_titre(fen, qtbot):
     assert liste.currentIndex() == avant and not ev.isAccepted()
 
 
-def test_rapports_emis_par_personne_et_protocole(fen, monkeypatch):
+def test_documents_emis_dossiers_partages(fen, monkeypatch):
     from mat_methode.domain.models import Personne
     fen.ctrl.reglages.personnes.append(Personne(nom="Claire LACOUX", igg="PIERRE"))  # IGG du poste de test : « pierre »
     m = ethanol(fen)
@@ -340,14 +340,16 @@ def test_rapports_emis_par_personne_et_protocole(fen, monkeypatch):
     fen.aller("rapport")
     vus = {}
     monkeypatch.setattr("mat_methode.ui.fenetre.QFileDialog.getSaveFileName", lambda _p, _t, chemin, _f: (vus.setdefault("chemin", chemin), "")[0:2])
-    fen.exporter_fichier("protocole")
-    chemin = vus["chemin"]
-    assert "Claire LACOUX" in chemin and chemin.endswith("DA-2026-0158 - Désacidification éthanol - Protocole.pdf")
-    assert m.rapports and m.rapports[-1].type == "protocole" and m.rapports[-1].par == "Claire LACOUX"
     ouverts = []
     monkeypatch.setattr("PySide6.QtGui.QDesktopServices.openUrl", lambda url: ouverts.append(url.toLocalFile()))
-    fen.ouvrir_fichier(m.rapports[-1].chemin)
-    assert [Path(x) for x in ouverts] == [Path(chemin)]  # Windows : « / » et « \\ » désignent le même fichier
+    fen.exporter_fichier("protocole")
+    chemin = vus["chemin"]
+    assert Path(chemin).parent.name == "Protocoles" and chemin.endswith("DA-2026-0158 - Désacidification éthanol - Protocole.pdf")
+    assert m.rapports and m.rapports[-1].type == "protocole" and m.rapports[-1].par == "Claire LACOUX"
+    assert [Path(x) for x in ouverts] == [Path(chemin)]  # le PDF s'ouvre après l'export (Windows : « / » ou « \\ »)
+    vus.clear()
+    fen.exporter_fichier("pdf")
+    assert Path(vus["chemin"]).parent.name == "Rapports"
     fen.p_rapport.rafraichir()
 
 
@@ -365,13 +367,18 @@ def test_onglet_protocole_apercu(fen):
     assert fen.page == "protocole" and fen.titre.text() == f"Protocole · {m.nom}" and fen.nav["protocole"].isEnabled()
     nom = next(x for x in fen.p_protocole.flux.findChildren(QLineEdit) if x.text() == m.nom)
     assert nom.isReadOnly()  # même vue que Flux, en lecture
-    textes = [b.text() for b in fen.p_protocole.findChildren(QPushButton)]
-    assert {"✎  Modifier", "En cours", "Annulée", "Réalisée", "Exporter le protocole (PDF)", "Ouvrir le dernier protocole émis"} <= set(textes)
-    assert textes.index("✎  Modifier") < textes.index("En cours") < textes.index("Exporter le protocole (PDF)")
+    from mat_methode.ui.widgets import Liste
+    bandeau = fen.p_protocole.flux.bandeau
+    assert bandeau.parentWidget() is fen.zone_fixe and fen.zone_fixe.isVisible()  # toujours visible, hors de la zone qui défile
+    st = next(x for x in bandeau.findChildren(Liste) if x.accessibleName() == f"Statut de {m.nom}")
+    assert [st.itemText(i) for i in range(st.count())] == ["Validée", "En cours", "Réalisée", "Annulée"]
+    textes = [b.text() for b in bandeau.findChildren(QPushButton)]
+    assert "✎  Modifier" in textes and "Exporter le protocole (PDF)" in textes
+    assert "Ouvrir le dernier protocole émis" in [b.text() for b in fen.p_protocole.findChildren(QPushButton)]
     fen.p_protocole._mode("modifier")
     nom = next(x for x in fen.p_protocole.flux.findChildren(QLineEdit) if x.text() == m.nom)
     assert not nom.isReadOnly()
-    fen.p_protocole._statut("realisee")
+    fen.p_protocole.flux._statut("realisee")
     fen.ouvrir_rapport(m.id)
     assert "Ouvrir le dernier protocole émis" not in [b.text() for b in fen.p_rapport.findChildren(QPushButton)]
 
@@ -473,3 +480,25 @@ def test_ordre_dans_les_reglages(fen):
     fen.ouvrir(m.id, "def")
     typ = next(x for x in fen.p_flux.findChildren(Liste) if r.types_demande[0] in [x.itemText(i) for i in range(x.count())])
     assert [typ.itemText(i) for i in range(typ.count())][1:3] == r.types_demande[:2]
+
+
+def test_tag_cree_dans_les_reglages_et_ordre_des_cartes(fen, monkeypatch):
+    from mat_methode.domain.regles import tous_les_tags
+    from mat_methode.ui.widgets import ChampTexte, ListeSaisie
+    fen.aller("reglages", "tags")
+    champ = next(x for x in fen.p_reglages.findChildren(ChampTexte) if x.placeholderText() == "Nouveau tag")
+    champ.setText("pilote")
+    champ.returnPressed.emit()
+    assert "pilote" in tous_les_tags(fen.ctrl.manips, fen.ctrl.reglages.ordre_tags)
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux.basculer_edition()
+    tag = next(x for x in fen.p_flux.findChildren(ListeSaisie) if x.accessibleName() == "Ajouter un tag")
+    assert "pilote" in [tag.itemText(i) for i in range(tag.count())]
+    fen.aller("reglages")
+    premiere = fen.p_reglages._sections_ordonnees()[0][0]
+    fen.p_reglages._deplacer_carte(premiere, 1)
+    assert fen.p_reglages._sections_ordonnees()[1][0] == premiere
+    fen.aller("manips")
+    textes = [w.text() for w in fen.p_manips.findChildren(type(fen.titre))]
+    assert {"DONNEUR D’ORDRE", "TYPE", "TAGS", "STATUT"} <= set(textes)

@@ -189,3 +189,14 @@ def test_analyses_possibles_selon_le_labo(ethanol, reglages):
     assert R.analyses_possibles(reglages, p)[-1] == "Teneur en eau"
     p.labo = "Labo inconnu"
     assert R.analyses_possibles(reglages, p)[:5] == reglages.analyses
+
+
+def test_dupliquer_echantillon(reglages):
+    m = Manip()
+    e = R.ajouter_etape(m, "chauffage")
+    p = R.nouvel_echantillon(m, reglages, e.id)
+    p.scirius, p.commentaire = "123", "flacon ambré"
+    copies = R.dupliquer_echantillon(m, p.id, 2)
+    lab = R.etiquettes(m)
+    assert [lab[x.id] for x in m.prelevements] == ["S1a", "S1b", "S1c"]
+    assert all(c.scirius == "" and c.commentaire == "flacon ambré" and c.etape_id == e.id for c in copies)

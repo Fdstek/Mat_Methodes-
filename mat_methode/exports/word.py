@@ -105,7 +105,7 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
 
     def pastille(x, y, p):
         l1 = f"{p['id']} · {fmt_vol(p['volume_ml'] or 0)} mL"
-        l2 = moment_texte(p)
+        l2 = moment_texte(p) + (f" · {p['labo']}" if p.get("labo") else "")  # laboratoire de l'échantillon
         w = int(max(d.textlength(l1, font=f_bs), d.textlength(l2, font=f_s)) + 64)
         d.rounded_rectangle([x, y, x + w, y + 54], 8, fill="#FDF1DC", outline="#8A4B00", width=2)
         d.ellipse([x + 8, y + 12, x + 38, y + 42], fill="#8A4B00")
@@ -272,19 +272,21 @@ def ecrire_docx(data: dict, chemin) -> None:
     doc.add_heading("Détail par phase du flux", level=1)
     for i, ph in enumerate(data.get("phases", [])):
         if i == 0:
-            entete = (f"{ctx.get('matiere') or ''} (lot {manque(ctx.get('lot'))}" + (f", n° Scirius {ctx['scirius']}" if ctx.get("scirius") else "")
-                      + (f", fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "") + ")") + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
+            entete = (f"{ctx.get('matiere') or ''}" + (f" · n° Scirius {ctx['scirius']}" if ctx.get("scirius") else "")
+                      + (f" · fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "")) + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
         else:
-            entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "")
+            entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
+                f"\nRemarque : {ph['remarque']}" if ph.get("remarque") else "")
         lignes = [((ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"], entete)]
         if i:
             lignes.append(("Réactifs", "\n".join(
                 f"{r['nom']}{' · ' + r['quantite'] if r.get('quantite') else ''} — n° Scirius {manque(r.get('scirius'))}, "
-                f"emplacement {manque(r.get('emplacement'))}, fournisseur {manque(r.get('fournisseur'))}, lot {manque(r.get('lot'))}"
+                f"emplacement {manque(r.get('emplacement'))}, fournisseur {manque(r.get('fournisseur'))}"
                 for r in ph["reactifs"]) or "aucun"))
         lignes.append(("Échantillons", "\n".join(
             f"{x['id']} · {fmt_vol(x['volume'] or 0)} mL · {x['moment']} · {x.get('labo', '')} · {', '.join(x.get('analyses', [])) or 'aucune analyse'} — "
-            f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}" for x in ph["echantillons"]) or "aucun"))
+            f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}"
+            + (f"\nCommentaire : {x['commentaire']}" if x.get("commentaire") else "") for x in ph["echantillons"]) or "aucun"))
         tab = doc.add_table(rows=len(lignes), cols=2)
         tab.style = "Table Grid"
         tab.autofit = False
@@ -325,9 +327,9 @@ def ecrire_docx(data: dict, chemin) -> None:
             elif e["n"] not in x[1]:
                 x[1].append(e["n"])
     if noms:
-        tableau("Réactifs", ["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Lot", "Étape"],
-                [[nm] + [inv.get(nm.lower(), {}).get(k) for k in ("scirius", "emplacement", "fournisseur", "lot")] + [", ".join(map(str, st))]
-                 for nm, st in noms], [3.3, 2.2, 4.6, 2.8, 1.8, 2.3])
+        tableau("Réactifs", ["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Étape"],
+                [[nm] + [inv.get(nm.lower(), {}).get(k) for k in ("scirius", "emplacement", "fournisseur")] + [", ".join(map(str, st))]
+                 for nm, st in noms], [3.6, 2.4, 5.2, 3.4, 2.4])
     if pre:
         tableau("Échantillons", ["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Laboratoire", "Analyses"],
                 [[p["id"], "entrée" if not p["apres_etape"] else f"{p['apres_etape']} · {etapes[p['apres_etape'] - 1]['operation']}", moment_texte(p),

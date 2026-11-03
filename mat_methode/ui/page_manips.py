@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QSizePolicy, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.models import ARCHIVEE, STATUTS_DEFINITION
 from mat_methode.domain.regles import tous_les_tags
 from mat_methode.domain.texte import fmt_dt, norm
+from mat_methode.ui import colonnes as C
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.widgets import (
@@ -20,7 +20,6 @@ from mat_methode.ui.widgets import (
     flux_widgets,
     liste_statut,
     pastille,
-    pastille_couleur,
     vider,
 )
 
@@ -176,7 +175,8 @@ class PageManips(QWidget):
         for i, m in enumerate(lignes):
             self.l_liste.addWidget(self._ligne(m, i == len(lignes) - 1))
 
-    LARGEURS = (160, 130, 80, 40)  # contenu, statut, Ouvrir, « … » : colonnes alignées sur l'en-tête
+    # colonnes alignées sur l'en-tête : donneur, type, tags, statut, Ouvrir, « … »
+    LARGEURS = (C.LARG_DONNEUR, C.LARG_TYPE, C.LARG_TAGS, 125, 75, 40)
 
     def _grille(self, g: QGridLayout):
         g.setContentsMargins(14, 12, 14, 12)
@@ -197,9 +197,10 @@ class PageManips(QWidget):
         self._grille(g)
         g.setContentsMargins(14, 8, 14, 8)
         g.addWidget(etiquette("MANIP", "etiquetteChamp"), 0, 0)
-        g.addWidget(self._fixe(etiquette("CONTENU", "etiquetteChamp"), 1), 0, 1)
-        g.addWidget(self._fixe(etiquette("STATUT", "etiquetteChamp"), 2), 0, 2)
-        for k in (3, 4):
+        for k, x in enumerate(C.entetes_communes(), start=1):
+            g.addWidget(x, 0, k)
+        g.addWidget(self._fixe(etiquette("STATUT", "etiquetteChamp"), 4), 0, 4)
+        for k in (5, 6):
             g.addWidget(self._fixe(QWidget(), k), 0, k)
         return w
 
@@ -211,28 +212,8 @@ class PageManips(QWidget):
         g = QGridLayout(w)
         self._grille(g)
         gauche = QVBoxLayout()
-        gauche.setSpacing(4)
-        nom = etiquette(m.nom, "titreCarte", wrap=True)  # titre complet, sur plusieurs lignes si besoin
-        gauche.addWidget(nom)
-        tags = []
-        if m.contexte.donneur:
-            tags.append(pastille_couleur(m.contexte.donneur, O.couleur_donneur(r, m.contexte.donneur)))
-        if m.contexte.type:
-            tags.append(pastille(m.contexte.type))
-        for t in m.tags:
-            b = bouton(f"#{t}", lambda t=t: (setattr(self, "f_tag", t), self.rafraichir()), tip=f"Filtrer sur le tag {t}")
-            c = QColor(O.couleur_tag(r, t))
-            fg = c.lighter(160).name() if p.sombre else c.name()
-            b.setStyleSheet(f"QPushButton{{background:rgba({c.red()},{c.green()},{c.blue()},{40 if p.sombre else 28});color:{fg};"
-                            f"border:1px solid {c.name()};border-radius:4px;padding:2px 8px;font-size:9pt;font-weight:600;}}")
-            tags.append(b)
-        reste = sum(1 for t in m.a_faire if not t.fait)
-        if reste:
-            tags.append(pastille(f"{reste} à faire", "warn", " ; ".join(t.texte for t in m.a_faire if not t.fait)))
-        v = self.ctrl.st.verrou_autre(m.id)
-        if v:
-            tags.append(pastille(f"Modifiée en ce moment par {self.ctrl.nom_de(v.utilisateur)}", "info"))
-        gauche.addWidget(flux_widgets(tags))
+        gauche.setSpacing(3)
+        gauche.addWidget(etiquette(m.nom, "titreCarte", wrap=True))  # titre complet, sur plusieurs lignes si besoin
         if m.contexte.objectif:
             o = etiquette("", secondaire=True)
             o.setStyleSheet("font-style:italic;")
@@ -241,22 +222,36 @@ class PageManips(QWidget):
             o.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             o.setToolTip(m.contexte.objectif)
             gauche.addWidget(o)
+        ne = len(m.etapes)
+        info = etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch. · {fmt_dt(m.maj)[:10]} · v{m.rev}", secondaire=True)
+        info.setMinimumWidth(1)
+        info.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        gauche.addWidget(info)
+        marques = []
+        reste = sum(1 for t in m.a_faire if not t.fait)
+        if reste:
+            marques.append(pastille(f"{reste} à faire", "warn", " ; ".join(t.texte for t in m.a_faire if not t.fait)))
+        v = self.ctrl.st.verrou_autre(m.id)
+        if v:
+            marques.append(pastille(f"Modifiée par {self.ctrl.nom_de(v.utilisateur)}", "info"))
+        if marques:
+            gauche.addWidget(flux_widgets(marques))
         cg = QWidget()
         cg.setLayout(gauche)
         gauche.setContentsMargins(0, 0, 0, 0)
         g.addWidget(cg, 0, 0)
-        ne = len(m.etapes)
-        g.addWidget(self._fixe(etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch.<br>{fmt_dt(m.maj)} · v{m.rev}",
-                                         secondaire=True), 1), 0, 1)
+        for k, x in enumerate(C.cellules_communes(m, r, lambda t: (setattr(self, "f_tag", t), self.rafraichir())), start=1):
+            g.addWidget(x, 0, k)
         if m.etat == ARCHIVEE:
-            g.addWidget(self._fixe(etiquette("Archivée", secondaire=True), 2), 0, 2)
+            g.addWidget(self._fixe(etiquette("Archivée", secondaire=True), 4), 0, 4)
         else:
             st = liste_statut(m, STATUTS_DEFINITION)
             st.setMinimumWidth(0)
+            st.setMinimumContentsLength(6)
             st.choisi.connect(lambda v, m=m: self._statut(m, v))
-            g.addWidget(self._fixe(st, 2), 0, 2)
+            g.addWidget(self._fixe(st, 4), 0, 4)
         g.addWidget(self._fixe(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True,
-                                      tip=f"Ouvrir le flux de {m.nom}"), 3), 0, 3)
+                                      tip=f"Ouvrir le flux de {m.nom}"), 5), 0, 5)
         plus = bouton("…", tip=f"Autres actions pour {m.nom}")
         menu = QMenu(plus)
         menu.addAction("Modifier le flux (étapes)", lambda: self.ouvrir.emit(m.id, "def"))
@@ -267,9 +262,9 @@ class PageManips(QWidget):
             menu.addAction("Supprimer", lambda: self._supprimer(m))
         plus.setMenu(menu)
         plus.setStyleSheet("QPushButton::menu-indicator{width:0;}")
-        self._fixe(plus, 4)
-        g.addWidget(plus, 0, 4)
-        for k in range(1, 5):
+        self._fixe(plus, 6)
+        g.addWidget(plus, 0, 6)
+        for k in range(1, 7):
             g.setAlignment(g.itemAtPosition(0, k).widget(), Qt.AlignmentFlag.AlignVCenter)
         return w
 

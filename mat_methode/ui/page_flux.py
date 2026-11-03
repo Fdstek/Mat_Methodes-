@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
-from mat_methode.domain.models import ANNULEE, ARCHIVEE, BROUILLON, ENCOURS, STATUTS, STATUTS_DEFINITION, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
+from mat_methode.domain.models import ANNULEE, ARCHIVEE, BROUILLON, ENCOURS, REALISEE, STATUTS, STATUTS_DEFINITION, STATUTS_PROTOCOLE, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -45,6 +45,7 @@ from mat_methode.ui.widgets import (
     flux_widgets,
     icone,
     ligne,
+    liste_statut,
     numero,
     pastille,
     vider,
@@ -128,6 +129,7 @@ class PageFlux(QWidget):
     voir_rapport = Signal()
     voir_reglages = Signal(object)  # clé de la carte des Réglages à ouvrir
     dupliquer = Signal(str)
+    edition_changee = Signal()
 
     def __init__(self, ctrl: Controleur, contexte: str = "definition"):
         super().__init__()
@@ -144,7 +146,11 @@ class PageFlux(QWidget):
         self.lay.setSpacing(14)
         self._bilan = None
         self._volumes = None
-        self._lancement = None
+        # Bandeau de statut : placé par la fenêtre au-dessus de la zone qui défile (toujours visible)
+        self._lancement = QWidget()
+        self._lancement.setObjectName("bandeauStatut")
+        QVBoxLayout(self._lancement).setContentsMargins(0, 0, 0, 0)
+        self.actions_bandeau = None  # fonction -> boutons en plus (Protocole : exporter, dossier)
         self._colonne = None
 
     @property
@@ -161,9 +167,14 @@ class PageFlux(QWidget):
             return False
         return self.contexte == "protocole" or (m is not None and m.etat != BROUILLON)
 
+    @property
+    def bandeau(self) -> QWidget:
+        return self._lancement
+
     def basculer_edition(self):
         self.edition = not self.edition
         self.rafraichir()
+        self.edition_changee.emit()
 
     def ouvrir(self, mode: str):
         self.edition = False
@@ -190,9 +201,6 @@ class PageFlux(QWidget):
             self.lay.addWidget(InfoBar(f"Ouverte en lecture seule (depuis {fmt_dt(v.depuis)[-5:]}).",
                                        titre=f"Modifiée en ce moment par {self.ctrl.nom_de(v.utilisateur)}",
                                        niveau="info", actions=[bouton("Dupliquer pour travailler dessus", lambda: self.dupliquer.emit(m.id))]))
-        self._lancement = QWidget()
-        QVBoxLayout(self._lancement).setContentsMargins(0, 0, 0, 0)
-        self.lay.addWidget(self._lancement)
         self._remplir_lancement()
         demande = self._demande()
         self.lay.addWidget(demande)
@@ -230,8 +238,7 @@ class PageFlux(QWidget):
             self._remplir_bilan()
         if self._volumes is not None:
             self._remplir_volumes()
-        if self._lancement is not None:
-            self._remplir_lancement()
+        self._remplir_lancement()
         if self._colonne is not None and self.mode == "comp":
             self._remplir_colonne()
 
@@ -246,46 +253,55 @@ class PageFlux(QWidget):
 
     # ------------------------------------------------------------ lancement (§8.9)
     def _remplir_lancement(self):
-        """Bandeau du haut : statut de la manip (et lancement) ; dans Définition › Flux, boutons de statut et « Modifier »."""
+        """Bandeau de statut (toujours visible) : statut en liste déroulante, lancement, « Modifier » et actions de la page."""
         lay = self._lancement.layout()
         vider(lay)
         m = self.m
+        if m is None:
+            return
         f = QFrame()
         f.setObjectName("lancement")
         f.setProperty("lancee", m.lancee is not None)
-        f.setProperty("garder", True)
-        h = QHBoxLayout(f)
-        h.setContentsMargins(16, 10, 16, 10)
-        col = QVBoxLayout()
-        nom, ton = STATUTS.get(m.etat, ("Archivée", "neutre"))
-        col.addWidget(ligne(etiquette("<b>Statut</b>"), pastille(nom, ton), "stretch"))
+        v = QVBoxLayout(f)
+        v.setContentsMargins(16, 8, 16, 8)
+        v.setSpacing(4)
+        h = QHBoxLayout()  # ligne 1 : statut, « Modifier », actions de la page
+        h.setSpacing(10)
+        h2 = QHBoxLayout()  # ligne 2 : lancement / indications
+        h2.setSpacing(10)
+        v.addLayout(h)
+        v.addLayout(h2)
+        h.addWidget(etiquette("<b>Statut</b>"))
+        choix = STATUTS_PROTOCOLE if self.contexte == "protocole" else STATUTS_DEFINITION
+        if m.etat == ARCHIVEE or self.ctrl.lecture_seule:
+            nom, ton = STATUTS.get(m.etat, ("Archivée", "neutre"))
+            h.addWidget(pastille(nom, ton))
+        else:
+            st = liste_statut(m, choix)
+            st.choisi.connect(self._statut)
+            h.addWidget(st)
         if m.lancee:
             n = len(m.journal)
-            infos = [etiquette(f"Lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}", secondaire=True)]
+            infos = [etiquette(f"lancée le {fmt_dt(m.lancee.le)[:10]} par {m.lancee.par}", secondaire=True)]
             if n:
-                infos += [pastille(f"⚠ Modifiée après lancement · {n} modification{'s' if n > 1 else ''}", "warn"),
-                          bouton("Voir le journal", self._journal)]
-            else:
-                infos.append(pastille("Aucune modification depuis le lancement", "ok"))
-                if not self.ctrl.lecture_seule and self.contexte == "definition":
-                    infos.append(bouton("Annuler le lancement", self._annuler_lancement))
-            col.addWidget(ligne(*infos, "stretch"))
-        elif m.etat == VALIDEE:
+                infos += [pastille(f"⚠ {n} modification{'s' if n > 1 else ''} après lancement", "warn"), bouton("Voir le journal", self._journal)]
+            elif not self.ctrl.lecture_seule and self.contexte == "definition":
+                infos.append(bouton("Annuler le lancement", self._annuler_lancement))
+            for w in infos:
+                h2.addWidget(w)
+        elif m.etat == VALIDEE and self.contexte == "definition":
             rang = [x.id for x in R.protocoles(self.ctrl.manips, self.ctrl.reglages.ordre_protocoles)]
-            col.addWidget(etiquette("Dans Protocole" + (f", n° {rang.index(m.id) + 1} à réaliser" if m.id in rang else "")
-                                    + " ; passe-le « En cours » au démarrage de la manip.", secondaire=True, wrap=True))
+            h2.addWidget(etiquette("Dans Protocole" + (f", n° {rang.index(m.id) + 1} à réaliser" if m.id in rang else "")
+                                   + " ; passe-la « En cours » au démarrage de la manip.", secondaire=True))
         elif m.etat == BROUILLON:
-            col.addWidget(etiquette("Quand le Mat & Méthode est prêt, passe-le « Validée » : il arrive dans Protocole.",
-                                    secondaire=True, wrap=True))
-        h.addLayout(col, 1)
-        if self.contexte == "definition" and m.etat != ARCHIVEE and not self.ctrl.lecture_seule:
-            seg = Segmente([(k, STATUTS[k][0]) for k in STATUTS_DEFINITION], m.etat)
-            seg.setAccessibleName("Statut de la manip")
-            seg.change.connect(self._statut)
-            h.addWidget(seg)
-            if m.etat != BROUILLON:
-                h.addWidget(bouton("Terminer la modification" if self.edition else "✎  Modifier", self.basculer_edition,
-                                   accent=not self.edition, tip="Rendre la manip modifiable (elle est en lecture une fois validée)"))
+            h2.addWidget(etiquette("Passe-la « Validée » quand le Mat & Méthode est prêt : elle arrivera dans Protocole.", secondaire=True))
+        h.addStretch(1)
+        h2.addStretch(1)
+        if not self.ctrl.lecture_seule and m.etat != ARCHIVEE and (self.contexte == "protocole" or m.etat != BROUILLON):
+            h.addWidget(bouton("Terminer la modification" if self.edition else "✎  Modifier", self.basculer_edition,
+                               accent=not self.edition, tip="Rendre la manip modifiable (elle s’affiche en lecture)"))
+        for w in (self.actions_bandeau() if self.actions_bandeau else []):
+            h.addWidget(w)
         lay.addWidget(f)
 
     def _valider(self):
@@ -300,7 +316,8 @@ class PageFlux(QWidget):
         msg = self.ctrl.changer_statut(self.m, statut)
         self.edition = False
         self.ctrl.toast.emit(msg or {VALIDEE: "Validée : elle est maintenant dans Protocole", BROUILLON: "Remise en brouillon",
-                                     ANNULEE: "Annulée"}.get(statut, "Statut changé"))
+                                     ANNULEE: "Annulée", ENCOURS: "En cours : la manip est lancée, chaque modification sera notée",
+                                     REALISEE: "Réalisée : le rapport est maintenant dans Rapport"}.get(statut, "Statut changé"))
 
     def _lancer(self):
         from mat_methode.ui.dialogues import confirmer
@@ -830,7 +847,7 @@ class PageFlux(QWidget):
         def pill(p):
             n = R.numero_etape(m, p)
             q = "avant" if n == 0 else (f"à {fmt_dur(p.temps_min)}" if p.temps_min is not None else "à ?") if p.moment == "pendant" else "sortie"
-            return ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}", code_badge(lab[p.id]))
+            return ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}" + (f" · {p.labo}" if p.labo else ""), code_badge(lab[p.id]))
 
         dep = [p for p in ech if R.numero_etape(m, p) == 0]
         c = self._carte_flux(DEPART, None, "Départ")
@@ -936,16 +953,14 @@ class PageFlux(QWidget):
             cl.addWidget(etiquette("Matière de départ", "titreCarte"))
             mat = ChampTexte(m.contexte.matiere)
             mat.modifie.connect(lambda v: (setattr(m.contexte, "matiere", v), self._toucher()))
-            lot = ChampTexte(m.contexte.lot, "lot ?", mono=True)
-            lot.modifie.connect(lambda v: (setattr(m.contexte, "lot", v), self._toucher()))
             sc = ChampTexte(m.contexte.scirius, "à saisir", mono=True)
             sc.modifie.connect(lambda v: (setattr(m.contexte, "scirius", v.strip()), self._toucher()))
             fo = ChampTexte(m.contexte.fournisseur)
             fo.modifie.connect(lambda v: (setattr(m.contexte, "fournisseur", v), self._toucher()))
-            cl.addWidget(ligne(champ("Matière (charge)", mat), champ("Lot", lot)))
+            cl.addWidget(champ("Matière (charge)", mat))
             cl.addWidget(ligne(champ("N° Scirius de la charge", sc), champ("Fournisseur", fo)))
             cl.addWidget(ligne(bouton("Chercher la charge dans Scirius…", self._scirius_charge, accent=True,
-                                      tip="Remplit le nom, le lot, le n° Scirius et le fournisseur depuis le fichier Scirius de SharePoint"),
+                                      tip="Remplit le nom, le n° Scirius et le fournisseur depuis le fichier Scirius de SharePoint"),
                                etiquette("Pas dans le fichier ? Saisis les champs à la main.", secondaire=True), "stretch"))
             lay.addWidget(f)
         else:
@@ -1072,7 +1087,7 @@ class PageFlux(QWidget):
                              tip="Ajouter un réactif à la liste des Réglages et le choisir ici")
             v.addWidget(champ("Réactif", nom))
             v.addWidget(flux_widgets([nouveau, bouton("Chercher dans Scirius…", lambda re_=re_: self._scirius_reactif(re_), lien=True,
-                                                      tip="Remplit le n° Scirius, l’emplacement, le fournisseur et le lot depuis le fichier Scirius")]))
+                                                      tip="Remplit le n° Scirius, l’emplacement et le fournisseur depuis le fichier Scirius")]))
             q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
             v.addWidget(champ("Quantité ou ratio", q))
@@ -1082,16 +1097,9 @@ class PageFlux(QWidget):
                 sc.modifie.connect(lambda val, inv=inv: self._inv(inv, "scirius", val))
                 em = ChampTexte(inv.emplacement, "ex. armoire 1, étagère 2")
                 em.modifie.connect(lambda val, inv=inv: self._inv(inv, "emplacement", val))
-                v.addWidget(ligne(champ("N° Scirius", sc), champ("Emplacement", em)))
-                plus = Expander("Fournisseur et lot", ouvert=bool(inv.fournisseur or inv.lot))
-                plus.setObjectName("")
-                plus.layout().setContentsMargins(0, 0, 0, 0)
                 fo = ChampTexte(inv.fournisseur)
                 fo.modifie.connect(lambda val, inv=inv: self._inv(inv, "fournisseur", val))
-                lo = ChampTexte(inv.lot, mono=True)
-                lo.modifie.connect(lambda val, inv=inv: self._inv(inv, "lot", val))
-                plus.ajouter(ligne(champ("Fournisseur", fo), champ("Lot", lo)))
-                v.addWidget(plus)
+                v.addWidget(ligne(champ("N° Scirius", sc), champ("Emplacement", em), champ("Fournisseur", fo)))
             g.addWidget(sf, k // 2, k % 2, Qt.AlignmentFlag.AlignTop)
         wg = QWidget()
         wg.setLayout(g)
@@ -1205,6 +1213,7 @@ class PageFlux(QWidget):
             t = etiquette(lab[p.id], "titreCarte")
             t.setStyleSheet(f"color:{theme.P.ambre_texte};")
             v.addWidget(ligne(badge(code_badge(lab[p.id])), t, "stretch",
+                              icone("⧉", f"Dupliquer l’échantillon {lab[p.id]} (choix du nombre de copies)", lambda p=p: self._dupliquer_ech(p)),
                               icone("✕", f"Supprimer l’échantillon {lab[p.id]}", lambda p=p: self._supprimer_ech(p), danger=True)))
             if e:
                 seg = Segmente([("pendant", "Pendant l’étape"), ("effluent", "À la sortie")], "pendant" if p.moment == "pendant" else "effluent")
@@ -1249,6 +1258,19 @@ class PageFlux(QWidget):
                                 etiquette("Reprend le laboratoire, le volume et les analyses par défaut.", secondaire=True),
                                 bouton("Réglages des laboratoires", lambda: self.voir_reglages.emit("laboratoires"), lien=True)]))
         return x
+
+    def _dupliquer_ech(self, p):
+        from mat_methode.ui.dialogues import demander_nombre
+        lab = etiquettes(self.m)[p.id]
+        n = demander_nombre(self, f"Dupliquer l’échantillon {lab}",
+                            "Les copies reprennent le moment, le volume, le laboratoire, les analyses et le commentaire, sans les n° Scirius / Aramis. "
+                            "Elles prennent les lettres suivantes de l’étape.")
+        if not n:
+            return
+        self.ctrl.memoriser_manip()
+        R.dupliquer_echantillon(self.m, p.id, n)
+        self._toucher(True)
+        self.ctrl.toast.emit(f"{lab} dupliqué {n} fois")
 
     def _ajouter_ech(self, e):
         R.nouvel_echantillon(self.m, self.ctrl.reglages, e.id if e else None)

@@ -16,12 +16,13 @@ def test_html_identique_a_la_reference(ethanol, reglages):
     assert rapport_html(ethanol, reglages) == (EXEMPLES / "rapport_attendu.html").read_text(encoding="utf-8")
 
 
-def test_seules_les_corrections_14_different_du_prototype(ethanol, reglages):
+def test_seules_les_corrections_attendues_different_du_prototype(ethanol, reglages):
     """Une fois les lignes recollées, le texte ne diffère de la référence du prototype que sur 2.2 et 2.3 (corrections §14)."""
     from mat_methode.report.rapport import vers_markdown
     proto = (EXEMPLES / "rapport_attendu_prototype.md").read_text(encoding="utf-8").splitlines()
     textes = {s.titre: vers_markdown(" ".join(s.texte.split("\n"))) for s in construire(ethanol, reglages).sections}
-    for titre, egal in (("2.1 Échantillon", True), ("2.2 Matériel et réactifs", False), ("2.3 Méthodes", False), ("2.4 Prélèvements", True)):
+    # 2.1 et 2.2 : sans le lot (03/11) ; 2.2 et 2.3 : corrections §14
+    for titre, egal in (("2.1 Échantillon", False), ("2.2 Matériel et réactifs", False), ("2.3 Méthodes", False), ("2.4 Prélèvements", True)):
         ancien = proto[proto.index(f"### {titre}") + 2]
         assert (ancien == textes[titre]) is egal, titre
 
@@ -106,3 +107,9 @@ def test_mention_lancement(ethanol, reglages):
     ethanol.lancee, ethanol.journal = None, []
     md = markdown(ethanol, reglages)
     assert "Version 4 · enregistrée" in md and "lancement" not in md.lower()
+
+
+def test_plus_de_lot_dans_les_documents(ethanol, reglages):
+    md = markdown(ethanol, reglages)
+    import re
+    assert not re.search(r"\blot\b", md, re.I) and "| Lot |" not in md

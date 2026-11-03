@@ -127,13 +127,19 @@ def test_protocole(ethanol, reglages, tmp_path):
 def test_commentaire_echantillon(ethanol, reglages, tmp_path):
     from mat_methode.exports.protocole import ecrire_protocole
     ethanol.prelevements[0].commentaire = "flacon ambré"
+    ethanol.etapes[2].remarque = "à l’abri de la lumière"
     d = exporter(ethanol, reglages)
     assert d["prelevements"][0]["commentaire"] == "flacon ambré" and "commentaire" not in d["prelevements"][1]
     m, _ = importer(json.loads(json.dumps(d)), reglages)
     assert m.prelevements[0].commentaire == "flacon ambré"
     ecrire_protocole(d, tmp_path / "p.pdf")
     with pdfplumber.open(tmp_path / "p.pdf") as pdf:
-        assert "flacon ambré" in " ".join(p.extract_text() for p in pdf.pages)
+        t = " ".join(p.extract_text() for p in pdf.pages)
+    assert "Commentaire S0 : flacon ambré" in t and "Remarque : à l’abri de la lumière" in t
+    ecrire_pdf(d, tmp_path / "r.pdf")  # rapport : remarque et commentaire dans le détail par phase
+    with pdfplumber.open(tmp_path / "r.pdf") as pdf:
+        t = " ".join(" ".join(p.extract_text() for p in pdf.pages).split())
+    assert "Commentaire : flacon ambré" in t and "Remarque : à l’abri de la lumière" in t
 
 
 def test_import_ancien_mat_et_methode(tmp_path, reglages):
