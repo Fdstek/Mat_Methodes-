@@ -68,7 +68,7 @@ class PageReglages(QWidget):
             ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
             ("a_faire", "Catégories « À faire »", "Réflexion, Matériel manquant, Réactif manquant…",
              f"{len(r.categories_a_faire)}", self._categories),
-            ("tags", "Tags", "Renommer ou retirer un tag partout", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
+            ("tags", "Tags", "Ajouter, renommer, retirer, ordre et couleur des tags", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
             ("scirius", "Fichier Scirius", "Lien avec le suivi des enregistrements Scirius (SharePoint)",
              "choisi" if r.scirius_fichier else "auto", self._scirius),
         ]
@@ -83,11 +83,12 @@ class PageReglages(QWidget):
         lecture_seule = self.ctrl.st.lecture_seule
         if sec is None:
             self.lay.addWidget(etiquette("Réglages de base de l’application, partagés avec les autres utilisateurs du dossier. "
-                                         "Clique une carte pour l’ouvrir.", secondaire=True, wrap=True))
+                                         "Clique une carte pour l’ouvrir ; ◂ ▸ changent l’ordre des cartes (pour toi seulement).", secondaire=True, wrap=True))
             grille = QGridLayout()
             grille.setSpacing(12)
-            for k, (cle, titre, desc, compte, _) in enumerate(self.sections()):
-                grille.addWidget(self._carte(cle, titre, desc, compte), k // 3, k % 3)
+            cartes = self._sections_ordonnees()
+            for k, (cle, titre, desc, compte, _) in enumerate(cartes):
+                grille.addWidget(self._carte(cle, titre, desc, compte, k, len(cartes)), k // 3, k % 3)
             for c in range(3):
                 grille.setColumnStretch(c, 1)
             w = QWidget()
@@ -107,7 +108,25 @@ class PageReglages(QWidget):
             if isinstance(w, Expander):
                 w.corps.setEnabled(not lecture_seule)
 
-    def _carte(self, cle, titre, desc, compte) -> QWidget:
+    def _sections_ordonnees(self) -> list:
+        """Cartes dans l'ordre choisi par la personne (préférences), les nouvelles à la fin."""
+        ordre = self.ctrl.st.lire_preferences().get("ordre_reglages") or []
+        rang = {c: k for k, c in enumerate(ordre)}
+        return sorted(self.sections(), key=lambda x: rang.get(x[0], len(rang)))
+
+    def _deplacer_carte(self, cle: str, sens: int):
+        cles = [x[0] for x in self._sections_ordonnees()]
+        i = cles.index(cle)
+        j = i + sens
+        if not 0 <= j < len(cles):
+            return
+        cles[i], cles[j] = cles[j], cles[i]
+        p = self.ctrl.st.lire_preferences()
+        p["ordre_reglages"] = cles
+        self.ctrl.st.ecrire_preferences(p)
+        self.rafraichir()
+
+    def _carte(self, cle, titre, desc, compte, k: int = 0, n: int = 1) -> QWidget:
         f = QFrame()
         f.setObjectName("carteFlux")
         f.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -117,6 +136,11 @@ class PageReglages(QWidget):
         v.setContentsMargins(16, 14, 16, 14)
         v.addWidget(ligne(etiquette(titre, "titreCarte"), "stretch", pastille(compte)))
         v.addWidget(etiquette(desc, secondaire=True, wrap=True))
+        avant = icone("◂", f"Placer « {titre} » avant", lambda: self._deplacer_carte(cle, -1))
+        avant.setEnabled(k > 0)
+        apres = icone("▸", f"Placer « {titre} » après", lambda: self._deplacer_carte(cle, 1))
+        apres.setEnabled(k < n - 1)
+        v.addWidget(ligne("stretch", avant, apres))
         f.mousePressEvent = lambda _e: self.ouvrir(cle)
         f.keyPressEvent = lambda ev: self.ouvrir(cle) if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space) else None
         f.setMinimumHeight(96)
@@ -124,7 +148,7 @@ class PageReglages(QWidget):
 
     def _reactifs(self):
         self._liste_simple("Réactifs", [x.nom for x in self.r.reactifs], self._suppr_reactif, self._ajout_reactif, "Nouveau réactif",
-                           "Seul le nom se règle ici. Le n° Scirius, l’emplacement, le fournisseur et le lot se renseignent dans l’étape "
+                           "Seul le nom se règle ici. Le n° Scirius, l’emplacement et le fournisseur se renseignent dans l’étape "
                            "(ou depuis Scirius) et sont gardés pour la prochaine fois. On peut aussi ajouter un réactif depuis une étape.",
                            renommer=self._ren(O.renommer_reactif, lambda: [x.nom for x in self.r.reactifs]), ordre=self.r.reactifs)
 
@@ -458,7 +482,7 @@ class PageReglages(QWidget):
 
     def _suppr_reactif(self, nom):
         if O.reactif_a_des_infos(self.r, nom) and not confirmer(
-                self, "Supprimer ce réactif ?", f"Le n° Scirius, l’emplacement, le fournisseur et le lot mémorisés pour « {nom} » seront aussi effacés.",
+                self, "Supprimer ce réactif ?", f"Le n° Scirius, l’emplacement et le fournisseur mémorisés pour « {nom} » seront aussi effacés.",
                 "Supprimer"):
             return
         O.supprimer_reactif(self.r, nom)
@@ -484,15 +508,30 @@ class PageReglages(QWidget):
                                          couleur=O.couleur_tag(self.r, t),
                                          changer_couleur=lambda t=t: (O.couleur_tag_suivante(self.r, t), self._changer(), self.rafraichir())))
         x.ajouter(flux_widgets(chips) if chips else etiquette("Aucun tag pour l’instant", secondaire=True))
+        nouveau = ChampTexte("", "Nouveau tag")
+
+        def ajout():
+            t = nouveau.text().strip().lstrip("#").strip()
+            if not t or any(norm(t) == norm(y) for y in tous_les_tags(self.ctrl.manips, self.r.ordre_tags)):
+                return
+            self.r.ordre_tags = tous_les_tags(self.ctrl.manips, self.r.ordre_tags) + [t]  # proposé dans les listes déroulantes de tags
+            self._changer()
+            self.rafraichir()
+
+        nouveau.returnPressed.connect(ajout)
+        x.ajouter(ligne(champ("Nouveau tag", nouveau), bouton("Ajouter", ajout), "stretch"))
 
     def _renommer_tag(self, a: str, b: str):
+        if norm(a) != norm(b) and any(norm(x) == norm(b) for x in tous_les_tags(self.ctrl.manips, self.r.ordre_tags)):
+            return None  # ce tag existe déjà
         ch = O.renommer_tag(self.ctrl.manips, a, b)
-        if ch:  # l'ordre choisi suit le nouveau nom
+        dans_liste = any(norm(x) == norm(a) for x in self.r.ordre_tags)
+        if ch or dans_liste:  # l'ordre choisi suit le nouveau nom
             self.r.ordre_tags = [b if norm(x) == norm(a) else x for x in self.r.ordre_tags]
             if norm(a) in self.r.couleurs_tags:
                 self.r.couleurs_tags = {**{k: v for k, v in self.r.couleurs_tags.items() if k != norm(a)}, norm(b): self.r.couleurs_tags[norm(a)]}
             self.ctrl.toucher_reglages()
-        return ch or None
+        return ch if (ch or dans_liste) else None
 
     def _deplacer_tag(self, t: str, sens: int):
         if deplacer_tag(self.ctrl.manips, self.r, t, sens):
@@ -500,7 +539,9 @@ class PageReglages(QWidget):
             self.rafraichir()
 
     def _retirer_tag(self, t):
-        if confirmer(self, "Retirer ce tag ?", f"#{t} sera retiré de toutes les manips.", "Retirer"):
+        if confirmer(self, "Retirer ce tag ?", f"#{t} sera retiré de toutes les manips et de la liste des tags.", "Retirer"):
+            self.r.ordre_tags = [y for y in self.r.ordre_tags if norm(y) != norm(t)]
+            self.ctrl.toucher_reglages()
             for m in O.retirer_tag_partout(self.ctrl.manips, t):
                 self.ctrl.toucher(m)
             self.ctrl.toast.emit("Tag retiré de toutes les manips")

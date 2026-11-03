@@ -1,15 +1,16 @@
 """Listes « Protocole » (manips validées, dans l'ordre de réalisation) et « Rapport » (manips réalisées)."""
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
 from mat_methode.domain import regles as R
 from mat_methode.domain.models import ANNULEE, REALISEE, STATUTS_PROTOCOLE
 from mat_methode.domain.texte import fmt_dt
+from mat_methode.ui import colonnes as C
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
-from mat_methode.ui.widgets import bouton, etiquette, icone, liste_statut, numero, pastille, vider
+from mat_methode.ui.widgets import bouton, etiquette, flux_widgets, icone, liste_statut, numero, pastille, vider
 
 
 def _cadre_liste() -> tuple[QFrame, QVBoxLayout]:
@@ -31,16 +32,39 @@ def _ligne_cadre(derniere: bool) -> tuple[QFrame, QGridLayout]:
     return w, g
 
 
-def _resume(m) -> QWidget:
-    """Nom (cliquable), référence, donneur d'ordre."""
+def _resume(m, *lignes: str, marques: list | None = None) -> QWidget:
+    """Nom, référence et informations de la manip (colonne « Manip »)."""
     c = QWidget()
     v = QVBoxLayout(c)
     v.setContentsMargins(0, 0, 0, 0)
     v.setSpacing(2)
     v.addWidget(etiquette(m.nom, "titreCarte", wrap=True))
-    infos = " · ".join(x for x in (m.contexte.ref, m.contexte.donneur, m.contexte.type) if x)
-    v.addWidget(etiquette(infos or "—", secondaire=True, wrap=True))
+    for t in (m.contexte.ref, *lignes):
+        if t:
+            v.addWidget(etiquette(t, secondaire=True, wrap=True))
+    if marques:
+        v.addWidget(flux_widgets(marques))
     return c
+
+
+def _rangee(cellules: list[QWidget], largeurs: list[int | None], derniere: bool, entete: bool = False) -> QFrame:
+    """Une ligne du tableau : largeurs fixes (None = colonne qui prend la place restante), alignées sur l'en-tête."""
+    w, g = _ligne_cadre(derniere)
+    if entete:
+        g.setContentsMargins(14, 8, 14, 8)
+        w.setStyleSheet(f"QFrame#ligneManip{{border-bottom:1px solid {theme.P.trait};}}")
+    for k, (c, lg) in enumerate(zip(cellules, largeurs)):
+        if lg is None:
+            g.setColumnStretch(k, 1)
+        else:
+            g.setColumnMinimumWidth(k, lg)
+            c.setFixedWidth(lg)
+        g.addWidget(c, 0, k, Qt.AlignmentFlag.AlignVCenter)
+    return w
+
+
+def _titre(t: str) -> QWidget:
+    return etiquette(t, "etiquetteChamp")
 
 
 class PageProtocoles(QWidget):
@@ -85,34 +109,42 @@ class PageProtocoles(QWidget):
                              "Aucun protocole à réaliser : valide une manip dans « Définition Mat & Méthode ».", secondaire=True)
             vide.setContentsMargins(16, 24, 16, 24)
             v.addWidget(vide)
+        else:
+            v.addWidget(self._entete())
         for i, m in enumerate(liste):
             v.addWidget(self._ligne(m, i, len(liste)))
         self.lay.addWidget(f)
         self.lay.addStretch(1)
 
+    def _largeurs(self) -> list[int | None]:
+        debut = [] if self.clotures else [30]
+        fin = [125] + ([] if self.clotures else [34, 34]) + [75]
+        return debut + [None] + [lg for _, lg in C.COMMUNES] + fin
+
+    def _entete(self) -> QWidget:
+        cel = ([] if self.clotures else [_titre("N°")]) + [_titre("PROTOCOLE")] + C.entetes_communes() + [_titre("STATUT")]
+        cel += ([] if self.clotures else [QWidget(), QWidget()]) + [QWidget()]
+        return _rangee(cel, self._largeurs(), False, entete=True)
+
     def _ligne(self, m, i: int, n: int) -> QWidget:
-        w, g = _ligne_cadre(i == n - 1)
-        col = 0
-        if not self.clotures:
-            g.addWidget(numero(i + 1), 0, col)
-            col += 1
-        g.addWidget(_resume(m), 0, col)
-        g.setColumnStretch(col, 1)
         ne = len(m.etapes)
-        g.addWidget(etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch."
-                              + (f"<br>lancée le {fmt_dt(m.lancee.le)[:10]}" if m.lancee else ""), secondaire=True), 0, col + 1)
+        cel = [] if self.clotures else [C.boite(numero(i + 1), 30)]
+        cel.append(_resume(m, f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch."
+                           + (f" · lancée le {fmt_dt(m.lancee.le)[:10]}" if m.lancee else "")))
+        cel += C.cellules_communes(m, self.ctrl.reglages)
         st = liste_statut(m, STATUTS_PROTOCOLE)
+        st.setMinimumWidth(0)
+        st.setMinimumContentsLength(6)
         st.choisi.connect(lambda val, m=m: self._statut(m, val))
-        g.addWidget(st, 0, col + 2)
+        cel.append(st)
         if not self.clotures:
             haut = icone("↑", f"Réaliser avant : {m.nom}", lambda m=m: self.ctrl.deplacer_protocole(m, -1))
             haut.setEnabled(i > 0)
             bas = icone("↓", f"Réaliser après : {m.nom}", lambda m=m: self.ctrl.deplacer_protocole(m, 1))
             bas.setEnabled(i < n - 1)
-            g.addWidget(haut, 0, col + 3)
-            g.addWidget(bas, 0, col + 4)
-        g.addWidget(bouton("Ouvrir", lambda m=m: self.ouvrir.emit(m.id), accent=True, tip=f"Voir et modifier le protocole de {m.nom}"), 0, col + 5)
-        return w
+            cel += [haut, bas]
+        cel.append(bouton("Ouvrir", lambda m=m: self.ouvrir.emit(m.id), accent=True, tip=f"Voir et modifier le protocole de {m.nom}"))
+        return _rangee(cel, self._largeurs(), i == n - 1)
 
     def _statut(self, m, statut: str):
         msg = self.ctrl.changer_statut(m, statut)
@@ -144,16 +176,15 @@ class PageRapports(QWidget):
             vide = etiquette("Aucun rapport : passe un protocole au statut « Réalisée » dans Protocole.", secondaire=True)
             vide.setContentsMargins(16, 24, 16, 24)
             v.addWidget(vide)
+        largeurs = [None] + [lg for _, lg in C.COMMUNES] + [125]
+        if liste:
+            v.addWidget(_rangee([_titre("RAPPORT")] + C.entetes_communes() + [QWidget()], largeurs, False, entete=True))
         for i, m in enumerate(liste):
-            w, g = _ligne_cadre(i == len(liste) - 1)
-            g.addWidget(_resume(m), 0, 0)
-            g.setColumnStretch(0, 1)
             emis = [x for x in m.rapports if x.type == "rapport"]
-            g.addWidget(etiquette(f"modifiée le {fmt_dt(m.maj)[:10]}<br>{len(emis)} rapport{'s' if len(emis) > 1 else ''} émis",
-                                  secondaire=True), 0, 1)
-            if m.journal:
-                g.addWidget(pastille(f"Modifiée après lancement ({len(m.journal)})", "warn"), 0, 2)
-            g.addWidget(bouton("Voir le rapport", lambda m=m: self.ouvrir.emit(m.id), accent=True, tip=f"Rapport de {m.nom}"), 0, 3)
-            v.addWidget(w)
+            marques = [pastille(f"Modifiée après lancement ({len(m.journal)})", "warn")] if m.journal else []
+            cel = [_resume(m, f"modifiée le {fmt_dt(m.maj)[:10]} · {len(emis)} rapport{'s' if len(emis) > 1 else ''} émis", marques=marques)]
+            cel += C.cellules_communes(m, self.ctrl.reglages)
+            cel.append(bouton("Voir le rapport", lambda m=m: self.ouvrir.emit(m.id), accent=True, tip=f"Rapport de {m.nom}"))
+            v.addWidget(_rangee(cel, largeurs, i == len(liste) - 1))
         self.lay.addWidget(f)
         self.lay.addStretch(1)

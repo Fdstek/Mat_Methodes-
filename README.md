@@ -84,6 +84,15 @@ un matériel tapé à la main est ajouté à la liste. ✎ renomme aussi dans le
 **Volumes** : section « Volumes » sous « Ma demande » : volume engagé (départ), prélevé (total des échantillons), restant,
 la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (en rouge en cas de dépassement).
 
+**Tableaux** : Définition (et Archivées), Protocole et Rapport ont les colonnes Donneur d'ordre, Type et Tags.
+
+**Lot** : plus de champ ni de mention « lot » dans l'application et les documents (seule la recherche Scirius l'affiche).
+
+**PDF du protocole** : le contexte est en puces, avec le titre de chaque point en gras ; dans le schéma du flux, chaque
+échantillon porte l'étiquette de son laboratoire (aussi dans le Word et à l'écran).
+
+**Réglages** : ◂ ▸ sous chaque carte changent l'ordre des cartes (préférence de chaque personne).
+
 **Remarques et commentaires** : la remarque d'une étape et le commentaire d'un échantillon sont repris dans le PDF du
 protocole, le PDF et le Word du rapport (détail par phase).
 
@@ -91,7 +100,7 @@ protocole, le PDF et le Word du rapport (détail par phase).
 moment : les étiquettes déjà notées ne changent pas. Chaque échantillon a une ligne « Commentaire », reprise dans le
 protocole et le détail du Rapport.
 
-**Tags** : liste déroulante des tags déjà utilisés (on peut aussi en taper un nouveau, Entrée). Chaque tag a une couleur
+**Tags** : Réglages › Tags permet aussi d'en créer un nouveau. Liste déroulante des tags déjà utilisés (on peut aussi en taper un nouveau, Entrée). Chaque tag a une couleur
 (fixe, tirée de son nom) ; Réglages › Tags : ● change la couleur.
 
 **Importer un ancien Mat & Méthode** (Définition) : fichier Word (.docx) ou texte (.txt), ou texte collé ; les étapes

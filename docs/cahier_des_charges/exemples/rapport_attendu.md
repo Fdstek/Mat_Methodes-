@@ -18,7 +18,7 @@ Objectif : Réduire le taux de FFA de la graisse animale par désacidification �
 
 Contexte : Essai de référence avant le passage à l’échelle pilote.
 
-Matière étudiée : Graisse animale (lot [n° à saisir]).
+Matière étudiée : Graisse animale.
 
 Volume de départ : 1 000 mL, dont 325 mL prélevés sous forme de 6 échantillons.
 
@@ -28,7 +28,7 @@ Le flux comporte 5 étapes (étapes 1 à 5), décrites en 2.3.
 
 Matériel : plaque chauffante agitatrice (étape 1), entonnoir Büchner (étape 2), fiole à vide (étape 2), membrane 5 µm (étape 2), ampoule à décanter 500 mL (étapes 3, 4), étuve (étape 5).
 
-Réactifs : éthanol 96 % (étape 3, fournisseur [nom à saisir], lot [n° à saisir]) ; eau distillée (étape 3, fournisseur production interne, lot [n° à saisir]).
+Réactifs : éthanol 96 % (étape 3, fournisseur [nom à saisir]) ; eau distillée (étape 3, fournisseur production interne).
 
 ### 2.3 Méthodes
 
@@ -83,8 +83,8 @@ Un échantillon de 100 mL (S5b) a été prélevé à l’effluent de l’étape 
 - Conditions : 25 °C · 15 min · 300 tr/min
 - Matériel : Ampoule à décanter 500 mL
 - Réactifs : 
-  - Éthanol 96 % · 1 : 1 (v/v) · n° Scirius 001245 · emplacement Armoire inflammables 1 · étagère 2 · fournisseur à saisir · lot à saisir
-  - Eau distillée · 5 % (v/v) · n° Scirius à saisir · emplacement Distillateur · labo 2 · fournisseur production interne · lot à saisir
+  - Éthanol 96 % · 1 : 1 (v/v) · n° Scirius 001245 · emplacement Armoire inflammables 1 · étagère 2 · fournisseur à saisir
+  - Eau distillée · 5 % (v/v) · n° Scirius à saisir · emplacement Distillateur · labo 2 · fournisseur production interne
 - Échantillons : 
   - S3a · 50 mL · pendant · à 10 min · Labo interne · FFA / indice d’acide, Teneur en eau, Impuretés insolubles · n° Scirius 000414 · n° Aramis à saisir
   - S3b · 25 mL · effluent · Labo externe · Métaux (ICP), Phosphore · n° Scirius à saisir · n° Aramis à saisir
@@ -107,10 +107,10 @@ Un échantillon de 100 mL (S5b) a été prélevé à l’effluent de l’étape 
 
 ### Réactifs
 
-| Réactif | N° Scirius | Emplacement | Fournisseur | Lot | Étape |
-|---|---|---|---|---|---|
-| Éthanol 96 % | 001245 | Armoire inflammables 1 · étagère 2 | à saisir | à saisir | 3 |
-| Eau distillée | à saisir | Distillateur · labo 2 | production interne | à saisir | 3 |
+| Réactif | N° Scirius | Emplacement | Fournisseur | Étape |
+|---|---|---|---|---|
+| Éthanol 96 % | 001245 | Armoire inflammables 1 · étagère 2 | à saisir | 3 |
+| Eau distillée | à saisir | Distillateur · labo 2 | production interne | 3 |
 
 ### Échantillons
 

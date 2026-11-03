@@ -847,7 +847,7 @@ class PageFlux(QWidget):
         def pill(p):
             n = R.numero_etape(m, p)
             q = "avant" if n == 0 else (f"à {fmt_dur(p.temps_min)}" if p.temps_min is not None else "à ?") if p.moment == "pendant" else "sortie"
-            return ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}", code_badge(lab[p.id]))
+            return ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}" + (f" · {p.labo}" if p.labo else ""), code_badge(lab[p.id]))
 
         dep = [p for p in ech if R.numero_etape(m, p) == 0]
         c = self._carte_flux(DEPART, None, "Départ")
@@ -953,16 +953,14 @@ class PageFlux(QWidget):
             cl.addWidget(etiquette("Matière de départ", "titreCarte"))
             mat = ChampTexte(m.contexte.matiere)
             mat.modifie.connect(lambda v: (setattr(m.contexte, "matiere", v), self._toucher()))
-            lot = ChampTexte(m.contexte.lot, "lot ?", mono=True)
-            lot.modifie.connect(lambda v: (setattr(m.contexte, "lot", v), self._toucher()))
             sc = ChampTexte(m.contexte.scirius, "à saisir", mono=True)
             sc.modifie.connect(lambda v: (setattr(m.contexte, "scirius", v.strip()), self._toucher()))
             fo = ChampTexte(m.contexte.fournisseur)
             fo.modifie.connect(lambda v: (setattr(m.contexte, "fournisseur", v), self._toucher()))
-            cl.addWidget(ligne(champ("Matière (charge)", mat), champ("Lot", lot)))
+            cl.addWidget(champ("Matière (charge)", mat))
             cl.addWidget(ligne(champ("N° Scirius de la charge", sc), champ("Fournisseur", fo)))
             cl.addWidget(ligne(bouton("Chercher la charge dans Scirius…", self._scirius_charge, accent=True,
-                                      tip="Remplit le nom, le lot, le n° Scirius et le fournisseur depuis le fichier Scirius de SharePoint"),
+                                      tip="Remplit le nom, le n° Scirius et le fournisseur depuis le fichier Scirius de SharePoint"),
                                etiquette("Pas dans le fichier ? Saisis les champs à la main.", secondaire=True), "stretch"))
             lay.addWidget(f)
         else:
@@ -1089,7 +1087,7 @@ class PageFlux(QWidget):
                              tip="Ajouter un réactif à la liste des Réglages et le choisir ici")
             v.addWidget(champ("Réactif", nom))
             v.addWidget(flux_widgets([nouveau, bouton("Chercher dans Scirius…", lambda re_=re_: self._scirius_reactif(re_), lien=True,
-                                                      tip="Remplit le n° Scirius, l’emplacement, le fournisseur et le lot depuis le fichier Scirius")]))
+                                                      tip="Remplit le n° Scirius, l’emplacement et le fournisseur depuis le fichier Scirius")]))
             q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
             v.addWidget(champ("Quantité ou ratio", q))
@@ -1099,16 +1097,9 @@ class PageFlux(QWidget):
                 sc.modifie.connect(lambda val, inv=inv: self._inv(inv, "scirius", val))
                 em = ChampTexte(inv.emplacement, "ex. armoire 1, étagère 2")
                 em.modifie.connect(lambda val, inv=inv: self._inv(inv, "emplacement", val))
-                v.addWidget(ligne(champ("N° Scirius", sc), champ("Emplacement", em)))
-                plus = Expander("Fournisseur et lot", ouvert=bool(inv.fournisseur or inv.lot))
-                plus.setObjectName("")
-                plus.layout().setContentsMargins(0, 0, 0, 0)
                 fo = ChampTexte(inv.fournisseur)
                 fo.modifie.connect(lambda val, inv=inv: self._inv(inv, "fournisseur", val))
-                lo = ChampTexte(inv.lot, mono=True)
-                lo.modifie.connect(lambda val, inv=inv: self._inv(inv, "lot", val))
-                plus.ajouter(ligne(champ("Fournisseur", fo), champ("Lot", lo)))
-                v.addWidget(plus)
+                v.addWidget(ligne(champ("N° Scirius", sc), champ("Emplacement", em), champ("Fournisseur", fo)))
             g.addWidget(sf, k // 2, k % 2, Qt.AlignmentFlag.AlignTop)
         wg = QWidget()
         wg.setLayout(g)

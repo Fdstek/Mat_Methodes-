@@ -138,7 +138,7 @@ class Fenetre(QMainWindow):
             s = QScrollArea()
             s.setWidgetResizable(True)
             s.setFrameShape(QFrame.Shape.NoFrame)
-            s.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff if k in ("manips", "protocoles", "rapports") else Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            s.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # fenêtre étroite : défilement plutôt que colonnes coupées
             boite = QWidget()
             boite.setObjectName("page")
             bl = QVBoxLayout(boite)

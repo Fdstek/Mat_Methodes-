@@ -10,6 +10,7 @@ from __future__ import annotations
 from xml.sax.saxutils import escape
 
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table, TableStyle
 
@@ -44,7 +45,7 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         titre = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + \
             f"<b>{escape(ph['titre'])}</b>"
         if i == 0:
-            info = escape(ctx.get("matiere") or "") + (f" · lot {escape(ctx['lot'])}" if ctx.get("lot") else " · lot : ……………") + (
+            info = escape(ctx.get("matiere") or "") + "" + (
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
@@ -96,7 +97,11 @@ def ecrire_protocole(data: dict, chemin) -> None:
     contexte = next((b for b in data.get("sous_sections", []) if b.get("titre", "").startswith("2.1")), None)
     if contexte:
         story.append(Paragraph("Contexte", h2))
-        story += [Paragraph(avec_reperes(x.replace(", décrites en 2.3", "")), corps) for x in contexte["texte"].split("\n") if x]
+        puce = ParagraphStyle("puce", parent=corps, leftIndent=12, bulletIndent=2, spaceAfter=1)
+        for x in (x for x in contexte["texte"].split("\n") if x):  # « Demande : … » -> puce, titre en gras
+            x = avec_reperes(x.replace(", décrites en 2.3", ""))
+            titre, sep, reste = x.partition(" : ")
+            story.append(Paragraph(f"<b>{titre} :</b> {reste}" if sep else x, puce, bulletText="•"))
     story += [Paragraph("Flux de prétraitement", h2), Flux(data["etapes"], data.get("prelevements", []), largeur),
               Spacer(1, 3 * mm), Paragraph(escape(legende_flux(data)), petit)]
     tab = table_reactifs(data, s)

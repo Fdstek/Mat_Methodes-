@@ -171,8 +171,7 @@ class PageRapport(QWidget):
                 col_r.addWidget(etiquette(f"<b>{escape(x.nom)}</b>{' · ' + escape(x.quantite) if x.quantite else ''}<br>"
                                           f"<span style='color:{theme.P.texte2}'>n° Scirius</span> {a_saisir(x.scirius)} · "
                                           f"<span style='color:{theme.P.texte2}'>emplacement</span> {a_saisir(x.emplacement)}<br>"
-                                          f"<span style='color:{theme.P.texte2}'>fournisseur</span> {a_saisir(x.fournisseur)} · "
-                                          f"<span style='color:{theme.P.texte2}'>lot</span> {a_saisir(x.lot)}", wrap=True))
+                                          f"<span style='color:{theme.P.texte2}'>fournisseur</span> {a_saisir(x.fournisseur)}", wrap=True))
             col_r.addStretch(1)
             col_e = QVBoxLayout()
             col_e.addWidget(etiquette("Échantillons", "etiquetteChamp"))
@@ -193,8 +192,8 @@ class PageRapport(QWidget):
 
         if rap.reactifs:
             self.lay.addWidget(etiquette("Réactifs", "sousTitre"))
-            self.lay.addWidget(table(["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Lot", "Étape"],
-                                     [[x.nom, x.scirius, x.emplacement, x.fournisseur, x.lot, ", ".join(map(str, x.etapes))] for x in rap.reactifs]))
+            self.lay.addWidget(table(["Réactif", "N° Scirius", "Emplacement", "Fournisseur", "Étape"],
+                                     [[x.nom, x.scirius, x.emplacement, x.fournisseur, ", ".join(map(str, x.etapes))] for x in rap.reactifs]))
         if rap.echantillons:
             self.lay.addWidget(etiquette("Échantillons", "sousTitre"))
             self.lay.addWidget(table(["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Laboratoire", "Analyses"],

@@ -50,4 +50,4 @@ def test_charge_dans_le_texte(ethanol, reglages):
     from mat_methode.report.rapport import construire
     ethanol.contexte.scirius, ethanol.contexte.fournisseur = "000777", "Interne"
     t = construire(ethanol, reglages).sections[0].texte
-    assert "Matière étudiée : Graisse animale (lot {{?n°}}, n° Scirius 000777, fournisseur Interne)." in t
+    assert "Matière étudiée : Graisse animale (n° Scirius 000777, fournisseur Interne)." in t

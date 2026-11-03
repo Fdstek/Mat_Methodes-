@@ -50,9 +50,9 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
             + "</div>")
     t1 = ""
     if r.reactifs:
-        t1 = ("<h3>Réactifs</h3><table><tr><th>Réactif</th><th>N° Scirius</th><th>Emplacement</th><th>Fournisseur</th><th>Lot</th><th>Étape</th></tr>"
+        t1 = ("<h3>Réactifs</h3><table><tr><th>Réactif</th><th>N° Scirius</th><th>Emplacement</th><th>Fournisseur</th><th>Étape</th></tr>"
               + "".join(f"<tr><td><b>{e(x.nom)}</b></td><td>{td(x.scirius)}</td><td>{td(x.emplacement)}</td><td>{td(x.fournisseur)}</td>"
-                        f"<td>{td(x.lot)}</td><td>{', '.join(map(str, x.etapes))}</td></tr>" for x in r.reactifs) + "</table>")
+                        f"<td>{', '.join(map(str, x.etapes))}</td></tr>" for x in r.reactifs) + "</table>")
     t2 = ""
     if r.echantillons:
         t2 = ("<h3>Échantillons</h3><table><tr><th>Éch.</th><th>Étape</th><th>Moment</th><th>Volume</th><th>N° Scirius</th><th>N° Aramis</th><th>Laboratoire</th><th>Analyses</th></tr>"
@@ -70,7 +70,7 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
         + (f'<div class="e">{e(", ".join(ph.materiel))}</div>' if ph.materiel else "")
         + (("<div><b>Réactifs</b> " + ("".join(
             f"<div>{e(x.nom)}{' · ' + e(x.quantite) if x.quantite else ''} — n° Scirius {td(x.scirius)}, emplacement {td(x.emplacement)}, "
-            f"fournisseur {td(x.fournisseur)}, lot {td(x.lot)}</div>" for x in ph.reactifs) or "aucun") + "</div>") if ph.n else "")
+            f"fournisseur {td(x.fournisseur)}</div>" for x in ph.reactifs) or "aucun") + "</div>") if ph.n else "")
         + "<div><b>Échantillons</b> " + ("".join(
             f'<div class="s"><b>{e(x.id)}</b> · {fmt_vol(x.volume or 0)} mL · {e(x.moment)} · {e(x.labo)} · {e(", ".join(x.analyses))} — '
             f"n° Scirius {td(x.scirius)}, n° Aramis {td(x.aramis)}</div>" for x in ph.echantillons) or "aucun") + "</div></div>"

@@ -480,3 +480,25 @@ def test_ordre_dans_les_reglages(fen):
     fen.ouvrir(m.id, "def")
     typ = next(x for x in fen.p_flux.findChildren(Liste) if r.types_demande[0] in [x.itemText(i) for i in range(x.count())])
     assert [typ.itemText(i) for i in range(typ.count())][1:3] == r.types_demande[:2]
+
+
+def test_tag_cree_dans_les_reglages_et_ordre_des_cartes(fen, monkeypatch):
+    from mat_methode.domain.regles import tous_les_tags
+    from mat_methode.ui.widgets import ChampTexte, ListeSaisie
+    fen.aller("reglages", "tags")
+    champ = next(x for x in fen.p_reglages.findChildren(ChampTexte) if x.placeholderText() == "Nouveau tag")
+    champ.setText("pilote")
+    champ.returnPressed.emit()
+    assert "pilote" in tous_les_tags(fen.ctrl.manips, fen.ctrl.reglages.ordre_tags)
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux.basculer_edition()
+    tag = next(x for x in fen.p_flux.findChildren(ListeSaisie) if x.accessibleName() == "Ajouter un tag")
+    assert "pilote" in [tag.itemText(i) for i in range(tag.count())]
+    fen.aller("reglages")
+    premiere = fen.p_reglages._sections_ordonnees()[0][0]
+    fen.p_reglages._deplacer_carte(premiere, 1)
+    assert fen.p_reglages._sections_ordonnees()[1][0] == premiere
+    fen.aller("manips")
+    textes = [w.text() for w in fen.p_manips.findChildren(type(fen.titre))]
+    assert {"DONNEUR D’ORDRE", "TYPE", "TAGS", "STATUT"} <= set(textes)

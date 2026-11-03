@@ -473,8 +473,8 @@ def rapports_clotures(manips: list[Manip]) -> list[Manip]:
 
 # ------------------------------------------------------------------ tags (§8.7 bis)
 def tous_les_tags(manips: list[Manip], ordre: list[str] | None = None) -> list[str]:
-    """Tags utilisés, dans l'ordre choisi dans les Réglages (`ordre`), puis les autres par ordre alphabétique."""
-    out: list[str] = []
+    """Tags utilisés et tags créés dans les Réglages (`ordre`), dans l'ordre choisi, puis les autres par ordre alphabétique."""
+    out: list[str] = [t for t in (ordre or []) if t.strip()]
     for m in manips:
         for t in m.tags:
             if not any(norm(x) == norm(t) for x in out):

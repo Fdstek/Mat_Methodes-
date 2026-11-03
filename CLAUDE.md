@@ -58,16 +58,17 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   - `Fenetre.choix` : manip choisie par section ; une sous-section n'est active qu'après « Ouvrir » dans sa liste (`choisie`) ;
   - `page_rapport.py` : exports, dernier rapport émis (`ligne_emis`) ;
   - `page_protocole.py` : même vue que Flux en lecture (2e `PageFlux`, contexte protocole) ; Modifier, statut et export dans le bandeau fixe ;
-  - `page_reglages.py` : cartes des Réglages ;
+  - `page_reglages.py` : cartes des Réglages (ordre par personne : préférence `ordre_reglages`) ;
+  - `colonnes.py` : colonnes communes des tableaux (donneur d'ordre, type, tags) ;
   - `widgets.py` : `SansMolette`, `ListeSaisie`, `ChipSupprimable`, `Expander` ;
   - `dialogues.py`, `controleur.py`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 19 ; la construction de l'exe sous Windows réussit (02/11).
-- Lot du 03/11 07h47 (bandeau de statut fixe hors défilement — `PageFlux.bandeau` placé par `Fenetre._bandeau` dans
-  `zone_fixe`, statut en liste déroulante, actions de Protocole via `actions_bandeau` ; remarques et commentaires dans les PDF ;
-  ouverture du document après export ; dossiers Rapports / Protocoles ; duplication d'échantillon) : poussé sur la branche.
+- Lots livrés et fusionnés jusqu'à la PR n° 21 ; la construction de l'exe sous Windows réussit (02/11).
+- Lot du 03/11 10h55 (plus de lot dans l'appli et les documents ; nouveau tag dans Réglages (`ordre_tags`) ; colonnes
+  Donneur / Type / Tags via `ui/colonnes.py` dans Définition, Protocole, Rapport ; contexte du protocole en puces ;
+  étiquette du labo des échantillons dans le schéma du flux ; ordre des cartes des Réglages dans les préférences) : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
