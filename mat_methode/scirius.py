@@ -103,6 +103,11 @@ def ouvrir_avec_excel(url: str, cible: Path) -> tuple[Optional[Path], str]:
         return None, "Excel n’est pas accessible depuis l’application (module pywin32 absent)"
     excel = classeur = None
     try:
+        import pythoncom  # type: ignore
+        pythoncom.CoInitialize()  # nécessaire hors du fil principal (chargement en arrière-plan)
+    except Exception:
+        pythoncom = None
+    try:
         excel = win32com.client.DispatchEx("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
@@ -119,6 +124,11 @@ def ouvrir_avec_excel(url: str, cible: Path) -> tuple[Optional[Path], str]:
                 excel.Quit()
         except Exception:
             pass
+        if pythoncom is not None:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
 
 
 def associer_colonnes(valeurs) -> dict:

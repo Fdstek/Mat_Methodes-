@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from mat_methode.domain.catalogue import est_centrifugation, participe
 from mat_methode.domain.models import Etape, Manip, Prelevement, Reglages
 from mat_methode.domain.regles import (
+    bilan,
     blocs,
     echantillons_tries,
     est_entree,
@@ -19,7 +20,6 @@ from mat_methode.domain.regles import (
     moment_court,
     numero_etape,
     plage,
-    total_preleve,
 )
 from mat_methode.domain.texte import (
     cap,
@@ -200,14 +200,18 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     sections = []
 
     # une idée par ligne (lisibilité) : les exports font un paragraphe par ligne
+    b = bilan(m)
     l21 = [f"Demande : {c.donneur or ph('donneur d’ordre')}{', type ' + c.type if c.type else ''} (réf. {c.ref or ph('n°')}).",
            phrase("Objectif", c.objectif).strip(), (phrase("Idée testée", c.idee).strip() if est_test(c.type) else ""),
            phrase("Contexte", c.precisions).strip(),
            f"Matière étudiée : {c.matiere or ph('matière')}"
            + (" (" + ", ".join(x for x in (f"n° Scirius {c.scirius}" if c.scirius else "", f"fournisseur {c.fournisseur}" if c.fournisseur else "") if x)
               + ")" if c.scirius or c.fournisseur else "") + ".",
+           (f"Prélèvement en amont : {fmt_vol(b.amont)} mL avant traitement ({b.n_amont} échantillon{'s' if b.n_amont > 1 else ''}, "
+            f"hors volume de départ)" + (f", soit {fmt_vol(b.total)} mL de charge à prévoir" if c.volume_depart_ml is not None else "") + "."
+            if b.n_amont else ""),
            "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
-           + (f", dont {fmt_vol(total_preleve(m))} mL prélevés sous forme de {ns} échantillon{'s' if ns > 1 else ''}" if ns else "") + ".",
+           + (f", dont {fmt_vol(b.preleve)} mL prélevés pendant le flux sous forme de {b.n} échantillon{'s' if b.n > 1 else ''}" if b.n else "") + ".",
            (f"Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else ""),
            ("Grandes étapes : " + " ; ".join(f"{g.nom} ({plage([i + 1 for i in idx])})" for g, idx in grands) + "." if grands else "")]
     t21 = "\n".join(x for x in l21 if x)

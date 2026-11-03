@@ -36,6 +36,7 @@ from mat_methode.ui.widgets import (
     Segmente,
     ToggleSwitch,
     ambre,
+    avatar,
     badge,
     bouton,
     carte,
@@ -173,7 +174,7 @@ class PageFlux(QWidget):
 
     def basculer_edition(self):
         self.edition = not self.edition
-        self.rafraichir()
+        self._actualiser()
         self.edition_changee.emit()
 
     def ouvrir(self, mode: str):
@@ -182,6 +183,11 @@ class PageFlux(QWidget):
         self.etape_id = DEPART
         self.inserer_apres = None
         self.groupe_cible = None
+
+    def _actualiser(self):
+        """Reconstruit la page sans la faire remonter (position gardée par la fenêtre)."""
+        f = getattr(self, "sur_place", None)
+        f() if f else self.rafraichir()
 
     # ------------------------------------------------------------ rendu
     def rafraichir(self, structure: bool = True):
@@ -297,6 +303,13 @@ class PageFlux(QWidget):
             h2.addWidget(etiquette("Passe-la « Validée » quand le Mat & Méthode est prêt : elle arrivera dans Protocole.", secondaire=True))
         h.addStretch(1)
         h2.addStretch(1)
+        autres = self.ctrl.presents_sur(m.id)
+        if autres:  # comme dans Excel : qui d'autre a cette manip ouverte
+            h.addWidget(etiquette("aussi ouverte par", secondaire=True))
+            for pr in autres:
+                h.addWidget(avatar(self.ctrl.initiales_de(pr.get("utilisateur", "")),
+                                   f"{self.ctrl.nom_de(pr.get('utilisateur', ''))} ({pr.get('pc', '')}) a cette manip ouverte",
+                                   cle=pr.get("utilisateur", "")))
         if not self.ctrl.lecture_seule and m.etat != ARCHIVEE and (self.contexte == "protocole" or m.etat != BROUILLON):
             h.addWidget(bouton("Terminer la modification" if self.edition else "✎  Modifier", self.basculer_edition,
                                accent=not self.edition, tip="Rendre la manip modifiable (elle s’affiche en lecture)"))
@@ -484,7 +497,8 @@ class PageFlux(QWidget):
         vider(lay)
         m, p = self.m, theme.P
         b = R.bilan(m)
-        self._volumes_x.changer_note(f"{fmt_vol(b.depart)} mL engagés · {fmt_vol(b.preleve)} mL prélevés · "
+        self._volumes_x.changer_note((f"{fmt_vol(b.amont)} mL en amont · " if b.n_amont else "")
+                                     + f"{fmt_vol(b.depart)} mL engagés · {fmt_vol(b.preleve)} mL prélevés · "
                                      + (f"dépassement de {fmt_vol(-b.restant)} mL" if b.depassement else f"{fmt_vol(b.restant)} mL restants"))
 
         def tuile(titre, valeur, detail, couleur=None):
@@ -502,11 +516,17 @@ class PageFlux(QWidget):
             return f
 
         depart = m.contexte.volume_depart_ml
-        lay.addWidget(ligne(
-            tuile("ENGAGÉ", f"{fmt_vol(b.depart)} mL" if depart else "—", "volume de départ (Ma demande)" if depart else "volume de départ à saisir dans Ma demande"),
-            tuile("PRÉLEVÉ", f"{fmt_vol(b.preleve)} mL", f"{b.n} échantillon{'s' if b.n > 1 else ''}"),
-            tuile("RESTANT", f"{fmt_vol(b.restant)} mL", "dépassement : plus prélevé qu’engagé" if b.depassement else "à la fin du flux",
-                  p.danger if b.depassement else p.succes)))
+        tuiles = []
+        if b.n_amont:  # échantillons pris avant traitement : en plus du volume de la manip
+            tuiles.append(tuile("EN AMONT", f"{fmt_vol(b.amont)} mL", f"{b.n_amont} éch. avant traitement, hors manip"))
+        tuiles += [tuile("ENGAGÉ", f"{fmt_vol(b.depart)} mL" if depart else "—",
+                         "volume de départ (Ma demande)" if depart else "volume de départ à saisir dans Ma demande"),
+                   tuile("PRÉLEVÉ", f"{fmt_vol(b.preleve)} mL", f"{b.n} éch. pendant le flux"),
+                   tuile("RESTANT", f"{fmt_vol(b.restant)} mL", "dépassement : plus prélevé qu’engagé" if b.depassement else "à la fin du flux",
+                         p.danger if b.depassement else p.succes)]
+        if b.n_amont:
+            tuiles.append(tuile("À PRÉVOIR", f"{fmt_vol(b.total)} mL", "charge totale : amont + engagé"))
+        lay.addWidget(ligne(*tuiles))
         if b.depart:
             barre = QProgressBar()
             barre.setRange(0, 100)
@@ -526,8 +546,8 @@ class PageFlux(QWidget):
                 g.addWidget(etiquette(f"<b style='color:{p.ambre_texte}'>{lab}</b>"), i, 0)
                 g.addWidget(etiquette(ou, wrap=True), i, 1)
                 g.addWidget(etiquette(f"{fmt_vol(vol)} mL"), i, 2)
-                r = etiquette(f"{fmt_vol(reste)} mL" if b.depart else "—")
-                if b.depart and reste < 0:
+                r = etiquette(f"{fmt_vol(reste)} mL" if b.depart and reste is not None else "—")
+                if b.depart and reste is not None and reste < 0:
                     r.setStyleSheet(f"color:{p.danger};font-weight:600;")
                 g.addWidget(r, i, 3)
             g.setColumnStretch(1, 1)
@@ -688,7 +708,7 @@ class PageFlux(QWidget):
             if nom:
                 self._commencer_groupe(nom)
             else:
-                self.rafraichir()
+                self._actualiser()
         else:
             self._commencer_groupe(v[2:])
 
@@ -706,11 +726,11 @@ class PageFlux(QWidget):
 
     def _viser_groupe(self, gid):
         self.groupe_cible, self.inserer_apres = gid, None
-        self.rafraichir()
+        self._actualiser()
 
     def _finir_groupe(self):
         self.groupe_cible = None
-        self.rafraichir()
+        self._actualiser()
 
     def _defaire_groupe(self, g):
         self.ctrl.memoriser_manip()
@@ -791,7 +811,7 @@ class PageFlux(QWidget):
     def _inserer(self, i):
         self.inserer_apres = i
         self.groupe_cible = None
-        self.rafraichir()
+        self._actualiser()
 
     def _deplacer(self, e, sens):
         R.deplacer_etape(self.m, e.id, sens)
@@ -917,7 +937,7 @@ class PageFlux(QWidget):
 
     def aller(self, ident):
         self.etape_id = ident
-        self.rafraichir()
+        self._actualiser()
 
     def ordre(self):
         return [DEPART] + [e.id for e in self.m.etapes]

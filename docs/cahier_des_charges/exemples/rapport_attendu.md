@@ -20,7 +20,9 @@ Contexte : Essai de référence avant le passage à l’échelle pilote.
 
 Matière étudiée : Graisse animale.
 
-Volume de départ : 1 000 mL, dont 325 mL prélevés sous forme de 6 échantillons.
+Prélèvement en amont : 50 mL avant traitement (1 échantillon, hors volume de départ), soit 1 050 mL de charge à prévoir.
+
+Volume de départ : 1 000 mL, dont 275 mL prélevés pendant le flux sous forme de 5 échantillons.
 
 Le flux comporte 5 étapes (étapes 1 à 5), décrites en 2.3.
 

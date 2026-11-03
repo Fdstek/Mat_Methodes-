@@ -144,6 +144,10 @@ class Stockage:
         return self.donnees / "verrous"
 
     @property
+    def d_presence(self) -> Path:
+        return self.donnees / "presence"
+
+    @property
     def d_exports(self) -> Path:
         return self.donnees / "exports"
 
@@ -355,6 +359,48 @@ class Stockage:
                 (self.d_verrous / f"{ident}.lock").unlink()
             except OSError:
                 pass
+
+    # ------------------------------------------------------------ présence (qui a l'application ouverte, et sur quelle manip)
+    def _f_presence(self) -> Path:
+        return self.d_presence / f"{self.utilisateur}_{self.pc}.json".replace("\\", "_").replace("/", "_")
+
+    def signaler_presence(self, manip: str | None) -> None:
+        """Battement de présence (toutes les 30 s) : utilisateur, poste, manip ouverte."""
+        if self.lecture_seule:
+            return
+        try:
+            self.d_presence.mkdir(parents=True, exist_ok=True)
+            ecrire_atomique(self._f_presence(), _dumps({"utilisateur": self.utilisateur, "pc": self.pc, "manip": manip or "",
+                                                        "battement": maintenant_iso()}))
+        except OSError:
+            pass
+
+    def retirer_presence(self) -> None:
+        try:
+            self._f_presence().unlink()
+        except OSError:
+            pass
+
+    def presences_autres(self, maintenant: datetime | None = None) -> list[dict]:
+        """Les autres personnes (ou moi sur un autre poste) dont la présence date de moins de 3 minutes."""
+        maintenant = maintenant or datetime.now(timezone.utc)
+        out = []
+        try:
+            fichiers = sorted(self.d_presence.glob("*.json"))
+        except OSError:
+            return out
+        for f in fichiers:
+            try:
+                d = lire_json(f)
+                b = datetime.fromisoformat(str(d.get("battement", "")).replace("Z", "+00:00"))
+            except (OSError, ValueError, TypeError):
+                continue
+            if (maintenant - b).total_seconds() > EXPIRATION_VERROU_S:
+                continue
+            if d.get("utilisateur") == self.utilisateur and d.get("pc") == self.pc:
+                continue
+            out.append(d)
+        return out
 
     # ------------------------------------------------------------ préférences
     def lire_preferences(self) -> dict:

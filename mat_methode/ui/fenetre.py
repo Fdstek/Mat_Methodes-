@@ -31,7 +31,7 @@ from mat_methode.ui.page_manips import PageManips
 from mat_methode.ui.page_protocole import PageProtocole
 from mat_methode.ui.page_rapport import PageRapport
 from mat_methode.ui.page_reglages import PageReglages
-from mat_methode.ui.widgets import Toast, bouton, etiquette, pastille, vider
+from mat_methode.ui.widgets import Toast, avatar, bouton, etiquette, pastille, vider
 
 # Segoe Fluent Icons (Windows 11) ; repli sur des symboles simples
 ICONES = {"manips": ("\ue8fd", "≡"), "flux": ("\ue8ab", "⇄"),
@@ -114,6 +114,11 @@ class Fenetre(QMainWindow):
         self.enregistrement = etiquette("", "enregistrement")
         self.enregistrement.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
         self.enregistrement.setAccessibleName("État de l’enregistrement")
+        self.presents = QWidget()  # pastilles aux initiales des autres personnes présentes
+        self.presents.setAccessibleName("Autres personnes présentes")
+        QHBoxLayout(self.presents).setContentsMargins(0, 0, 12, 0)
+        self.presents.layout().setSpacing(2)
+        tete.addWidget(self.presents, 0, Qt.AlignmentFlag.AlignTop)
         tete.addWidget(self.enregistrement, 0, Qt.AlignmentFlag.AlignTop)
         cv.addLayout(tete)
         self.zone_fixe = QWidget()  # bandeau de statut de Flux / Édition : ne défile pas avec la page
@@ -133,6 +138,9 @@ class Fenetre(QMainWindow):
         self.p_rapports = PageRapports(ctrl)
         self.pages = {"manips": self.p_manips, "flux": self.p_flux, "protocoles": self.p_protocoles, "protocole": self.p_protocole,
                       "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages}
+        for k, page in self.pages.items():  # actions dans une page : reconstruction sans remonter en haut
+            page.sur_place = lambda k=k: self._sur_place(k)
+        self.p_protocole.flux.sur_place = lambda: self._sur_place("protocole")
         self.defilements = {}
         for k, p in self.pages.items():
             s = QScrollArea()
@@ -158,6 +166,7 @@ class Fenetre(QMainWindow):
         ctrl.conflit.connect(self._conflit)
         ctrl.retour_dossier.connect(self._retour_dossier)
         ctrl.alerte.connect(lambda t: D.informer(self, "Attention", t))
+        ctrl.presence_changee.connect(self._presence)
         self.p_manips.ouvrir.connect(self.ouvrir)
         self.p_manips.nouvelle.connect(self.nouvelle)
         self.p_manips.importer.connect(self.importer)
@@ -307,6 +316,23 @@ class Fenetre(QMainWindow):
         self._statut(self._texte_statut() if not ctrl.st.lecture_seule else "Non enregistré : dossier inaccessible",
                      ctrl.st.lecture_seule)
 
+    def _presence(self):
+        """Pastilles des personnes présentes (en haut à droite) ; les listes et le bandeau de la manip se mettent à jour."""
+        lay = self.presents.layout()
+        vider(lay)
+        noms = {m.id: m.nom for m in self.ctrl.manips}
+        for p in self.ctrl.presents:
+            qui = self.ctrl.nom_de(p.get("utilisateur", ""))
+            ou = noms.get(p.get("manip") or "", "")
+            lay.addWidget(avatar(self.ctrl.initiales_de(p.get("utilisateur", "")),
+                                 f"{qui} ({p.get('pc', '')}) est dans l’application" + (f" · manip ouverte : {ou}" if ou else ""),
+                                 cle=p.get("utilisateur", "")))
+        self.presents.setVisible(bool(self.ctrl.presents))
+        if self.page in ("manips", "protocoles", "rapports"):
+            self.pages[self.page].rafraichir()
+        elif self.page in ("flux", "protocole"):
+            {"flux": self.p_flux, "protocole": self.p_protocole.flux}[self.page]._remplir_lancement()
+
     def _bandeau(self):
         """Place le bandeau de statut de la page (Flux ou Protocole › Édition) dans la zone fixe."""
         lay = self.zone_fixe.layout()
@@ -346,15 +372,40 @@ class Fenetre(QMainWindow):
         self._carte()
         m = self.ctrl.courante
         if structure:
-            pos = self.defilements[self.page].verticalScrollBar().value()
-            self.rafraichir()
-            QTimer.singleShot(0, lambda: self.defilements[self.page].verticalScrollBar().setValue(pos))
+            self.rafraichir_sur_place()
         elif self.page == "flux":
             self.p_flux.rafraichir(structure=False)
             if m and self.titre.text() != m.nom:
                 self.titre.setText(m.nom)
         elif self.page == "protocole":
             self.p_protocole.rafraichir(structure=False)
+
+    def _sur_place(self, page: str):
+        if self.page == page:
+            self.rafraichir_sur_place()
+        else:
+            self.pages[page].rafraichir()
+
+    def rafraichir_sur_place(self):
+        """Reconstruit la page sans la faire remonter : la hauteur du contenu est gardée pendant la reconstruction
+        (sinon la barre de défilement retombe à 0), puis la position est rétablie une fois la mise en page faite."""
+        zone = self.defilements[self.page]
+        sb, contenu = zone.verticalScrollBar(), zone.widget()
+        pos = sb.value()
+        contenu.setMinimumHeight(contenu.height())
+        self.rafraichir()
+        essais = [0]
+
+        def retablir():
+            essais[0] += 1
+            if sb.maximum() < pos and essais[0] < 10:  # mise en page pas encore terminée
+                QTimer.singleShot(15, retablir)
+                return
+            sb.setValue(pos)
+            contenu.setMinimumHeight(0)
+            QTimer.singleShot(0, lambda: sb.setValue(pos))
+
+        QTimer.singleShot(0, retablir)
 
     def _liste_changee(self):
         if self.page in ("manips", "protocoles", "rapports"):

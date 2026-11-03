@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_vol
-from mat_methode.exports.pdf import code_badge, conditions, moment_texte
+from mat_methode.exports.pdf import code_badge, conditions, moment_texte, phrase_volumes
 from mat_methode.exports.polices import trouver
 
 TEAL, AMBER, MUTED = "0F6B5C", "8A4B00", "566360"
@@ -254,12 +254,8 @@ def ecrire_docx(data: dict, chemin) -> None:
         ecrire(doc.add_paragraph(), "Grandes étapes : " + " ; ".join(f"{g['nom']} ({plage(g['etapes'])})" for g in data["grandes_etapes"]) + ".",
                8.5, couleur=MUTED)
     vd = ctx.get("volumeDepart")
-    if vd is not None:
-        pris = sum(p["volume_ml"] or 0 for p in pre)
-        reste = vd - pris
-        ecrire(doc.add_paragraph(), f"Volume : {fmt_vol(vd)} mL au départ, {fmt_vol(pris)} mL prélevés, "
-               + (f"{fmt_vol(reste)} mL restants. " if reste >= 0 else f"dépassement de {fmt_vol(-reste)} mL. ")
-               + "Chaque badge marque un prélèvement : sa place sur la frise donne le moment (bord droit = sortie de l’étape).", 8.5, couleur=MUTED)
+    if phrase_volumes(data):
+        ecrire(doc.add_paragraph(), phrase_volumes(data) + " Chaque badge marque un prélèvement : sa place sur la frise donne le moment (bord droit = sortie de l’étape).", 8.5, couleur=MUTED)
 
     doc.add_heading("Matériel et méthodes", level=1)
     for ss in data.get("sous_sections", []):

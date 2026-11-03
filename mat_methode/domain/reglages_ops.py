@@ -118,6 +118,9 @@ def renommer_type(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -
     ch = [m for m in manips if m.contexte.type == ancien]
     for m in ch:
         m.contexte.type = nouveau.strip()
+    if norm(ancien) in r.couleurs_types:  # la couleur choisie suit le nouveau nom
+        c = r.couleurs_types[norm(ancien)]
+        r.couleurs_types = {**{k: v for k, v in r.couleurs_types.items() if k != norm(ancien)}, norm(nouveau): c}
     return ch
 
 
@@ -307,6 +310,20 @@ def couleur_tag_suivante(r: Reglages, tag: str) -> str:
     i = PALETTE_TAGS.index(actuelle) if actuelle in PALETTE_TAGS else -1
     r.couleurs_tags = {**r.couleurs_tags, norm(tag): PALETTE_TAGS[(i + 1) % len(PALETTE_TAGS)]}
     return r.couleurs_tags[norm(tag)]
+
+
+def couleur_type(r: Reglages, typ: str) -> str:
+    """Couleur d'un type de demande : celle choisie dans les Réglages, sinon une couleur fixe tirée de son nom."""
+    import zlib
+    cle = norm(typ)
+    return r.couleurs_types.get(cle) or PALETTE_TAGS[(zlib.crc32(cle.encode("utf-8")) + 3) % len(PALETTE_TAGS)]
+
+
+def couleur_type_suivante(r: Reglages, typ: str) -> str:
+    actuelle = couleur_type(r, typ)
+    i = PALETTE_TAGS.index(actuelle) if actuelle in PALETTE_TAGS else -1
+    r.couleurs_types = {**r.couleurs_types, norm(typ): PALETTE_TAGS[(i + 1) % len(PALETTE_TAGS)]}
+    return r.couleurs_types[norm(typ)]
 
 
 def couleur_donneur(r: Reglages, nom: str) -> str:

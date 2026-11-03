@@ -118,6 +118,8 @@ def test_protocole(ethanol, reglages, tmp_path):
               "Réactifs", "Détail du flux par phase", "N° Aramis", "S3a", "S5b"):
         assert x in texte, x
     assert "Heure réelle" not in texte and "Observations" not in texte
+    for x in ("Volumes", "EN AMONT", "ENGAGÉ", "RESTANT", "À PRÉVOIR", "1 050 mL", "hors volume engagé"):
+        assert x.replace(" ", "") in texte.replace(" ", "").replace("\u202f", ""), x
     # ordre demandé : contexte, flux, réactifs, puis le détail par phase (les échantillons sont dans chaque phase)
     assert texte.index("Contexte") < texte.index("Flux de prétraitement") < texte.index("Réactifs") < texte.index("Détail du flux par phase")
     assert "Échantillons" not in texte.split("Détail du flux par phase")[0]

@@ -29,6 +29,8 @@ class Controleur(QObject):
     conflit = Signal(object, object)  # ma version, version du disque
     retour_dossier = Signal(int)  # nombre de manips en attente d'enregistrement
     alerte = Signal(str)
+    presence_changee = Signal()  # quelqu'un a ouvert / fermé l'application ou changé de manip
+    scirius_pret = Signal(object)  # lecture du fichier Scirius terminée en arrière-plan
 
     def __init__(self, stockage: Stockage):
         super().__init__()
@@ -46,6 +48,10 @@ class Controleur(QObject):
         self._t_save.timeout.connect(self.enregistrer_tout)
         self._t_journal = QTimer(self, singleShot=True, interval=600)
         self._t_journal.timeout.connect(self.journaliser)
+        self._scirius = None
+        self._prechargement = False
+        self.scirius_pret.connect(self._scirius_lu)
+        self.presents: list[dict] = []  # autres personnes présentes (fichiers donnees\\presence)
         self._t_battement = QTimer(self, interval=30_000)
         self._t_battement.timeout.connect(self._battement)
         self._t_actualiser = QTimer(self, interval=60_000)
@@ -74,6 +80,8 @@ class Controleur(QObject):
         if self.sales:
             self._t_save.start()
         self._t_battement.start()
+        self.actualiser_presence()
+        QTimer.singleShot(3000, self.precharger_scirius)  # après l'ouverture de la fenêtre, sans la ralentir
         self._t_actualiser.start()
         self._t_dossier.start()
         if st.lecture_seule:
@@ -126,6 +134,7 @@ class Controleur(QObject):
             self.st.liberer_verrou(self.courante_id)
         self.courante_id = ident
         self.verrou_autre = self.st.prendre_verrou(ident)
+        self.st.signaler_presence(ident)
         if self.verrou_autre is None:  # on relit la dernière version avant de modifier
             m = self.manip(ident)
             if m is not None and ident not in self.sales:
@@ -142,8 +151,25 @@ class Controleur(QObject):
         self.enregistrer_tout()
         if self.courante_id:
             self.st.liberer_verrou(self.courante_id)
+        self.st.retirer_presence()
+
+    def actualiser_presence(self) -> None:
+        """Signale ma présence et relit celle des autres (pastilles aux initiales, comme dans Excel)."""
+        self.st.signaler_presence(self.courante_id)
+        avant = [(p.get("utilisateur"), p.get("pc"), p.get("manip")) for p in self.presents]
+        self.presents = self.st.presences_autres()
+        if [(p.get("utilisateur"), p.get("pc"), p.get("manip")) for p in self.presents] != avant:
+            self.presence_changee.emit()
+
+    def presents_sur(self, ident: str | None) -> list[dict]:
+        return [p for p in self.presents if ident and p.get("manip") == ident]
+
+    def initiales_de(self, igg: str) -> str:
+        p = self.reglages.personne_igg(igg)
+        return p.sigle() if p else (igg or "?")[:2].upper()
 
     def _battement(self) -> None:
+        self.actualiser_presence()
         if self.courante_id and not self.st.lecture_seule:
             autre = self.st.prendre_verrou(self.courante_id)
             if autre and not self.verrou_autre:
@@ -185,6 +211,33 @@ class Controleur(QObject):
         src = SourceScirius(self.st.donnees / "cache", self.reglages.scirius_fichier, self.st.utilisateur)
         self._scirius = src.lire(forcer=forcer, etape=etape)
         return self._scirius
+
+    def precharger_scirius(self) -> None:
+        """Lit le fichier Scirius en arrière-plan (fil séparé) : la recherche Scirius est ensuite immédiate."""
+        import os
+        import threading
+
+        from mat_methode.scirius import SourceScirius
+        if os.environ.get("MATMETHODE_SANS_SCIRIUS") or self._prechargement or (self._scirius is not None and self._scirius.lignes):
+            return
+        self._prechargement = True
+        src = SourceScirius(self.st.donnees / "cache", self.reglages.scirius_fichier, self.st.utilisateur)
+
+        def travail():
+            try:
+                lu = src.lire(forcer=False)
+            except Exception as ex:  # jamais d'erreur visible : la recherche relira le fichier
+                log.info("Scirius en arrière-plan : %s", ex)
+                lu = None
+            self.scirius_pret.emit(lu)
+
+        threading.Thread(target=travail, name="scirius", daemon=True).start()
+
+    def _scirius_lu(self, lu) -> None:
+        self._prechargement = False
+        if lu is not None and getattr(lu, "lignes", None) and not (self._scirius is not None and self._scirius.lignes):
+            self._scirius = lu
+            log.info("Scirius chargé en arrière-plan : %s lignes (%s)", len(lu.lignes), getattr(lu, "origine", ""))
 
     def nom_utilisateur(self) -> str:
         """Nom de la personne connectée (liste des personnes des Réglages, retrouvée par son IGG), sinon l'IGG."""

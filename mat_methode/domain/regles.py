@@ -77,40 +77,58 @@ def moment_court(m: Manip, p: Prelevement) -> str:
 # ------------------------------------------------------------------ bilan (§8.3)
 @dataclass
 class Bilan:
-    depart: float
-    preleve: float
+    """Volumes : les échantillons pris avant traitement (S0) sont prélevés EN AMONT, hors du volume engagé dans la manip."""
+    depart: float  # volume engagé dans la manip (volume de départ)
+    preleve: float  # prélevé pendant le flux
     n: int
-    restant: float
+    restant: float  # engagé - prélevé pendant le flux
     numeros_a_saisir: int
+    amont: float = 0  # prélevé avant traitement, en plus du volume engagé
+    n_amont: int = 0
 
     @property
     def depassement(self) -> bool:
         return self.restant < 0
 
+    @property
+    def total(self) -> float:
+        """Charge à prévoir : prélèvements en amont + volume engagé."""
+        return self.depart + self.amont
+
 
 def total_preleve(m: Manip) -> float:
-    return sum(p.volume_ml or 0 for p in m.prelevements)
+    """Prélevé pendant le flux (sans les échantillons pris en amont, avant traitement)."""
+    return sum(p.volume_ml or 0 for p in m.prelevements if not est_entree(m, p))
+
+
+def total_amont(m: Manip) -> float:
+    return sum(p.volume_ml or 0 for p in m.prelevements if est_entree(m, p))
 
 
 def numeros_a_saisir(m: Manip) -> int:
     return sum((0 if p.scirius.strip() else 1) + (0 if p.aramis.strip() else 1) for p in m.prelevements)
 
 
-def suivi_volumes(m: Manip) -> list[tuple[str, str, float, float]]:
-    """Échantillons dans l'ordre du flux : (étiquette, où et quand, volume prélevé, volume restant après ce prélèvement)."""
+def suivi_volumes(m: Manip) -> list[tuple[str, str, float, float | None]]:
+    """Échantillons dans l'ordre du flux : (étiquette, où et quand, volume prélevé, volume restant ensuite).
+    Un échantillon pris en amont (avant traitement) ne compte pas dans le volume engagé : reste = None."""
     lab, reste, out = etiquettes(m), m.contexte.volume_depart_ml or 0, []
     for p in echantillons_tries(m):
         n = numero_etape(m, p)
+        if est_entree(m, p):
+            out.append((lab[p.id], "en amont, avant traitement (hors volume engagé)", p.volume_ml or 0, None))
+            continue
         reste -= p.volume_ml or 0
-        ou = "avant traitement" if est_entree(m, p) else f"étape {n} ({m.etapes[n - 1].operation}) · {moment_court(m, p)}"
-        out.append((lab[p.id], ou, p.volume_ml or 0, reste))
+        out.append((lab[p.id], f"étape {n} ({m.etapes[n - 1].operation}) · {moment_court(m, p)}", p.volume_ml or 0, reste))
     return out
 
 
 def bilan(m: Manip) -> Bilan:
     vd = m.contexte.volume_depart_ml or 0
     tot = total_preleve(m)
-    return Bilan(vd, tot, len(m.prelevements), vd - tot, numeros_a_saisir(m))
+    amont = [p for p in m.prelevements if est_entree(m, p)]
+    return Bilan(vd, tot, len(m.prelevements) - len(amont), vd - tot, numeros_a_saisir(m),
+                 amont=sum(p.volume_ml or 0 for p in amont), n_amont=len(amont))
 
 
 # ------------------------------------------------------------------ conditions (§6.3, §8.5)

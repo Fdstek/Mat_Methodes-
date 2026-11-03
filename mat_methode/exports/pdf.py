@@ -389,20 +389,47 @@ def cartouche(data: dict, s: dict) -> Table:
     return t
 
 
+def volumes(data: dict) -> dict:
+    """Volumes depuis le JSON d'échange : prélevé en amont (avant traitement, hors volume engagé), engagé, prélevé pendant
+    le flux, restant, total à prévoir, et le reste après chaque échantillon (None pour un échantillon pris en amont)."""
+    vd = data.get("contexte", {}).get("volumeDepart")
+    pre = data.get("prelevements", [])
+    amont = [p for p in pre if not p.get("apres_etape")]
+    flux = [p for p in pre if p.get("apres_etape")]
+    va, vp = sum(p["volume_ml"] or 0 for p in amont), sum(p["volume_ml"] or 0 for p in flux)
+    reste, suivi = vd or 0, []
+    for p in pre:
+        if p.get("apres_etape"):
+            reste -= p["volume_ml"] or 0
+            suivi.append((p, reste))
+        else:
+            suivi.append((p, None))
+    return {"depart": vd, "amont": va, "n_amont": len(amont), "preleve": vp, "n": len(flux),
+            "restant": (vd or 0) - vp, "total": (vd or 0) + va, "suivi": suivi}
+
+
+def phrase_volumes(data: dict) -> str:
+    v = volumes(data)
+    if v["depart"] is None:
+        return ""
+    t = (f"Volume : {fmt_vol(v['amont'])} mL prélevés en amont (hors manip) ; " if v["n_amont"] else "Volume : ")
+    t += f"{fmt_vol(v['depart'])} mL engagés, {fmt_vol(v['preleve'])} mL prélevés pendant le flux, " + (
+        f"{fmt_vol(v['restant'])} mL restants." if v["restant"] >= 0 else f"dépassement de {fmt_vol(-v['restant'])} mL.")
+    if v["n_amont"]:
+        t += f" Charge à prévoir : {fmt_vol(v['total'])} mL."
+    return t
+
+
 def legende_flux(data: dict) -> str:
-    ctx, etapes, pre = data.get("contexte", {}), data["etapes"], data.get("prelevements", [])
+    etapes = data["etapes"]
     total = sum(e["parametres"].get("duree_min") or 0 for e in etapes)
     legende = (f"Durée cumulée des étapes chronométrées : {fmt_dur(total)}. Chaque prélèvement a un badge : dans la carte de l’étape, "
                "posé à son moment sur la frise (à l’extrémité droite pour un prélèvement à l’effluent), et sous la carte avec son nom, son volume et son moment.")
     if data.get("grandes_etapes"):
         legende += " Grandes étapes (bandeau en haut des cartes) : " + " ; ".join(
             f"{g['nom']} ({plage(g['etapes'])})" for g in data["grandes_etapes"]) + "."
-    vd = ctx.get("volumeDepart")
-    if vd is not None:
-        pris = sum(p["volume_ml"] or 0 for p in pre)
-        reste = vd - pris
-        legende += (f" Volume : {fmt_vol(vd)} mL au départ, {fmt_vol(pris)} mL prélevés, "
-                    + (f"{fmt_vol(reste)} mL restants." if reste >= 0 else f"dépassement de {fmt_vol(-reste)} mL."))
+    if phrase_volumes(data):
+        legende += " " + phrase_volumes(data)
     return legende
 
 

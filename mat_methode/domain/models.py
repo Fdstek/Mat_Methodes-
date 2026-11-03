@@ -131,6 +131,7 @@ class Reglages(_Modele):
     ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)
     ordre_tags: list[str] = Field(default_factory=list)  # ordre choisi des tags (Réglages › Tags) ; les autres suivent, par ordre alphabétique
     couleurs_tags: dict[str, str] = Field(default_factory=dict)  # tag (sans casse ni accents) -> couleur choisie ; sinon couleur automatique
+    couleurs_types: dict[str, str] = Field(default_factory=dict)  # type de demande -> couleur choisie ; sinon couleur automatique
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
