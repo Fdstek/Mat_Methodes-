@@ -638,7 +638,7 @@ def test_experience_attribution_etapes_filtres_et_demandes(fen, tmp_path):
     assert len(f.appliquer([m, c])) == 2
     assert C.trier_manips([c, m], ("attribue", False))[0] is m
     # listes : le numéro d'expérience et la colonne Étapes ne cassent pas la mise en page
-    fen.resize(1400, 860)
+    fen.resize(1700, 860)  # large écran : les polices de Windows sont plus larges que celles de ce test
     for page in ("manips", "protocoles", "rapports"):
         fen.aller(page)
         QTest.qWait(50)
