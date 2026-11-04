@@ -194,7 +194,7 @@ class ListeMulti(QToolButton):
         self.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.setAccessibleName(nom)
         self.setToolTip(nom + " (plusieurs choix possibles)")
-        self.setMinimumWidth(150)
+        self.setMinimumWidth(130)
         self.setStyleSheet("QToolButton::menu-indicator{subcontrol-position:right center;right:8px;}QToolButton{padding:5px 26px 5px 10px;text-align:left;}")
         menu = _MenuCoche(self)
         for o in options:
