@@ -140,10 +140,8 @@ class PageProtocoles(QWidget):
         return _rangee(cel, self._largeurs(), False, entete=True)
 
     def _ligne(self, m, i: int, n: int) -> QWidget:
-        ne = len(m.etapes)
         cel = [] if self.clotures else [C.boite(numero(i + 1), 30)]
-        cel.append(_resume(m, f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch."
-                           + (f" · lancée le {fmt_dt(m.lancee.le)[:10]}" if m.lancee else "")))
+        cel.append(C.resume_manip(self.ctrl, m))  # même visuel que la liste Mat & Méthode
         cel += C.cellules_communes(m, self.ctrl.reglages, trier=self._trier)
         st = liste_statut(m, STATUTS_PROTOCOLE)
         st.setMinimumWidth(0)

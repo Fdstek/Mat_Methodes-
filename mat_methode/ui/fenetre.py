@@ -52,6 +52,9 @@ TITRES = {"manips": "Mat & Méthode", "protocoles": "Protocole", "rapports": "Ra
 def icone_menu(glyphe: str, famille: str | None, couleur: str) -> QIcon:
     """Icône du menu : le symbole est dessiné (police Segoe Fluent Icons si présente), visible quel que soit le texte du bouton."""
     from PySide6.QtGui import QColor, QPainter, QPixmap
+    if famille == "image":  # image fournie (ex. logo « Bugs et idées »)
+        from importlib import resources
+        return QIcon(str(resources.files("mat_methode.data").joinpath(glyphe)))
     pm = QPixmap(40, 40)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
@@ -236,7 +239,7 @@ class Fenetre(QMainWindow):
         b.setProperty("sous", sous)
         b.setAccessibleName(texte.replace("&&", "&"))
         b.setToolTip(texte.replace("&&", "&"))
-        b._glyphe = (ICONES[k][0], pi) if pi else (ICONES[k][1], None)
+        b._glyphe = ("bug.png", "image") if k == "demandes" else (ICONES[k][0], pi) if pi else (ICONES[k][1], None)
         b._textes = (texte, "")
         b.setText(b._textes[0])
         b.setIconSize(QSize(20, 20))

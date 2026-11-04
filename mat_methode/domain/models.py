@@ -73,6 +73,7 @@ class Personne(_Modele):
     initiales: str = ""
     igg: str = ""
     manipule: bool = False  # fait des manips : proposé en tête de la liste « Attribué à »
+    fait_mm: bool = False  # fait des Mat & Méthode : proposé en tête de la liste « Donneur d'ordre »
 
     def sigle(self) -> str:
         return (self.initiales or initiales_de(self.nom)).strip().upper()
@@ -148,6 +149,11 @@ class Reglages(_Modele):
     @property
     def donneurs_ordre(self) -> list[str]:
         return [p.nom for p in self.personnes]
+
+    @property
+    def donneurs_proposes(self) -> list[str]:
+        """Donneurs d'ordre proposés : ceux qui font des Mat & Méthode d'abord (ordre des Réglages), puis les autres."""
+        return [p.nom for p in self.personnes if p.fait_mm] + [p.nom for p in self.personnes if not p.fait_mm]
 
     @property
     def attributions(self) -> list[str]:

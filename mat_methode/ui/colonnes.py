@@ -252,33 +252,84 @@ class Filtres:
         return [m for m in manips if self.passe(m)]
 
     def barre(self, manips: list, r, change: Callable[[], None], tags: list[str]) -> QWidget:
-        """Barre de filtres ; `manips` = toutes les manips de la liste (avant filtre) pour les compteurs."""
+        """Barre de filtres ; `manips` = toutes les manips de la liste (avant filtre) pour les compteurs.
+        Une rangée de tags par donneur d'ordre, une par personne attribuée (seulement ceux qui ont des manips) et des listes à choix multiples."""
         from mat_methode.ui.widgets import bouton_tag_couleur, flux_widgets
         w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, 0, 0, 0)
-        h.addWidget(etiquette("Donneur d’ordre", secondaire=True))
-        presents = [n for n in r.donneurs_ordre if any(m.contexte.donneur == n for m in manips)]
-        self.donneur &= set(presents)
-        tous = bouton("Tous", lambda: (self.donneur.clear(), change()))
-        tous.setProperty("chip", True)
-        tous.setCheckable(True)
-        tous.setChecked(not self.donneur)
-        h.addWidget(tous)
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
 
-        def bascule(n):
-            (self.donneur.discard if n in self.donneur else self.donneur.add)(n)
-            change()
-        puces = [bouton_tag_couleur(n, O.couleur_donneur(r, n), sum(1 for m in manips if m.contexte.donneur == n), n in self.donneur,
-                                    lambda n=n: bascule(n)) for n in presents]
-        h.addWidget(flux_widgets(puces), 1)
-        for vide, options, choisis, nom in (("Tous les attribués", [n for n in r.attributions if any(m.contexte.attribue == n for m in manips)],
-                                             self.attribue, "Filtrer par personne attribuée"),
-                                            ("Tous les types", [t for t in r.types_demande if any(m.contexte.type == t for m in manips)],
+        def rangee(titre: str, noms: list[str], choisis: set[str], valeur, tout: str) -> QWidget:
+            presents = [n for n in noms if any(valeur(m) == n for m in manips)]
+            choisis &= set(presents)
+            ligne = QWidget()
+            h = QHBoxLayout(ligne)
+            h.setContentsMargins(0, 0, 0, 0)
+            h.addWidget(etiquette(titre, secondaire=True))
+            toutes = bouton(tout, lambda: (choisis.clear(), change()))
+            toutes.setProperty("chip", True)
+            toutes.setCheckable(True)
+            toutes.setChecked(not choisis)
+            h.addWidget(toutes)
+
+            def bascule(n):
+                (choisis.discard if n in choisis else choisis.add)(n)
+                change()
+            puces = [bouton_tag_couleur(n, O.couleur_donneur(r, n), sum(1 for m in manips if valeur(m) == n), n in choisis, lambda n=n: bascule(n))
+                     for n in presents]
+            h.addWidget(flux_widgets(puces), 1)
+            return ligne
+
+        haut = rangee("Donneur d’ordre", r.donneurs_proposes, self.donneur, lambda m: m.contexte.donneur, "Tous")
+        h1 = haut.layout()
+        for vide, options, choisis, nom in (("Tous les types", [t for t in r.types_demande if any(m.contexte.type == t for m in manips)],
                                              self.type, "Filtrer par type de demande"),
                                             ("Tous les tags", tags, self.tag, "Filtrer par tag")):
             choisis &= set(options)
             lm = ListeMulti(vide, options, choisis, nom)
             lm.change.connect(change)
-            h.addWidget(lm)
+            h1.addWidget(lm)
+        v.addWidget(haut)
+        v.addWidget(rangee("Manip attribuée à", r.attributions, self.attribue, lambda m: m.contexte.attribue, "Toutes"))
         return w
+
+
+# ------------------------------------------------------------------ colonne « Manip » (identique dans Mat & Méthode et Protocole)
+def resume_manip(ctrl, m) -> QWidget:
+    """Titre, n° d'expérience, objectif, étapes / échantillons / date / version, puis pastilles (à faire, modification en cours, présence)."""
+    from PySide6.QtWidgets import QSizePolicy
+
+    from mat_methode.domain.texte import fmt_dt
+    from mat_methode.ui.widgets import avatar, pastille
+    c = QWidget()
+    v = QVBoxLayout(c)
+    v.setContentsMargins(0, 0, 0, 0)
+    v.setSpacing(3)
+    v.addWidget(etiquette(m.nom, "titreCarte", wrap=True))  # titre complet, sur plusieurs lignes si besoin
+    if m.contexte.experience:
+        v.addWidget(etiquette(sous_titre_manip(m), secondaire=True, wrap=True))
+    if m.contexte.objectif:
+        o = etiquette(m.contexte.objectif, secondaire=True, wrap=True)
+        o.setStyleSheet("font-style:italic;")
+        o.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        v.addWidget(o)
+    ne = len(m.etapes)
+    info = etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch. · {fmt_dt(m.maj)[:10]} · v{m.rev}", secondaire=True)
+    info.setMinimumWidth(1)
+    info.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+    v.addWidget(info)
+    marques = []
+    reste = sum(1 for t in m.a_faire if not t.fait)
+    if reste:
+        marques.append(pastille(f"{reste} à faire", "warn", " ; ".join(t.texte for t in m.a_faire if not t.fait)))
+    verrou = ctrl.st.verrou_autre(m.id)
+    if verrou:
+        marques.append(pastille(f"Modifiée par {ctrl.nom_de(verrou.utilisateur)}", "info"))
+    for pr in ctrl.presents_sur(m.id):  # comme dans Excel : initiales de qui a la manip ouverte
+        if not (verrou and pr.get("utilisateur") == verrou.utilisateur):
+            marques.append(avatar(ctrl.initiales_de(pr.get("utilisateur", ""), pr), f"{ctrl.nom_present(pr)} a cette manip ouverte",
+                                  cle=pr.get("utilisateur", "")))
+    if marques:
+        v.addWidget(flux_widgets(marques))
+    return c

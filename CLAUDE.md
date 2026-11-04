@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\Rapports\` et `exports\Protocoles\` (partagés, pas de dossier par personne ; le document s'ouvre après l'export). On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 13` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags` ; 10 : `Reglages.couleurs_types` ; 11 : `Contexte.emplacement` ; 12 : `Manip.statuts` (historique des statuts) ; 13 : `Contexte.experience`, `Contexte.attribue`, `Personne.manipule`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 14` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags` ; 10 : `Reglages.couleurs_types` ; 11 : `Contexte.emplacement` ; 12 : `Manip.statuts` (historique des statuts) ; 13 : `Contexte.experience`, `Contexte.attribue`, `Personne.manipule` ; 14 : `Personne.fait_mm`, `Demande.tags`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -65,7 +65,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 34 ; la construction de l'exe sous Windows réussit (02/11).
+- Lots livrés et fusionnés jusqu'à la PR n° 37 ; la construction de l'exe sous Windows réussit (02/11).
 - Lot du 04/11 11h38 (écran d'ouverture `ui/demarrage.py` ; historique des statuts `Manip.statuts`, `regles.noter_statut`,
   `reglages_ops.texte_statut / journal_complet`, bandeau, Rapport, journal, export JSON « statuts », PDF / Word / protocole
   « Historique des statuts ») : poussé sur la branche.
@@ -78,6 +78,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   prénoms (`texte.prenom`) et tags de couleur pour donneur / attribué / étapes ; `ListeMulti` à cases dans le menu (reconstruction à la fermeture) ;
   « Fait des manips » remonte la personne dans `Reglages.personnes` ; Bugs et idées : export des seules « Nouvelle » (fichier daté) puis
   statut « À vérifier » (ancien « En cours » converti) : poussé sur la branche.
+- Lot du 04/11 20h48 (version 1.2.0) : glisser-déposer (`ui/glisser.py` : `Poignee`, `rendre_cible`, `rendre_source` ; `regles.deplacer_etape_vers /
+  deplacer_groupe_vers / deplacer_echantillon_vers`) ; `colonnes.resume_manip` partagé par Mat & Méthode et Protocole ; `bloc_a_faire` dans les PDF / Word
+  (clé JSON `a_faire`) ; demandes : tags `MENUS_DEMANDE`, modification, consigne dans le .md ; `Filtres.barre` (rangées de tags donneur / attribué) ;
+  `Personne.fait_mm` / `Reglages.donneurs_proposes` : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

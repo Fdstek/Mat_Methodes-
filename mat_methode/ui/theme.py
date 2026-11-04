@@ -136,6 +136,9 @@ QMainWindow, QWidget#racine, QStackedWidget, QScrollArea, QScrollArea > QWidget 
 QWidget#volet {{ background: {p.volet}; }}
 QFrame#carte, QFrame[carte="true"] {{ background: {p.carte}; border: 1px solid {p.trait}; border-radius: 8px; }}
 QFrame#sousCarte {{ background: {p.fond}; border: 1px solid {p.trait}; border-radius: 8px; }}
+QFrame[depot="avant"] {{ border-top: 3px solid {p.accent}; }}
+QFrame[depot="apres"] {{ border-bottom: 3px solid {p.accent}; }}
+QFrame[depot="dedans"] {{ border: 2px dashed {p.accent}; }}
 QFrame#carteFlux {{ background: {p.carte}; border: 1px solid {p.trait}; border-radius: 8px; }}
 QFrame#carteFlux[sel="true"] {{ background: {p.info_fond}; border: 1px solid {p.accent}; border-left: 3px solid {p.accent}; }}
 QFrame#carteFlux:hover {{ border-color: {p.texte2}; }}

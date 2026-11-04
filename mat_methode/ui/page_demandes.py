@@ -8,11 +8,13 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QPlainTextEdit, QVBoxLayout, QWidget
 
 from mat_methode import NOM_APPLICATION, VERSION
-from mat_methode.domain.demandes import STATUTS_DEMANDE, TYPES_DEMANDE, Demande, vers_markdown
+from mat_methode.domain.demandes import MENUS_DEMANDE, STATUTS_DEMANDE, TYPES_DEMANDE, Demande, vers_markdown
+from mat_methode.domain.models import maintenant_iso
 from mat_methode.domain.texte import fmt_dt
 from mat_methode.storage import demandes as S
+from mat_methode.ui import colonnes as C
 from mat_methode.ui.controleur import Controleur
-from mat_methode.ui.widgets import ChampTexte, Liste, bouton, carte, champ, etiquette, pastille, vider
+from mat_methode.ui.widgets import ChampTexte, Liste, bouton, carte, champ, etiquette, flux_widgets, pastille, vider
 
 
 class PageDemandes(QWidget):
@@ -28,6 +30,8 @@ class PageDemandes(QWidget):
         self.filtre = ""  # statut affiché ("" = tous)
         self.joints: list[str] = []  # fichiers choisis pour la nouvelle demande
         self.type, self.titre_saisi, self.texte_saisi = TYPES_DEMANDE[0], "", ""
+        self.tags_saisis: set[str] = set()
+        self.edition: str | None = None  # identifiant de la demande en cours de modification
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
@@ -71,7 +75,7 @@ class PageDemandes(QWidget):
 
     def _formulaire(self) -> QWidget:
         f, lay = carte()
-        lay.addWidget(etiquette("Nouvelle demande", "titreCarte"))
+        lay.addWidget(etiquette("Modifier la demande" if self.edition else "Nouvelle demande", "titreCarte"))
         typ = Liste(list(TYPES_DEMANDE), self.type, vide=None)
         typ.choisi.connect(lambda v: setattr(self, "type", v))
         titre = ChampTexte(self.titre_saisi, "En une phrase")
@@ -82,25 +86,29 @@ class PageDemandes(QWidget):
         texte.setFixedHeight(110)
         texte.textChanged.connect(lambda: setattr(self, "texte_saisi", texte.toPlainText()))
         self._texte = texte
-        lay.addWidget(self._ligne_champs(champ("Type", typ), champ("Titre", titre)))
+        menus = C.ListeMulti("Choisir le ou les menus", list(MENUS_DEMANDE), self.tags_saisis, "Menus concernés")
+        lay.addWidget(self._ligne_champs(champ("Type", typ), champ("Titre", titre), champ("Menus concernés (plusieurs choix)", menus)))
         lay.addWidget(champ("Description", texte))
         bas = QHBoxLayout()
         bas.addWidget(bouton("Joindre un fichier…", self._joindre, tip="Capture d’écran, document, journal…"))
         self.noms = etiquette(", ".join(Path(p).name for p in self.joints) or "Aucun fichier joint", secondaire=True, wrap=True)
         bas.addWidget(self.noms, 1)
-        bas.addWidget(bouton("Envoyer la demande", self._envoyer, accent=True))
+        if self.edition:
+            bas.addWidget(bouton("Annuler", self._annuler_edition))
+        bas.addWidget(bouton("Enregistrer la modification" if self.edition else "Envoyer la demande", self._envoyer, accent=True))
         w = QWidget()
         w.setLayout(bas)
         lay.addWidget(w)
         return f
 
     @staticmethod
-    def _ligne_champs(a: QWidget, b: QWidget) -> QWidget:
+    def _ligne_champs(a: QWidget, b: QWidget, c: QWidget) -> QWidget:
         w = QWidget()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
         h.addWidget(a)
         h.addWidget(b, 1)
+        h.addWidget(c)
         return w
 
     def _ligne(self, d: Demande, derniere: bool) -> QWidget:
@@ -116,6 +124,8 @@ class PageDemandes(QWidget):
         gauche.addWidget(etiquette(f"{d.type} · {self._nom(d.auteur)} · {fmt_dt(d.cree)}"
                                    + (f" · statut changé le {fmt_dt(d.historique[-1].t)} par {self._nom(d.historique[-1].par)}" if d.historique else ""),
                                    secondaire=True, wrap=True))
+        if d.tags:
+            gauche.addWidget(flux_widgets([C.pilule(t, "#2F6FB8") for t in d.tags]))
         g = QWidget()
         g.setLayout(gauche)
         gauche.setContentsMargins(0, 0, 0, 0)
@@ -125,6 +135,8 @@ class PageDemandes(QWidget):
                                tip="Ouvrir la pièce jointe", lien=True))
         if d.type == "Bug":
             h.addWidget(pastille("Bug", "warn"), 0, Qt.AlignmentFlag.AlignVCenter)
+        h.addWidget(bouton("Modifier", lambda d=d: self._modifier(d), tip="Changer le type, le titre, la description ou les menus"),
+                    0, Qt.AlignmentFlag.AlignVCenter)
         st = Liste(list(STATUTS_DEMANDE), d.statut, vide=None)
         st.setMinimumWidth(130)
         st.setAccessibleName(f"Statut de la demande {d.titre}")
@@ -144,12 +156,29 @@ class PageDemandes(QWidget):
             self.joints += [f for f in fichiers if f not in self.joints]
             self.noms.setText(", ".join(Path(p).name for p in self.joints))
 
+    def _modifier(self, d: Demande):
+        """Recharge la demande dans le formulaire : type, titre, description, menus."""
+        self.edition, self.type, self.titre_saisi, self.texte_saisi = d.id, d.type, d.titre, d.texte
+        self.tags_saisis, self.joints = set(d.tags), []
+        self._actualiser()
+        self.ctrl.toast.emit("Modifie la demande puis « Enregistrer la modification »")
+
+    def _annuler_edition(self):
+        self.edition, self.titre_saisi, self.texte_saisi, self.joints, self.tags_saisis = None, "", "", [], set()
+        self._actualiser()
+
     def _envoyer(self):
         titre = self.titre_saisi.strip()
         if not titre and not self.texte_saisi.strip():
             self.ctrl.toast.emit("Écris au moins un titre ou une description")
             return
-        d = Demande(type=self.type, titre=titre, texte=self.texte_saisi.strip(), auteur=self.ctrl.st.utilisateur)
+        d = (S.relire(self.ctrl.st, self.edition) if self.edition else None)
+        modif = d is not None
+        if d is None:
+            d = Demande(auteur=self.ctrl.st.utilisateur)
+        d.type, d.titre, d.texte, d.tags = self.type, titre, self.texte_saisi.strip(), [t for t in MENUS_DEMANDE if t in self.tags_saisis]
+        if modif:
+            d.maj = maintenant_iso()
         try:
             for f in self.joints:
                 S.joindre(self.ctrl.st, d, f)
@@ -157,8 +186,8 @@ class PageDemandes(QWidget):
         except OSError as ex:
             self.ctrl.toast.emit(f"Demande non enregistrée : {ex}")
             return
-        self.titre_saisi, self.texte_saisi, self.joints = "", "", []
-        self.ctrl.toast.emit("Demande enregistrée, merci !")
+        self.edition, self.titre_saisi, self.texte_saisi, self.joints, self.tags_saisis = None, "", "", [], set()
+        self.ctrl.toast.emit("Demande modifiée" if modif else "Demande enregistrée, merci !")
         self._actualiser()
 
     def _statut(self, d: Demande, statut: str):

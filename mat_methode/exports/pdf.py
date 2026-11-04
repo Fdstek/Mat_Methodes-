@@ -395,6 +395,19 @@ def cartouche(data: dict, s: dict) -> Table:
     return t
 
 
+def bloc_a_faire(data: dict, s: dict) -> list:
+    """Points « À faire » du flux qui ne sont pas cochés (rapport et protocole), s'il y en a."""
+    af = data.get("a_faire") or []
+    if not af:
+        return []
+    cell = s["cell"]
+    lignes = [[Paragraph(f"<b>{h}</b>", cell) for h in ("", "Catégorie", "À faire")]]
+    lignes += [[Paragraph("☐", cell), Paragraph(escape(x.get("categorie") or ""), cell), Paragraph(escape(x.get("texte") or ""), cell)] for x in af]
+    t = Table(lignes, colWidths=[8 * mm, 42 * mm, 124 * mm], repeatRows=1)
+    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("GRID", (0, 0), (-1, -1), 0.4, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    return [KeepTogether([Paragraph(f"À faire ({len(af)} point{'s' if len(af) > 1 else ''} non coché{'s' if len(af) > 1 else ''})", s["h2"]), t])]
+
+
 def bloc_statuts(data: dict, s: dict) -> list:
     """Historique des changements de statut (date, qui, de → vers), s'il y en a."""
     st = data.get("statuts") or []
@@ -510,7 +523,7 @@ def ecrire_pdf(data: dict, chemin) -> None:
     doc, pied = document(chemin, titre)
     largeur = A4[0] - 36 * mm - 12
     lanc, jr = data.get("lancee"), data.get("journal") or []
-    story = [Paragraph(escape(titre), h1), cartouche(data, s),
+    story = [Paragraph(escape(titre), h1), cartouche(data, s), *bloc_a_faire(data, s),
              KeepTogether([Paragraph("Flux de prétraitement", h2), Flux(etapes, pre, largeur), Spacer(1, 3 * mm),
                            Paragraph(escape(legende_flux(data)), petit)])]
 

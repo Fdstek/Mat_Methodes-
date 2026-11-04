@@ -254,6 +254,18 @@ def ecrire_docx(data: dict, chemin) -> None:
     if lanc and jr:
         ecrire(c0.add_paragraph(), f"Modifiée après lancement ({len(jr)})", gras=True, couleur=AMBER)
 
+    if data.get("a_faire"):
+        doc.add_heading(f"À faire ({len(data['a_faire'])} point(s) non coché(s))", level=2)
+        taf = doc.add_table(rows=1, cols=2)
+        taf.style = "Table Grid"
+        for k, h in enumerate(("Catégorie", "À faire")):
+            fond(taf.rows[0].cells[k], "E1F0EC")
+            ecrire(taf.rows[0].cells[k].paragraphs[0], h, 8.5, gras=True)
+        for x in data["a_faire"]:
+            cells = taf.add_row().cells
+            ecrire(cells[0].paragraphs[0], "☐ " + (x.get("categorie") or ""), 8.5)
+            ecrire(cells[1].paragraphs[0], x.get("texte") or "", 8.5)
+
     doc.add_heading("Flux de prétraitement", level=1)
     buf = io.BytesIO()
     image_flux(etapes, pre).save(buf, format="PNG", dpi=(250, 250))
