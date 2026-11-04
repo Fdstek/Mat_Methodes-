@@ -114,6 +114,12 @@ def slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", norm(s)).strip("-") or "manip"
 
 
+def prenom(nom: str) -> str:
+    """« Pierre BURGUN » -> « Pierre » (les noms d'équipe comme « Interne · R&D » restent entiers)."""
+    nom = (nom or "").strip()
+    return nom if "·" in nom or " " not in nom else nom.split()[0]
+
+
 def nom_fichier(s: str) -> str:
     """Nom de fichier Windows lisible (garde accents et espaces, retire les caractères interdits)."""
     t = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", s or "").strip(" .")

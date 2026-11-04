@@ -208,7 +208,7 @@ class PageReglages(QWidget):
             fait = QCheckBox("Fait des manips")
             fait.setChecked(p.manipule)
             fait.setToolTip("Coché : la personne est proposée en tête de la liste « Attribuée à » (dans l’ordre de cette liste)")
-            fait.toggled.connect(lambda on, p=p: (setattr(p, "manipule", on), self.ctrl.toucher_reglages()))
+            fait.toggled.connect(lambda on, p=p: self._fait_des_manips(p, on))
             moi = pastille("c’est vous", "ok") if p.igg and p.igg.upper() == self.ctrl.st.utilisateur else None
             x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg), fait,
                             etiquette(f"{nb} manip{'s' if nb > 1 else ''}", secondaire=True), *( [moi] if moi else []), "stretch",
@@ -230,6 +230,13 @@ class PageReglages(QWidget):
         nigg.returnPressed.connect(ajout)
         moi = bouton("Me remplir (IGG de ce poste)", lambda: nigg.setText(self.ctrl.st.utilisateur), lien=True)
         x.ajouter(ligne(champ("Nouvelle personne", nouveau), champ("IGG", nigg), bouton("Ajouter", ajout), moi, "stretch"))
+
+    def _fait_des_manips(self, p: Personne, on: bool):
+        """Coché : la personne remonte en tête de liste (après celles qui font déjà des manips), ici et dans « Attribuée à »."""
+        p.manipule = on
+        self.r.personnes = [q for q in self.r.personnes if q.manipule] + [q for q in self.r.personnes if not q.manipule]
+        self._changer()
+        self._actualiser()
 
     def _fleches(self, liste: list, i: int, n: int, nom: str) -> list:
         """↑ ↓ pour changer l'ordre d'une ligne (personnes, laboratoires)."""

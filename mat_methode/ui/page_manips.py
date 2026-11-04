@@ -158,11 +158,11 @@ class PageManips(QWidget):
             self.l_liste.addWidget(self._ligne(m, i == len(lignes) - 1))
 
     # colonnes alignées sur l'en-tête : donneur, type, tags, statut, Ouvrir, « … »
-    LARGEURS = tuple(lg for _, lg in C.COMMUNES) + (125, 75, 40)
+    LARGEURS = tuple(lg for _, lg in C.COMMUNES) + (135, 70, 40)
 
     def _grille(self, g: QGridLayout):
         g.setContentsMargins(14, 12, 14, 12)
-        g.setHorizontalSpacing(12)
+        g.setHorizontalSpacing(16)
         g.setColumnStretch(0, 1)
         for k, lg in enumerate(self.LARGEURS, start=1):
             g.setColumnMinimumWidth(k, lg)

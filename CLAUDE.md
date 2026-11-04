@@ -65,7 +65,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 30 ; la construction de l'exe sous Windows réussit (02/11).
+- Lots livrés et fusionnés jusqu'à la PR n° 34 ; la construction de l'exe sous Windows réussit (02/11).
 - Lot du 04/11 11h38 (écran d'ouverture `ui/demarrage.py` ; historique des statuts `Manip.statuts`, `regles.noter_statut`,
   `reglages_ops.texte_statut / journal_complet`, bandeau, Rapport, journal, export JSON « statuts », PDF / Word / protocole
   « Historique des statuts ») : poussé sur la branche.
@@ -74,6 +74,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   (`colonnes.Filtres`, `ListeMulti`) dans Définition, Protocole, Rapport ; colonne « Étapes » (`regles.reperes_etapes`) ; duplicata = donneur d'ordre
   de la personne connectée ; `VERSION`, `DATE_VERSION`, `NOUVEAUTES` dans `mat_methode/__init__.py` (à mettre à jour à chaque lot) ; écran d'ouverture
   affiché avant les modules lourds : poussé sur la branche.
+- Lot du 04/11 19h33 (version 1.1.1) : menu « Mat & Méthode › Édition » (icônes dessinées par `fenetre.icone_menu`, volet de 215 px) ;
+  prénoms (`texte.prenom`) et tags de couleur pour donneur / attribué / étapes ; `ListeMulti` à cases dans le menu (reconstruction à la fermeture) ;
+  « Fait des manips » remonte la personne dans `Reglages.personnes` ; Bugs et idées : export des seules « Nouvelle » (fichier daté) puis
+  statut « À vérifier » (ancien « En cours » converti) : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
