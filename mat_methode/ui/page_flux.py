@@ -19,6 +19,7 @@ from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
 from mat_methode.domain.models import ANNULEE, ARCHIVEE, BROUILLON, ENCOURS, REALISEE, STATUTS, STATUTS_DEFINITION, STATUTS_PROTOCOLE, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
+from mat_methode.domain.reglages_ops import auteur
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -288,7 +289,7 @@ class PageFlux(QWidget):
             h.addWidget(st)
         if m.lancee:
             n = len(m.journal)
-            infos = [etiquette(f"lancée le {fmt_dt(m.lancee.le)[:10]} par {m.lancee.par}", secondaire=True)]
+            infos = [etiquette(f"lancée le {fmt_dt(m.lancee.le)[:10]} par {auteur(self.ctrl.reglages, m.lancee.par)}", secondaire=True)]
             if n:
                 infos += [pastille(f"⚠ {n} modification{'s' if n > 1 else ''} après lancement", "warn"), bouton("Voir le journal", self._journal)]
             elif not self.ctrl.lecture_seule and self.contexte == "definition":
@@ -353,7 +354,7 @@ class PageFlux(QWidget):
     def _journal(self):
         from mat_methode.ui.dialogues import journal
         self.ctrl.journaliser()
-        journal(self, self.m)
+        journal(self, self.m, self.ctrl.reglages)
 
     # ------------------------------------------------------------ Ma demande
     def _demande(self) -> QWidget:
@@ -977,10 +978,12 @@ class PageFlux(QWidget):
             sc.modifie.connect(lambda v: (setattr(m.contexte, "scirius", v.strip()), self._toucher()))
             fo = ChampTexte(m.contexte.fournisseur)
             fo.modifie.connect(lambda v: (setattr(m.contexte, "fournisseur", v), self._toucher()))
+            em = ChampTexte(m.contexte.emplacement, "ex. chambre froide, étagère 3")
+            em.modifie.connect(lambda v: (setattr(m.contexte, "emplacement", v), self._toucher()))
             cl.addWidget(champ("Matière (charge)", mat))
-            cl.addWidget(ligne(champ("N° Scirius de la charge", sc), champ("Fournisseur", fo)))
+            cl.addWidget(ligne(champ("N° Scirius de la charge", sc), champ("Fournisseur", fo), champ("Emplacement", em)))
             cl.addWidget(ligne(bouton("Chercher la charge dans Scirius…", self._scirius_charge, accent=True,
-                                      tip="Remplit le nom, le n° Scirius et le fournisseur depuis le fichier Scirius de SharePoint"),
+                                      tip="Remplit le nom, le n° Scirius, le fournisseur et l’emplacement depuis le fichier Scirius de SharePoint"),
                                etiquette("Pas dans le fichier ? Saisis les champs à la main.", secondaire=True), "stretch"))
             lay.addWidget(f)
         else:
@@ -1162,6 +1165,7 @@ class PageFlux(QWidget):
         c.lot = ln.get("batch") or c.lot
         c.scirius = ln.get("stock_item") or c.scirius
         c.fournisseur = ln.get("supplier") or c.fournisseur
+        c.emplacement = ln.get("storage") or c.emplacement
         self._toucher(True)
         self.ctrl.toast.emit("Charge remplie depuis Scirius")
 

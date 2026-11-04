@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from mat_methode.domain.catalogue import est_centrifugation, participe
 from mat_methode.domain.models import Etape, Manip, Prelevement, Reglages
+from mat_methode.domain.reglages_ops import auteur
 from mat_methode.domain.regles import (
     bilan,
     blocs,
@@ -205,8 +206,9 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
            phrase("Objectif", c.objectif).strip(), (phrase("Idée testée", c.idee).strip() if est_test(c.type) else ""),
            phrase("Contexte", c.precisions).strip(),
            f"Matière étudiée : {c.matiere or ph('matière')}"
-           + (" (" + ", ".join(x for x in (f"n° Scirius {c.scirius}" if c.scirius else "", f"fournisseur {c.fournisseur}" if c.fournisseur else "") if x)
-              + ")" if c.scirius or c.fournisseur else "") + ".",
+           + (" (" + ", ".join(x for x in (f"n° Scirius {c.scirius}" if c.scirius else "", f"fournisseur {c.fournisseur}" if c.fournisseur else "",
+                                           f"emplacement {c.emplacement}" if c.emplacement else "") if x)
+              + ")" if c.scirius or c.fournisseur or c.emplacement else "") + ".",
            (f"Prélèvement en amont : {fmt_vol(b.amont)} mL avant traitement ({b.n_amont} échantillon{'s' if b.n_amont > 1 else ''}, "
             f"hors volume de départ)" + (f", soit {fmt_vol(b.total)} mL de charge à prévoir" if c.volume_depart_ml is not None else "") + "."
             if b.n_amont else ""),
@@ -284,11 +286,11 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
 
 
 # ------------------------------------------------------------------ en-tête commun aux exports
-def ligne_version(m: Manip) -> str:
+def ligne_version(m: Manip, reglages: Reglages | None = None) -> str:
     from mat_methode.domain.texte import fmt_dt
     s = f"Version {m.rev} · enregistrée le {fmt_dt(m.maj)}"
     if m.lancee:
-        s += f" · lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}"
+        s += f" · lancée le {fmt_dt(m.lancee.le)} par {auteur(reglages, m.lancee.par)}"
     return s
 
 
@@ -311,7 +313,7 @@ def markdown(m: Manip, reglages: Reglages) -> str:
           f"Donneur d’ordre : {c.donneur or '[à saisir]'}{' · Type : ' + c.type if c.type else ''} · Réf. : {c.ref or '[à saisir]'}"]
     if m.tags:
         ln += ["", "Tags : " + " ".join("#" + t for t in m.tags)]
-    ln += ["", ligne_version(m)]
+    ln += ["", ligne_version(m, reglages)]
     if mention_modifiee(m):
         ln += ["", f"⚠ {mention_modifiee(m)}, voir la fin du document."]
     ln += ["", "## 2. Matériel et méthodes", ""]
@@ -351,7 +353,7 @@ def markdown(m: Manip, reglages: Reglages) -> str:
         ln += ["### Modifications après lancement", ""]
         if m.journal:
             ln += ["| Date et heure | Par | Modification |", "|---|---|---|"]
-            ln += [f"| {fmt_dt(j.t)} | {j.par} | {j.txt} |" for j in m.journal]
+            ln += [f"| {fmt_dt(j.t)} | {auteur(reglages, j.par)} | {j.txt} |" for j in m.journal]
         else:
             ln.append("Aucune modification depuis le lancement.")
         ln.append("")

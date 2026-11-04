@@ -181,3 +181,29 @@ def test_aucun_titre_seul_en_bas_de_page(exemples, tmp_path):
                 for p in pdf.pages:
                     lignes = [x.strip() for x in (p.extract_text() or "").splitlines() if x.strip()][:-1]  # sans le pied de page
                     assert not lignes or (lignes[-1] not in titres and not lignes[-1].startswith("Pour chaque phase")), (m.nom, lignes[-1])
+
+
+def test_import_mat_et_methode_pdf_et_emplacement(reglages, ethanol, tmp_path):
+    from mat_methode.extraction.extract_mm import extraire_texte, lire_texte
+    res = extraire_texte(lire_texte(EXEMPLES / "rapport_exemple.pdf"), "rapport_exemple.pdf")
+    assert [e["operation"] for e in res["etapes"]][:2] == ["chauffage", "filtration"]
+    ethanol.contexte.emplacement = "chambre froide 2"
+    d = exporter(ethanol, reglages)
+    assert d["contexte"]["emplacement"] == "chambre froide 2"
+    m, _ = importer(json.loads(json.dumps(d)), reglages)
+    assert m.contexte.emplacement == "chambre froide 2"
+    from mat_methode.exports.protocole import ecrire_protocole
+    ecrire_protocole(d, tmp_path / "p.pdf")
+    with pdfplumber.open(tmp_path / "p.pdf") as pdf:
+        assert "chambre froide 2" in " ".join(p.extract_text() for p in pdf.pages)
+
+
+def test_journal_avec_initiales(reglages, ethanol):
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.domain.models import Personne
+    reglages.personnes.append(Personne(nom="Alice LIMOGES", initiales="AL", igg="J0034240"))
+    ethanol.journal[0].par = "J0034240"
+    assert O.auteur(reglages, "J0034240") == "AL" and O.auteur(reglages, "Alice LIMOGES") == "AL" and O.auteur(reglages, "Pierre") == "Pierre"
+    d = exporter(ethanol, reglages)
+    assert d["journal"][0]["par"] == "AL"
+    assert "| AL |" in markdown(ethanol, reglages)

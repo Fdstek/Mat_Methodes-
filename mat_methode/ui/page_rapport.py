@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import regles as R
+from mat_methode.domain.reglages_ops import auteur
 from mat_methode.domain.texte import fmt_dt, fmt_vol
 from mat_methode.report.rapport import REPERE, construire, markdown, mention_modifiee
 from mat_methode.ui import theme
@@ -113,7 +114,7 @@ class PageRapport(QWidget):
         self.lay.addWidget(ligne_emis(m, ("rapport",), self.ouvrir_fichier.emit, [], "Aucun rapport émis pour l’instant."))
         v = f"Version {m.rev} · enregistrée automatiquement le {fmt_dt(m.maj)}"
         if m.lancee:
-            v += f" · lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}"
+            v += f" · lancée le {fmt_dt(m.lancee.le)} par {auteur(r, m.lancee.par)}"
         self.lay.addWidget(etiquette(v, secondaire=True))
         if mention_modifiee(m):
             self.lay.addWidget(InfoBar("Détail en bas du rapport.", titre=mention_modifiee(m),
@@ -202,7 +203,7 @@ class PageRapport(QWidget):
         if m.lancee:
             self.lay.addWidget(etiquette("Modifications après lancement", "sousTitre"))
             if m.journal:
-                self.lay.addWidget(table(["Date et heure", "Par", "Modification"], [[fmt_dt(j.t), j.par, j.txt] for j in m.journal]))
+                self.lay.addWidget(table(["Date et heure", "Par", "Modification"], [[fmt_dt(j.t), auteur(r, j.par), j.txt] for j in m.journal]))
             else:
                 self.lay.addWidget(pastille("Aucune modification depuis le lancement", "ok"))
         self.lay.addStretch(1)

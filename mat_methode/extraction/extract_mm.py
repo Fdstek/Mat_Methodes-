@@ -179,8 +179,11 @@ def extraire(source) -> dict:
 
 
 def lire_texte(chemin) -> str:
-    """Texte d'un ancien Mat & Méthode : Word (.docx) ou texte (.txt, .md)."""
+    """Texte d'un ancien Mat & Méthode : Word (.docx), PDF (texte, pas scanné) ou texte (.txt, .md)."""
     chemin = str(chemin)
+    if chemin.lower().endswith(".pdf"):
+        with pdfplumber.open(chemin) as pdf:
+            return "\n".join(l for _, l in lignes_propres(pdf))  # sans en-têtes ni pieds de page répétés
     if chemin.lower().endswith(".docx"):
         import docx
         d = docx.Document(chemin)

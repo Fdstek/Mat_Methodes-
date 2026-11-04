@@ -230,7 +230,16 @@ class Controleur(QObject):
                 self.modifie.emit(False)
 
     def operateur(self, m: Manip) -> str:
-        return (m.contexte.operateur or "").strip() or self.nom_utilisateur()
+        """Auteur noté dans le journal et au lancement : les initiales de la personne connectée (pas son IGG)."""
+        return self.initiales_utilisateur()
+
+    def initiales_utilisateur(self) -> str:
+        from mat_methode.domain.models import initiales_de
+        p = self.reglages.personne_igg(self.st.utilisateur)
+        if p:
+            return p.sigle()
+        nom = self.nom_utilisateur()
+        return initiales_de(nom) if nom != self.st.utilisateur else nom  # IGG inconnu des Réglages : on le garde tel quel
 
     def lire_scirius(self, forcer: bool = False, etape=lambda t: None):
         """Lignes du fichier Scirius (voir mat_methode.scirius), gardées en mémoire pendant la session."""
