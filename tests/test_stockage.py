@@ -170,3 +170,24 @@ def test_fichier_illisible_donne_sa_raison(tmp_path):
     (st.d_manips / "bbbbbbbb.json").write_text('{"id": "bbbbbbbb", "etat": 5}', encoding="utf-8")
     texte = " | ".join(st.lister().illisibles)
     assert "aaaaaaaa.json (fichier incomplet" in texte and "bbbbbbbb.json (champ « etat »" in texte
+
+
+def test_fichier_occupe_n_est_pas_illisible(tmp_path, monkeypatch):
+    import builtins
+
+    st = Stockage(tmp_path, "pierre", "PC")
+    st.initialiser()
+    (st.d_manips / "cccccccc.json").write_text('{"id": "cccccccc"}', encoding="utf-8")
+    ouvrir = builtins.open
+
+    def occupe(chemin, *a, **k):
+        if str(chemin).endswith("cccccccc.json"):
+            e = PermissionError(13, "utilisé par un autre processus")
+            e.winerror = 32
+            raise e
+        return ouvrir(chemin, *a, **k)
+
+    monkeypatch.setattr(builtins, "open", occupe)
+    monkeypatch.setattr("mat_methode.storage.stockage.time.sleep", lambda s: None)
+    liste = st.lister()
+    assert liste.occupes == ["cccccccc"] and liste.illisibles == []
