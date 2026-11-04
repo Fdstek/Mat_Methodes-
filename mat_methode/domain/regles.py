@@ -292,6 +292,55 @@ def deplacer_groupe(m: Manip, groupe_id: str, sens: int) -> bool:
     return True
 
 
+def deplacer_etape_vers(m: Manip, etape_id: str, cible_id: str, avant: bool = True) -> bool:
+    """Glisser-déposer : place l'étape juste avant ou après une autre. Elle prend la grande étape de la cible, sauf au bord
+    d'une grande étape (avant la 1re sous-étape ou après la dernière) où elle reste en dehors."""
+    e, c = m.etape(etape_id), m.etape(cible_id)
+    if e is None or c is None or e is c:
+        return False
+    m.etapes = [x for x in m.etapes if x is not e]
+    k = m.etapes.index(c)
+    g = c.groupe_id
+    voisin = (m.etapes[k - 1] if k > 0 else None) if avant else (m.etapes[k + 1] if k + 1 < len(m.etapes) else None)
+    if g and (voisin is None or voisin.groupe_id != g):  # bord de la grande étape : on reste à l'extérieur
+        g = None
+    e.groupe_id = g
+    m.etapes.insert(k if avant else k + 1, e)
+    return True
+
+
+def deplacer_groupe_vers(m: Manip, groupe_id: str, cible_id: str, avant: bool = True) -> bool:
+    """Glisser-déposer : place toute la grande étape avant ou après l'étape cible (ou la grande étape qui la contient)."""
+    c = m.etape(cible_id)
+    if c is None or c.groupe_id == groupe_id:
+        return False
+    propres = [e for e in m.etapes if e.groupe_id == groupe_id]
+    if not propres:
+        return False
+    reste = [e for e in m.etapes if e.groupe_id != groupe_id]
+    if c.groupe_id:  # cible dans une autre grande étape : on se place avant ou après tout son bloc
+        bloc = [i for i, e in enumerate(reste) if e.groupe_id == c.groupe_id]
+        pos = bloc[0] if avant else bloc[-1] + 1
+    else:
+        k = reste.index(c)
+        pos = k if avant else k + 1
+    m.etapes = reste[:pos] + propres + reste[pos:]
+    return True
+
+
+def deplacer_echantillon_vers(m: Manip, ech_id: str, etape_id: str | None) -> bool:
+    """Glisser-déposer : l'échantillon passe à une autre étape (None = avant le traitement)."""
+    p = m.prelevement(ech_id)
+    if p is None or (etape_id is not None and m.etape(etape_id) is None) or p.etape_id == etape_id:
+        return False
+    p.etape_id = etape_id
+    if etape_id is None:
+        changer_moment(p, "avant")
+    elif p.moment == "avant":
+        changer_moment(p, "effluent")
+    return True
+
+
 def dupliquer_groupe(m: Manip, groupe_id: str, fois: int = 1, echantillons: bool = False) -> list[Groupe]:
     """Recopie une grande étape (ses étapes, conditions, réactifs, matériel) « fois » fois, juste après elle.
     Les échantillons sont recopiés sur demande, sans leurs numéros Scirius / Aramis."""

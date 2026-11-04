@@ -7,6 +7,7 @@ from mat_methode.domain.models import maintenant_iso, nouvel_id
 from mat_methode.domain.texte import fmt_dt
 
 TYPES_DEMANDE = ("Bug", "Bonne idée")
+MENUS_DEMANDE = ("Mat & Méthode", "Protocole", "Rapport", "Réglages", "Bugs et idées", "Général")  # tags : le menu de gauche concerné
 STATUTS_DEMANDE = ("Nouvelle", "À vérifier", "Traitée", "Refusée")  # « À vérifier » : exportée, en attente de contrôle
 
 
@@ -29,6 +30,7 @@ class Demande(BaseModel):
     cree: str = Field(default_factory=maintenant_iso)
     maj: str = Field(default_factory=maintenant_iso)
     pieces: list[str] = Field(default_factory=list)  # noms des fichiers joints
+    tags: list[str] = Field(default_factory=list)  # menus concernés (plusieurs possibles)
     historique: list[ChangementDemande] = Field(default_factory=list)
 
     @field_validator("statut", mode="before")
@@ -46,10 +48,13 @@ class Demande(BaseModel):
 
 def vers_markdown(demandes: list[Demande], nom_de, version: str = "") -> str:
     """Toutes les demandes en un fichier .md (lisible tel quel et collable dans une conversation)."""
-    out = [f"# Bugs et idées — Mat & Méthode{' ' + version if version else ''}", "", f"_{len(demandes)} demande(s)_", ""]
+    out = [f"# Bugs et idées — Mat & Méthode{' ' + version if version else ''}", "",
+           "Consigne : si besoin, tu me poses des questions sur mes demandes.", "", f"_{len(demandes)} demande(s)_", ""]
     for d in demandes:
         out += [f"## [{d.statut}] {d.type} : {d.titre or '(sans titre)'}", "",
                 f"- Écrite par {nom_de(d.auteur)} le {fmt_dt(d.cree)}", f"- Statut : {d.statut}"]
+        if d.tags:
+            out.append("- Menus concernés : " + ", ".join(d.tags))
         if d.pieces:
             out.append("- Pièces jointes : " + ", ".join(d.pieces))
         for c in d.historique:

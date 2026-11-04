@@ -22,6 +22,7 @@ from mat_methode.exports.pdf import (
     TEAL_L,
     Flux,
     avec_reperes,
+    bloc_a_faire,
     bloc_statuts,
     cartouche,
     document,
@@ -141,7 +142,7 @@ def ecrire_protocole(data: dict, chemin) -> None:
     titre = data.get("titre") or "Manip"
     doc, pied = document(chemin, f"Protocole : {titre}", "Protocole - à compléter à la main pendant la manip")
     largeur = A4[0] - 36 * mm - 12
-    story = [Paragraph(f"Protocole : {escape(titre)}", h1), cartouche(data, s)]
+    story = [Paragraph(f"Protocole : {escape(titre)}", h1), cartouche(data, s), *bloc_a_faire(data, s)]
     contexte = next((b for b in data.get("sous_sections", []) if b.get("titre", "").startswith("2.1")), None)
     # chaque section reste entière sur une page (titre compris) quand elle tient sur une page
     if contexte:

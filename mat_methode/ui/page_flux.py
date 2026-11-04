@@ -25,6 +25,7 @@ from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
+from mat_methode.ui.glisser import Poignee, rendre_cible, rendre_source
 from mat_methode.ui.widgets import (
     ChampTexte,
     ChipSupprimable,
@@ -376,7 +377,7 @@ class PageFlux(QWidget):
         nom = ChampTexte(m.nom, "Nom de la manip")
         nom.modifie.connect(lambda v: (setattr(m, "nom", v.strip() or "Manip"), self._toucher()))
         g.addWidget(champ("Nom de la manip", nom), 0, 0, 1, 3)
-        donneur = Liste(r.donneurs_ordre, c.donneur)
+        donneur = Liste(r.donneurs_proposes, c.donneur)
         donneur.choisi.connect(self._choisir_donneur)
         g.addWidget(champ("Donneur d’ordre", donneur), 1, 0)
         ref = ChampTexte(c.ref, "choisir le donneur d’ordre", mono=True)
@@ -436,7 +437,7 @@ class PageFlux(QWidget):
 
     # ------------------------------------------------------------ à faire
     def _a_faire(self) -> QWidget:
-        """Liste de points à régler : réflexion, matériel manquant, réactif manquant… (pas dans le rapport)."""
+        """Liste de points à régler : réflexion, matériel manquant, réactif manquant…."""
         from PySide6.QtWidgets import QCheckBox
         m, p = self.m, theme.P
         reste = [t for t in m.a_faire if not t.fait]
@@ -444,7 +445,7 @@ class PageFlux(QWidget):
                      if m.a_faire else "rien pour l’instant", ouvert=bool(reste) or getattr(self, "_a_faire_ouvert", False))
         x.tete.clicked.connect(lambda *_: setattr(self, "_a_faire_ouvert", x.ouvert))
         x.ajouter(etiquette("Points à régler avant ou pendant la manip, dans l’ordre de réalisation (↑ ↓ pour le changer). "
-                            "Cette liste n’apparaît pas dans le rapport.", secondaire=True, wrap=True))
+                            "Les points non cochés sont repris en tête du protocole et du rapport (PDF et Word).", secondaire=True, wrap=True))
         n = len(m.a_faire)
         for k, t in enumerate(m.a_faire):
             case = QCheckBox()
@@ -645,6 +646,9 @@ class PageFlux(QWidget):
         sf.setObjectName("sousCarte")
         h = QHBoxLayout(sf)
         h.setContentsMargins(10, 6, 10, 6)
+        if not self.consultation:  # glisser-déposer : poignée à gauche, la ligne reçoit les étapes et les grandes étapes
+            h.addWidget(Poignee("etape", e.id, f"l’étape {i + 1}", sf))
+            rendre_cible(sf, {"etape": "avant", "groupe": "avant"}, lambda genre, ident, avant, e=e: self._deposer(genre, ident, e.id, avant))
         h.addWidget(numero(i + 1))
         op = Liste(catalogue, e.operation, vide=None, libelles={o: cap(o) for o in catalogue + [e.operation]})
         op.setAccessibleName(f"Opération de l’étape {i + 1}")
@@ -686,7 +690,15 @@ class PageFlux(QWidget):
         bas = icone("↓", f"Descendre la grande étape {g.nom}", lambda: (R.deplacer_groupe(m, g.id, 1), self._toucher(True)))
         haut.setEnabled(bool(idx) and idx[0] > 0)
         bas.setEnabled(bool(idx) and idx[-1] < len(m.etapes) - 1)
-        v.addWidget(ligne(titre, nom, "stretch", haut, bas,
+        if not self.consultation:
+            v.addWidget(ligne(Poignee("groupe", g.id, f"la grande étape {g.nom}", f), titre, nom, "stretch", haut, bas,
+                              bouton("+ Ajouter une sous-étape", lambda: self._viser_groupe(g.id)),
+                              icone("⧉", f"Dupliquer la grande étape {g.nom} (choix du nombre de copies)", lambda: self._dupliquer_groupe(g)),
+                              bouton("Défaire", lambda: self._defaire_groupe(g), tip=f"Défaire la grande étape {g.nom} (ses étapes restent dans le flux)")))
+            rendre_cible(f, {"etape": "dedans", "groupe": "avant"},
+                         lambda genre, ident, avant, g=g, idx=idx: self._deposer_sur_groupe(genre, ident, g, idx, avant))
+        else:
+            v.addWidget(ligne(titre, nom, "stretch", haut, bas,
                           bouton("+ Ajouter une sous-étape", lambda: self._viser_groupe(g.id)),
                           icone("⧉", f"Dupliquer la grande étape {g.nom} (choix du nombre de copies)", lambda: self._dupliquer_groupe(g)),
                           bouton("Défaire", lambda: self._defaire_groupe(g), tip=f"Défaire la grande étape {g.nom} (ses étapes restent dans le flux)")))
@@ -829,6 +841,31 @@ class PageFlux(QWidget):
         self.groupe_cible = None
         self._actualiser()
 
+    # ------------------------------------------------------------ glisser-déposer
+    def _deposer(self, genre: str, ident: str, cible_id: str, avant: bool):
+        """Une étape ou une grande étape déposée sur une ligne d'étape."""
+        self.ctrl.memoriser_manip()
+        ok = (R.deplacer_etape_vers if genre == "etape" else R.deplacer_groupe_vers)(self.m, ident, cible_id, avant)
+        if ok:
+            self._toucher(True)
+            self.ctrl.toast.emit("Déplacée (Ctrl+Z pour annuler)")
+
+    def _deposer_sur_groupe(self, genre: str, ident: str, g, idx: list[int], avant: bool):
+        """Une étape déposée dans le cadre d'une grande étape (elle y entre) ou une grande étape déposée avant / après celle-ci."""
+        self.ctrl.memoriser_manip()
+        if genre == "etape":
+            R.placer_dans_groupe(self.m, ident, g.id)
+            self._toucher(True)
+            self.ctrl.toast.emit(f"Étape rangée dans {g.nom} (Ctrl+Z pour annuler)")
+        elif idx:
+            self._deposer(genre, ident, self.m.etapes[idx[0] if avant else idx[-1]].id, avant)
+
+    def _deposer_ech(self, ech_id: str, etape_id: str | None):
+        self.ctrl.memoriser_manip()
+        if R.deplacer_echantillon_vers(self.m, ech_id, etape_id):
+            self._toucher(True)
+            self.ctrl.toast.emit("Échantillon déplacé (Ctrl+Z pour annuler)")
+
     def _deplacer(self, e, sens):
         R.deplacer_etape(self.m, e.id, sens)
         self._toucher(True)
@@ -883,10 +920,16 @@ class PageFlux(QWidget):
         def pill(p):
             n = R.numero_etape(m, p)
             q = "avant" if n == 0 else (f"à {fmt_dur(p.temps_min)}" if p.temps_min is not None else "à ?") if p.moment == "pendant" else "sortie"
-            return ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}" + (f" · {p.labo}" if p.labo else ""), code_badge(lab[p.id]))
+            w = ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}" + (f" · {p.labo}" if p.labo else ""), code_badge(lab[p.id]))
+            if not self.consultation:  # glisser l'échantillon vers une autre étape (ou le départ)
+                rendre_source(w, "echantillon", p.id, lambda p=p: self.aller(p.etape_id or DEPART))
+                w.setToolTip("Glisser vers une autre étape pour déplacer l’échantillon")
+            return w
 
         dep = [p for p in ech if R.numero_etape(m, p) == 0]
         c = self._carte_flux(DEPART, None, "Départ")
+        if not self.consultation:
+            rendre_cible(c, {"echantillon": "dedans"}, lambda genre, ident, avant: self._deposer_ech(ident, None))
         c.layout().addWidget(etiquette(f"{m.contexte.matiere or 'matière ?'}" + (f" · {fmt_vol(m.contexte.volume_depart_ml)} mL"
                                                                                  if m.contexte.volume_depart_ml is not None else ""), secondaire=True))
         for p in dep:
@@ -915,6 +958,8 @@ class PageFlux(QWidget):
                 lay.addWidget(cadre)
                 cible = cv
             c = self._carte_flux(e.id, i + 1, cap(e.operation))
+            if not self.consultation:
+                rendre_cible(c, {"echantillon": "dedans"}, lambda genre, ident, avant, e=e: self._deposer_ech(ident, e.id))
             cl = c.layout()
             for r in e.reactifs:
                 if r.nom:

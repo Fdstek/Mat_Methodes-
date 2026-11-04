@@ -124,7 +124,7 @@ class PageRapport(QWidget):
         reste = [t for t in m.a_faire if not t.fait]
         if reste:
             self.lay.addWidget(InfoBar(" ; ".join(f"{t.categorie} : {t.texte}" for t in reste[:5]) + (" …" if len(reste) > 5 else ""),
-                                       niveau="info", titre=f"{len(reste)} point{'s' if len(reste) > 1 else ''} à faire (non repris dans le rapport)"))
+                                       niveau="info", titre=f"{len(reste)} point{'s' if len(reste) > 1 else ''} à faire non coché{'s' if len(reste) > 1 else ''} (repris dans les PDF et le Word)"))
         n = R.numeros_a_saisir(m)
         manque = sum(len(REPERE.findall(s.texte)) for s in rap.sections)
         if n or manque:

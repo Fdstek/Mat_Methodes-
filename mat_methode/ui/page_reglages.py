@@ -191,7 +191,7 @@ class PageReglages(QWidget):
     def _personnes(self):
         x = self._section("Personnes (donneurs d’ordre)", f"{len(self.r.personnes)}")
         x.ajouter(etiquette("Les donneurs d’ordre proposés dans « Ma demande ». Les initiales forment la référence des manips "
-                            "(ex. PB-2026-10-31-01). « Fait des manips » place la personne en tête de la liste « Attribuée à » des manips. "
+                            "(ex. PB-2026-10-31-01). « Fait des manips » place la personne en tête de la liste « Attribuée à » ; « Fait des Mat & Méthode » en tête de la liste « Donneur d’ordre ». "
                             "L’IGG (identifiant Windows) permet de reconnaître la personne connectée : "
                             f"sur ce poste, l’IGG est {self.ctrl.st.utilisateur}.", secondaire=True, wrap=True))
         n_p = len(self.r.personnes)
@@ -209,8 +209,12 @@ class PageReglages(QWidget):
             fait.setChecked(p.manipule)
             fait.setToolTip("Coché : la personne est proposée en tête de la liste « Attribuée à » (dans l’ordre de cette liste)")
             fait.toggled.connect(lambda on, p=p: self._fait_des_manips(p, on))
+            fait_mm = QCheckBox("Fait des Mat && Méthode")
+            fait_mm.setChecked(p.fait_mm)
+            fait_mm.setToolTip("Coché : la personne est proposée en tête de la liste « Donneur d’ordre » (dans l’ordre de cette liste)")
+            fait_mm.toggled.connect(lambda on, p=p: self._fait_mm(p, on))
             moi = pastille("c’est vous", "ok") if p.igg and p.igg.upper() == self.ctrl.st.utilisateur else None
-            x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg), fait,
+            x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg), fait, fait_mm,
                             etiquette(f"{nb} manip{'s' if nb > 1 else ''}", secondaire=True), *( [moi] if moi else []), "stretch",
                             *self._fleches(self.r.personnes, i, n_p, p.nom),
                             icone("✕", f"Supprimer {p.nom}", lambda p=p: self._suppr_personne(p), danger=True)))
@@ -234,7 +238,17 @@ class PageReglages(QWidget):
     def _fait_des_manips(self, p: Personne, on: bool):
         """Coché : la personne remonte en tête de liste (après celles qui font déjà des manips), ici et dans « Attribuée à »."""
         p.manipule = on
-        self.r.personnes = [q for q in self.r.personnes if q.manipule] + [q for q in self.r.personnes if not q.manipule]
+        self._remonter_les_actifs()
+
+    def _fait_mm(self, p: Personne, on: bool):
+        """Coché : la personne remonte en tête de la liste « Donneur d’ordre »."""
+        p.fait_mm = on
+        self._remonter_les_actifs()
+
+    def _remonter_les_actifs(self):
+        """Les personnes qui font des manips ou des Mat & Méthode passent en tête du tableau (ordre gardé)."""
+        pers = self.r.personnes
+        self.r.personnes = [q for q in pers if q.manipule or q.fait_mm] + [q for q in pers if not (q.manipule or q.fait_mm)]
         self._changer()
         self._actualiser()
 

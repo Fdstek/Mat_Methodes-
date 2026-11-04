@@ -2,24 +2,21 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QSizePolicy, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
 from mat_methode.domain.models import ARCHIVEE, STATUTS_DEFINITION
 from mat_methode.domain.regles import tous_les_tags
-from mat_methode.domain.texte import fmt_dt, norm
+from mat_methode.domain.texte import norm
 from mat_methode.ui import colonnes as C
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.widgets import (
     InfoBar,
-    avatar,
     bouton,
     etiquette,
-    flux_widgets,
     liste_statut,
-    pastille,
     vider,
 )
 
@@ -194,38 +191,7 @@ class PageManips(QWidget):
         w.setObjectName("ligneManip")
         g = QGridLayout(w)
         self._grille(g)
-        gauche = QVBoxLayout()
-        gauche.setSpacing(3)
-        gauche.addWidget(etiquette(m.nom, "titreCarte", wrap=True))  # titre complet, sur plusieurs lignes si besoin
-        if m.contexte.experience:
-            gauche.addWidget(etiquette(C.sous_titre_manip(m), secondaire=True, wrap=True))
-        if m.contexte.objectif:
-            o = etiquette(m.contexte.objectif, secondaire=True, wrap=True)  # en entier, sur plusieurs lignes si besoin
-            o.setStyleSheet("font-style:italic;")
-            o.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            gauche.addWidget(o)
-        ne = len(m.etapes)
-        info = etiquette(f"{ne} étape{'s' if ne > 1 else ''} · {len(m.prelevements)} éch. · {fmt_dt(m.maj)[:10]} · v{m.rev}", secondaire=True)
-        info.setMinimumWidth(1)
-        info.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        gauche.addWidget(info)
-        marques = []
-        reste = sum(1 for t in m.a_faire if not t.fait)
-        if reste:
-            marques.append(pastille(f"{reste} à faire", "warn", " ; ".join(t.texte for t in m.a_faire if not t.fait)))
-        v = self.ctrl.st.verrou_autre(m.id)
-        if v:
-            marques.append(pastille(f"Modifiée par {self.ctrl.nom_de(v.utilisateur)}", "info"))
-        for pr in self.ctrl.presents_sur(m.id):  # comme dans Excel : initiales de qui a la manip ouverte
-            if not (v and pr.get("utilisateur") == v.utilisateur):
-                marques.append(avatar(self.ctrl.initiales_de(pr.get("utilisateur", ""), pr),
-                                      f"{self.ctrl.nom_present(pr)} a cette manip ouverte", cle=pr.get("utilisateur", "")))
-        if marques:
-            gauche.addWidget(flux_widgets(marques))
-        cg = QWidget()
-        cg.setLayout(gauche)
-        gauche.setContentsMargins(0, 0, 0, 0)
-        g.addWidget(cg, 0, 0)
+        g.addWidget(C.resume_manip(self.ctrl, m), 0, 0)
         for k, x in enumerate(C.cellules_communes(m, r, lambda t: (self.filtres_liste.tag.add(t), self._actualiser()), self._trier), start=1):
             g.addWidget(x, 0, k)
         k0 = len(C.COMMUNES) + 1

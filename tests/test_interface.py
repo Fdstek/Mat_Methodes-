@@ -686,3 +686,96 @@ def test_export_des_nouvelles_demandes_et_fait_des_manips(fen, tmp_path, monkeyp
     fen.p_reglages._fait_des_manips(r.personne("Zoé MARTIN"), True)
     assert r.personnes[0].nom == "Zoé MARTIN" and r.attributions[0] == "Zoé MARTIN"
     assert prenom("Pierre BURGUN") == "Pierre" and prenom("Interne · R&D") == "Interne · R&D"
+
+
+def test_glisser_deposer_etapes_groupes_et_echantillons(fen):
+    from PySide6.QtCore import QMimeData, QPointF, Qt
+    from PySide6.QtGui import QDropEvent
+
+    from mat_methode.domain import regles as R
+    from mat_methode.ui.glisser import MIME, lire
+    m = ethanol(fen)
+    ids = [e.id for e in m.etapes]
+    assert len(ids) >= 4
+    # étape : la 1re passe après la 3e
+    assert R.deplacer_etape_vers(m, ids[0], ids[2], avant=False)
+    assert [e.id for e in m.etapes][:3] == [ids[1], ids[2], ids[0]]
+    # grande étape : se place avant une étape ; elle reste d'un seul tenant
+    g = R.creer_groupe(m, "Degumming")
+    R.placer_dans_groupe(m, ids[1], g.id)
+    R.placer_dans_groupe(m, ids[2], g.id)
+    assert R.deplacer_groupe_vers(m, g.id, ids[3], avant=False)
+    assert [e.groupe_id for e in m.etapes if e.id in (ids[1], ids[2])] == [g.id, g.id]
+    pos = [e.id for e in m.etapes]
+    assert abs(pos.index(ids[1]) - pos.index(ids[2])) == 1 and pos.index(ids[3]) < pos.index(ids[1])
+    # bord de grande étape : déposer avant la 1re sous-étape sort de la grande étape
+    assert R.deplacer_etape_vers(m, ids[3], ids[1], avant=True) and m.etape(ids[3]).groupe_id is None
+    # échantillon : vers le départ, puis vers une étape
+    p = next(x for x in m.prelevements if x.etape_id)
+    assert R.deplacer_echantillon_vers(m, p.id, None) and p.etape_id is None and p.moment == "avant"
+    assert R.deplacer_echantillon_vers(m, p.id, ids[3]) and p.etape_id == ids[3] and p.moment == "effluent"
+    # vrai lâcher de souris sur une ligne d'étape du flux (brouillon : modifiable)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    fen.p_flux.rafraichir()
+    QTest.qWait(50)
+    from PySide6.QtWidgets import QFrame
+    lignes = [f for f in fen.p_flux.findChildren(QFrame) if f.objectName() == "sousCarte" and f.acceptDrops()]
+    assert len(lignes) >= 2
+    m = fen.ctrl.courante  # la manip ouverte (relue) : c'est elle qui est modifiée
+    avant_ordre = [e.id for e in m.etapes]
+    mime = QMimeData()
+    mime.setData(MIME, f"etape:{avant_ordre[-1]}".encode())
+    assert lire(mime) == ("etape", avant_ordre[-1])
+    cible = lignes[0]
+    ev = QDropEvent(QPointF(5, 2), Qt.DropAction.MoveAction, mime, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    filtre = next(x for x in cible.children() if type(x).__name__ == "_Cible")
+    assert filtre.eventFilter(cible, ev)  # le lâcher est pris en charge par la zone de dépôt
+    assert [e.id for e in m.etapes] != avant_ordre and m.etapes[-1].id != avant_ordre[-1]
+
+
+def test_demandes_modifiables_a_faire_dans_les_pdf_et_listes_identiques(fen, tmp_path):
+    import pdfplumber
+
+    from mat_methode.domain.demandes import vers_markdown
+    from mat_methode.domain.models import Personne, Tache
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.protocole import ecrire_protocole
+    from mat_methode.storage import demandes as S
+    from mat_methode.ui import colonnes as C
+    st, r = fen.ctrl.st, fen.ctrl.reglages
+    # demandes : menus concernés (plusieurs) puis modification
+    fen.aller("demandes")
+    p = fen.p_demandes
+    p.titre_saisi, p.texte_saisi = "Colonne trop étroite", "Dans la liste"
+    p.tags_saisis = {"Mat & Méthode", "Protocole"}
+    p._envoyer()
+    d = S.lister(st)[0]
+    assert d.tags == ["Mat & Méthode", "Protocole"]
+    p._modifier(d)
+    assert p.edition == d.id and p.titre_saisi == "Colonne trop étroite"
+    p.titre_saisi, p.tags_saisis = "Colonne trop large", {"Rapport"}
+    p._envoyer()
+    d2 = S.lister(st)
+    assert len(d2) == 1 and d2[0].titre == "Colonne trop large" and d2[0].tags == ["Rapport"] and p.edition is None
+    md = vers_markdown(d2, fen.ctrl.nom_de)
+    assert "Consigne : si besoin, tu me poses des questions sur mes demandes." in md and "Menus concernés : Rapport" in md
+    # « Fait des Mat & Méthode » : en tête des donneurs d'ordre
+    r.personnes += [Personne(nom="Anne DUPONT"), Personne(nom="Zoé MARTIN")]
+    fen.aller("reglages")
+    fen.p_reglages._fait_mm(r.personne("Zoé MARTIN"), True)
+    assert r.donneurs_proposes[0] == "Zoé MARTIN"
+    # à faire non cochés : dans les PDF
+    m = ethanol(fen)
+    m.a_faire = [Tache(categorie="Matériel", texte="Réserver le réacteur R1"), Tache(categorie="Sécurité", texte="Lire la fiche", fait=True)]
+    d = exporter(m, r)
+    assert [x["texte"] for x in d["a_faire"]] == ["Réserver le réacteur R1"]
+    for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
+        ecrire(d, tmp_path / f"{i}.pdf")
+        with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
+            t = " ".join(pg.extract_text() for pg in pdf.pages)
+        assert "Réserver le réacteur R1" in t and "Lire la fiche" not in t
+    # listes Mat & Méthode et Protocole : même colonne « Manip »
+    ref = C.resume_manip(fen.ctrl, m)
+    assert ref.findChildren(type(fen.titre))[0].text() == m.nom

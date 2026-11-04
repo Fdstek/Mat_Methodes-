@@ -80,6 +80,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
         **({"statuts": [{"t": c.t, "par": auteur(reglages, c.par), "nom": nom_auteur(reglages, c.par),
                          "de": nom_etat(reglages, c.de)[0], "vers": nom_etat(reglages, c.vers)[0]} for c in m.statuts]}
            if m.statuts else {}),
+        **({"a_faire": [{"categorie": t.categorie, "texte": t.texte} for t in m.a_faire if not t.fait]}
+           if any(not t.fait for t in m.a_faire) else {}),
         "etapes": etapes,
         "sous_sections": [{"titre": s.titre, "texte": vers_markdown(s.texte)} for s in r.sections],
         "materiel": materiel,

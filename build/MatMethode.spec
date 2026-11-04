@@ -16,6 +16,7 @@ datas = [
     (str(RACINE / "mat_methode" / "data" / "fleche_bas_sombre.png"), "mat_methode/data"),
     (str(RACINE / "mat_methode" / "data" / "MatMethode.ico"), "mat_methode/data"),
     (str(RACINE / "mat_methode" / "data" / "MatMethode.png"), "mat_methode/data"),
+    (str(RACINE / "mat_methode" / "data" / "bug.png"), "mat_methode/data"),
     (str(RACINE / "build" / "MatMethode.ico"), "."),
 ]
 datas += collect_data_files("reportlab")   # polices Vera (repli si Segoe UI absente), données
