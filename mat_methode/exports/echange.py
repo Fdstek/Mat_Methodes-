@@ -19,6 +19,7 @@ from mat_methode.domain.models import (
     Vide,
 )
 from mat_methode.domain.prototype import contexte_depuis
+from mat_methode.domain.reglages_ops import auteur
 from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, numero_etape
 from mat_methode.domain.texte import cap, minuscule_initiale
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
@@ -38,6 +39,8 @@ def contexte_vers(m: Manip) -> dict:
         d["scirius"] = c.scirius
     if c.fournisseur:
         d["fournisseur"] = c.fournisseur
+    if c.emplacement:
+        d["emplacement"] = c.emplacement
     d["tags"] = list(m.tags)
     return d
 
@@ -66,7 +69,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
     used = reactifs_utilises(m)
     d = {
         "titre": m.nom, "contexte": contexte_vers(m), "version": m.rev, "enregistree_le": m.maj,
-        "lancee": m.lancee.model_dump() if m.lancee else None, "journal": [j.model_dump() for j in m.journal],
+        "lancee": ({**m.lancee.model_dump(), "par": auteur(reglages, m.lancee.par)} if m.lancee else None),
+        "journal": [{**j.model_dump(), "par": auteur(reglages, j.par)} for j in m.journal],
         "etapes": etapes,
         "sous_sections": [{"titre": s.titre, "texte": vers_markdown(s.texte)} for s in r.sections],
         "materiel": materiel,

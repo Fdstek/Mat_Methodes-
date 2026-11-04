@@ -315,7 +315,7 @@ def importer_mm(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
     Les étapes sont reconnues par mots-clés, comme pour un ancien rapport. `traiter` retourne un message d'erreur, ou ""."""
     from mat_methode.extraction.extract_mm import extraire_texte, lire_texte
     d = Dialogue(parent, "Importer un ancien Mat & Méthode", 620)
-    d.lay.addWidget(etiquette("Choisis le fichier Word (.docx) ou texte (.txt) du Mat & Méthode, ou colle son texte. "
+    d.lay.addWidget(etiquette("Choisis le fichier Word (.docx), PDF ou texte (.txt) du Mat & Méthode, ou colle son texte. "
                               "Les étapes (chauffage, filtration, désacidification…) sont reconnues par mots-clés : vérifie-les ensuite.",
                               secondaire=True, wrap=True))
     zone = QPlainTextEdit()
@@ -337,7 +337,7 @@ def importer_mm(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
             d.accept()
 
     def depuis_fichier():
-        f, _ = QFileDialog.getOpenFileName(d, "Choisir un ancien Mat & Méthode", dossier, "Word ou texte (*.docx *.txt *.md)")
+        f, _ = QFileDialog.getOpenFileName(d, "Choisir un ancien Mat & Méthode", dossier, "Word, PDF ou texte (*.docx *.pdf *.txt *.md)")
         if not f:
             return
         try:
@@ -347,7 +347,7 @@ def importer_mm(parent, dossier: str, traiter: Callable[[dict], str]) -> bool:
             return
         importer_texte(texte, Path(f).name)
 
-    d.lay.addWidget(bouton("Choisir un fichier Word ou texte…", depuis_fichier, accent=True))
+    d.lay.addWidget(bouton("Choisir un fichier Word, PDF ou texte…", depuis_fichier, accent=True))
     d.lay.addWidget(champ("Ou coller le texte", zone))
     d.lay.addWidget(erreur)
     d.boutons.addWidget(bouton("Annuler", d.reject))
@@ -400,9 +400,10 @@ def exporter(parent, titre: str, contenu: Callable[[str], str], enregistrer: Cal
     d.exec()
 
 
-def journal(parent, m) -> None:
+def journal(parent, m, reglages=None) -> None:
+    from mat_methode.domain.reglages_ops import auteur
     d = Dialogue(parent, "Journal des modifications", 720)
-    d.lay.addWidget(etiquette(f"Manip lancée le {fmt_dt(m.lancee.le)} par {m.lancee.par}. Version {m.rev}, enregistrée le {fmt_dt(m.maj)}. "
+    d.lay.addWidget(etiquette(f"Manip lancée le {fmt_dt(m.lancee.le)} par {auteur(reglages, m.lancee.par)}. Version {m.rev}, enregistrée le {fmt_dt(m.maj)}. "
                               "Le journal ne peut être ni modifié ni effacé.", secondaire=True, wrap=True))
     lignes = list(reversed(m.journal))
     if lignes:
@@ -412,7 +413,7 @@ def journal(parent, m) -> None:
         t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         t.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         for i, j in enumerate(lignes):
-            for k, v in enumerate((fmt_dt(j.t), j.par, j.txt)):
+            for k, v in enumerate((fmt_dt(j.t), auteur(reglages, j.par), j.txt)):
                 t.setItem(i, k, QTableWidgetItem(v))
         t.resizeColumnsToContents()
         t.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)

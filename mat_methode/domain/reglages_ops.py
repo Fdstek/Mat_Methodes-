@@ -312,6 +312,15 @@ def couleur_tag_suivante(r: Reglages, tag: str) -> str:
     return r.couleurs_tags[norm(tag)]
 
 
+def auteur(r: Reglages | None, par: str) -> str:
+    """Auteur d'une ligne du journal (ou du lancement) affiché par ses initiales : une personne des Réglages retrouvée
+    par son IGG ou son nom ; sinon le texte tel quel (anciennes lignes)."""
+    if r is None or not par:
+        return par
+    p = r.personne_igg(par) or r.personne(par)
+    return p.sigle() if p else par
+
+
 def couleur_type(r: Reglages, typ: str) -> str:
     """Couleur d'un type de demande : celle choisie dans les Réglages, sinon une couleur fixe tirée de son nom."""
     import zlib

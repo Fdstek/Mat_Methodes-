@@ -197,7 +197,7 @@ class Fenetre(QMainWindow):
         self.p_protocole.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents(protocole=True))))
         self.p_rapport.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents())))
-        self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante))
+        self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante, ctrl.reglages))
 
         for seq, f in (("Ctrl+N", self.nouvelle), ("Ctrl+F", self._recherche), ("Ctrl+E", lambda: self.autres_formats()),
                        ("Ctrl+Z", self._annuler), ("Alt+Left", self.p_flux.precedente), ("Alt+Right", self.p_flux.suivante),
@@ -287,13 +287,16 @@ class Fenetre(QMainWindow):
         self._memoriser(ident)
 
     def quitter_manip(self):
-        """Ferme la manip de la sous-section (Flux, Édition ou Rapport de la manip) et revient à sa liste."""
+        """« ← » : ferme la manip en cours (dans toutes les sous-sections) et revient à la liste de la section."""
         listes = {"flux": "manips", "protocole": "protocoles", "rapport": "rapports"}
         if self.page not in listes:
             return
+        ident = self.ctrl.courante_id
+        for k in self.choix:  # la manip en cours est fermée partout (Flux, Édition, Rapport de la manip)
+            if self.choix[k] == ident:
+                self.choix[k] = None
         self.choix[self.page] = None
-        if not any(self.choix.values()):  # plus aucune section ne l'utilise : on la libère (verrou, présence)
-            self.ctrl.fermer_manip()
+        self.ctrl.fermer_manip()  # enregistrée, verrou libéré, plus « ouverte » pour les autres (présence)
         self.aller(listes[self.page])
 
     def _memoriser(self, ident: str):

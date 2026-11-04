@@ -253,6 +253,7 @@ class Contexte(_Modele):
     lot: str = ""
     scirius: str = ""  # n° Scirius de la charge de départ
     fournisseur: str = ""  # fournisseur de la charge de départ
+    emplacement: str = ""  # où est stockée la charge de départ (armoire, chambre froide…)
 
 
 class Communes(_Modele):

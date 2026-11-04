@@ -269,7 +269,8 @@ def ecrire_docx(data: dict, chemin) -> None:
     for i, ph in enumerate(data.get("phases", [])):
         if i == 0:
             entete = (f"{ctx.get('matiere') or ''}" + (f" · n° Scirius {ctx['scirius']}" if ctx.get("scirius") else "")
-                      + (f" · fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "")) + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
+                      + (f" · fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "")
+                      + (f" · emplacement {ctx['emplacement']}" if ctx.get("emplacement") else "")) + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
         else:
             entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
                 f"\nRemarque : {ph['remarque']}" if ph.get("remarque") else "")

@@ -69,7 +69,7 @@ def test_crit30_31_journal_une_ligne_par_saisie(fen, qtbot):
     qtbot.keyClick(boites[0], Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
     qtbot.keyClicks(boites[0], "30")  # deux frappes
     qtbot.waitUntil(lambda: len(m.journal) == n + 1, timeout=2000)
-    assert m.journal[-1].txt == "Étape 3 · Désacidification : température 25 → 30 °C" and m.journal[-1].par == "Pierre"
+    assert m.journal[-1].txt == "Étape 3 · Désacidification : température 25 → 30 °C" and m.journal[-1].par == fen.ctrl.initiales_utilisateur()
     qtbot.wait(800)
     assert len(m.journal) == n + 1
 
@@ -544,9 +544,11 @@ def test_retour_liste_sans_fenetre_en_trop_et_initiales(fen, qapp):
     fen.aller("protocole")
     assert [w for w in qapp.topLevelWidgets() if w.isVisible()] == [fen]  # le bandeau ne devient jamais une fenêtre à part
     assert fen.retour.isVisible()
-    fen.quitter_manip()  # « ← » dans Protocole › Édition
-    assert fen.page == "protocoles" and not fen.nav["protocole"].isEnabled() and fen.nav["flux"].isEnabled()
-    fen.aller("flux")
+    fen.quitter_manip()  # « ← » dans Protocole › Édition : la manip en cours est fermée partout
+    assert fen.page == "protocoles" and fen.ctrl.courante is None
+    assert not fen.nav["protocole"].isEnabled() and not fen.nav["flux"].isEnabled()
+    assert fen.ctrl.st.lire_verrou(m.id) is None  # verrou libéré
+    fen.ouvrir(m.id, "comp")
     fen.quitter_manip()
     assert fen.page == "manips" and fen.ctrl.courante is None and not fen.retour.isVisible()
     autre = Stockage(fen.ctrl.st.racine, "J0034240", "PC2")

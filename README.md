@@ -88,8 +88,14 @@ la part prélevée, puis chaque échantillon avec le volume qui reste ensuite (e
 Un clic sur l'en-tête « Donneur d'ordre » ou « Type » (ou sur un nom dans une ligne) trie le tableau : croissant,
 décroissant, puis ordre d'origine. Chaque type a une couleur (Réglages › Types : ● pour la changer).
 
-**Retour à la liste** : dans Flux, Édition et Rapport de la manip, le bouton « ← » à gauche du titre quitte la manip
-et revient à la liste de la section.
+**Retour à la liste** : dans Flux, Édition et Rapport de la manip, le bouton « ← » à gauche du titre ferme la manip en
+cours (enregistrée, verrou libéré, plus « ouverte » pour les autres) et revient à la liste de la section.
+
+**Journal des modifications** : l'auteur de chaque ligne (et du lancement) est noté par ses initiales ; les anciennes
+lignes écrites avec un IGG ou un nom s'affichent aussi en initiales quand la personne est dans Réglages › Personnes.
+
+**Charge de départ** : champ « Emplacement » (rempli aussi depuis Scirius, colonne Stockage), repris dans le texte 2.1
+et les PDF / Word.
 
 **Présence** : comme dans Excel, une pastille aux initiales montre qui d'autre a l'application ouverte (en haut à
 droite), qui a une manip ouverte (dans la liste) et qui regarde la même manip (bandeau de statut). Chaque poste
@@ -122,7 +128,7 @@ protocole et le détail du Rapport.
 **Tags** : Réglages › Tags permet aussi d'en créer un nouveau. Liste déroulante des tags déjà utilisés (on peut aussi en taper un nouveau, Entrée). Chaque tag a une couleur
 (fixe, tirée de son nom) ; Réglages › Tags : ● change la couleur.
 
-**Importer un ancien Mat & Méthode** (Définition) : fichier Word (.docx) ou texte (.txt), ou texte collé ; les étapes
+**Importer un ancien Mat & Méthode** (Définition) : fichier Word (.docx), PDF (texte) ou texte (.txt), ou texte collé ; les étapes
 sont reconnues par mots-clés, comme pour « Importer un ancien rapport » (PDF ou JSON).
 
 **Icône** : l'application pose aussi l'icône de MatMethode.exe sur sa fenêtre (barre des tâches) ; le résultat est noté

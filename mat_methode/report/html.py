@@ -4,6 +4,7 @@ from __future__ import annotations
 from html import escape
 
 from mat_methode.domain.models import Manip, Reglages
+from mat_methode.domain.reglages_ops import auteur
 from mat_methode.domain.regles import echantillons_tries, etiquettes, moment_court, numero_etape
 from mat_methode.domain.texte import cap, fmt_dt, fmt_vol
 from mat_methode.report.rapport import REPERE, construire, quantite_texte, resume_conditions
@@ -62,7 +63,7 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
     if m.lancee:
         tj = "<h3>Modifications après lancement</h3>" + (
             "<table><tr><th>Date et heure</th><th>Par</th><th>Modification</th></tr>"
-            + "".join(f"<tr><td>{fmt_dt(j.t)}</td><td>{e(j.par)}</td><td>{e(j.txt)}</td></tr>" for j in m.journal) + "</table>"
+            + "".join(f"<tr><td>{fmt_dt(j.t)}</td><td>{e(auteur(reglages, j.par))}</td><td>{e(j.txt)}</td></tr>" for j in m.journal) + "</table>"
             if m.journal else "<p>Aucune modification depuis le lancement.</p>")
     phases = "<h3>Détail par phase du flux</h3>" + "".join(
         (f'<h4 style="margin:12px 0 2px;color:#0F6B5C">Grande étape : {e(ph.groupe)} ({e(ph.groupe_plage)})</h4>' if ph.debut_groupe else "")
@@ -78,7 +79,7 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
     corps = "".join(f"<h3>{e(s.titre)}</h3>" + "".join(f"<p>{texte_html(x)}</p>" for x in s.texte.split("\n")) for s in r.sections)
     lanc = ""
     if m.lancee:
-        lanc = f" · <b>lancée le</b> {fmt_dt(m.lancee.le)} par {e(m.lancee.par)}"
+        lanc = f" · <b>lancée le</b> {fmt_dt(m.lancee.le)} par {e(auteur(reglages, m.lancee.par))}"
         if m.journal:
             lanc += f' <b style="color:#8A4B00">· modifiée après lancement ({len(m.journal)})</b>'
     meta = (f"<b>Donneur d’ordre :</b> {e(c.donneur) or '<i>à saisir</i>'} &nbsp; "

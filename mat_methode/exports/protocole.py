@@ -50,6 +50,7 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         if i == 0:
             info = escape(ctx.get("matiere") or "") + "" + (
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
+                f" · <b>emplacement :</b> {escape(ctx['emplacement'])}" if ctx.get("emplacement") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
             info = escape(ph.get("conditions") or "conditions à compléter") + (

@@ -52,7 +52,7 @@ class PageManips(QWidget):
         barre = QHBoxLayout()
         barre.addWidget(bouton("+  Nouvelle manip", self.nouvelle.emit, accent=True, tip="Nouvelle manip (Ctrl+N)"))
         barre.addWidget(bouton("Importer un ancien rapport", self.importer.emit, tip="Rapport PDF ou fichier JSON exporté"))
-        barre.addWidget(bouton("Importer un ancien Mat & Méthode", self.importer_mm.emit, tip="Fichier Word ou texte, ou texte collé"))
+        barre.addWidget(bouton("Importer un ancien Mat & Méthode", self.importer_mm.emit, tip="Fichier Word, PDF ou texte, ou texte collé"))
         barre.addStretch(1)
         self.recherche = QLineEdit()  # placée à droite des onglets Manips / Archivées
         self.recherche.setPlaceholderText("Rechercher une manip, un tag, un objectif…")
