@@ -8,7 +8,7 @@ from typing import Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QMenu, QPushButton, QToolButton, QVBoxLayout, QWidget, QWidgetAction
+from PySide6.QtWidgets import QCheckBox, QLabel, QMenu, QPushButton, QToolButton, QVBoxLayout, QWidget, QWidgetAction
 
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
@@ -252,47 +252,47 @@ class Filtres:
         return [m for m in manips if self.passe(m)]
 
     def barre(self, manips: list, r, change: Callable[[], None], tags: list[str]) -> QWidget:
-        """Barre de filtres ; `manips` = toutes les manips de la liste (avant filtre) pour les compteurs.
-        Une rangée de tags par donneur d'ordre, une par personne attribuée (seulement ceux qui ont des manips) et des listes à choix multiples."""
+        """Barre de filtres sur une seule ligne (qui passe à la suivante si la fenêtre est étroite) : tags de donneur d'ordre,
+        tags de personne attribuée (seulement ceux qui ont des manips) et listes à choix multiples.
+        Les noms sont réduits au prénom, puis aux initiales quand il y a beaucoup de tags."""
+        from mat_methode.domain.models import initiales_de
         from mat_methode.ui.widgets import bouton_tag_couleur, flux_widgets
-        w = QWidget()
-        v = QVBoxLayout(w)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(6)
-
-        def rangee(titre: str, noms: list[str], choisis: set[str], valeur, tout: str) -> QWidget:
+        groupes = []  # (titre, texte « tout », noms présents, choisis, valeur)
+        for titre, tout, noms, choisis, valeur in (("Donneur d’ordre", "Tous", r.donneurs_proposes, self.donneur, lambda m: m.contexte.donneur),
+                                                   ("Manip attribuée à", "Toutes", r.attributions, self.attribue, lambda m: m.contexte.attribue)):
             presents = [n for n in noms if any(valeur(m) == n for m in manips)]
             choisis &= set(presents)
-            ligne = QWidget()
-            h = QHBoxLayout(ligne)
-            h.setContentsMargins(0, 0, 0, 0)
-            h.addWidget(etiquette(titre, secondaire=True))
-            toutes = bouton(tout, lambda: (choisis.clear(), change()))
+            groupes.append((titre, tout, presents, choisis, valeur))
+        court = sum(len(g[2]) for g in groupes) > 6  # beaucoup de tags : initiales seulement
+
+        def libelle(nom: str) -> str:
+            return nom if "·" in nom else (initiales_de(nom) if court else prenom(nom))
+
+        widgets: list[QWidget] = []
+        for titre, tout, presents, choisis, valeur in groupes:
+            widgets.append(etiquette(titre, secondaire=True))
+            toutes = bouton(tout, lambda choisis=choisis: (choisis.clear(), change()))
             toutes.setProperty("chip", True)
             toutes.setCheckable(True)
             toutes.setChecked(not choisis)
-            h.addWidget(toutes)
+            widgets.append(toutes)
 
-            def bascule(n):
+            def bascule(n, choisis=choisis):
                 (choisis.discard if n in choisis else choisis.add)(n)
                 change()
-            puces = [bouton_tag_couleur(n, O.couleur_donneur(r, n), sum(1 for m in manips if valeur(m) == n), n in choisis, lambda n=n: bascule(n))
-                     for n in presents]
-            h.addWidget(flux_widgets(puces), 1)
-            return ligne
-
-        haut = rangee("Donneur d’ordre", r.donneurs_proposes, self.donneur, lambda m: m.contexte.donneur, "Tous")
-        h1 = haut.layout()
+            for n in presents:
+                b = bouton_tag_couleur(libelle(n), O.couleur_donneur(r, n), sum(1 for m in manips if valeur(m) == n), n in choisis,
+                                       lambda n=n, bascule=bascule: bascule(n))
+                b.setToolTip(n)
+                widgets.append(b)
         for vide, options, choisis, nom in (("Tous les types", [t for t in r.types_demande if any(m.contexte.type == t for m in manips)],
                                              self.type, "Filtrer par type de demande"),
                                             ("Tous les tags", tags, self.tag, "Filtrer par tag")):
             choisis &= set(options)
             lm = ListeMulti(vide, options, choisis, nom)
             lm.change.connect(change)
-            h1.addWidget(lm)
-        v.addWidget(haut)
-        v.addWidget(rangee("Manip attribuée à", r.attributions, self.attribue, lambda m: m.contexte.attribue, "Toutes"))
-        return w
+            widgets.append(lm)
+        return flux_widgets(widgets)
 
 
 # ------------------------------------------------------------------ colonne « Manip » (identique dans Mat & Méthode et Protocole)
