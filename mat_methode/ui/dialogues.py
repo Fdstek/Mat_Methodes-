@@ -401,11 +401,12 @@ def exporter(parent, titre: str, contenu: Callable[[str], str], enregistrer: Cal
 
 
 def journal(parent, m, reglages=None) -> None:
-    from mat_methode.domain.reglages_ops import auteur
+    from mat_methode.domain.reglages_ops import auteur, journal_complet
     d = Dialogue(parent, "Journal des modifications", 720)
-    d.lay.addWidget(etiquette(f"Manip lancée le {fmt_dt(m.lancee.le)} par {auteur(reglages, m.lancee.par)}. Version {m.rev}, enregistrée le {fmt_dt(m.maj)}. "
-                              "Le journal ne peut être ni modifié ni effacé.", secondaire=True, wrap=True))
-    lignes = list(reversed(m.journal))
+    lance = f"Manip lancée le {fmt_dt(m.lancee.le)} par {auteur(reglages, m.lancee.par)}. " if m.lancee else "Manip pas encore lancée. "
+    d.lay.addWidget(etiquette(lance + f"Version {m.rev}, enregistrée le {fmt_dt(m.maj)}. Changements de statut et modifications après "
+                              "lancement ; le journal ne peut être ni modifié ni effacé.", secondaire=True, wrap=True))
+    lignes = journal_complet(reglages, m)
     if lignes:
         t = QTableWidget(len(lignes), 3)
         t.setHorizontalHeaderLabels(["Date et heure", "Par", "Modification"])
@@ -413,14 +414,14 @@ def journal(parent, m, reglages=None) -> None:
         t.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         t.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         for i, j in enumerate(lignes):
-            for k, v in enumerate((fmt_dt(j.t), auteur(reglages, j.par), j.txt)):
+            for k, v in enumerate((fmt_dt(j[0]), j[1], j[2])):
                 t.setItem(i, k, QTableWidgetItem(v))
         t.resizeColumnsToContents()
         t.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         t.setMinimumHeight(min(420, 40 + 32 * len(lignes)))
         d.lay.addWidget(t)
     else:
-        d.lay.addWidget(etiquette("Aucune modification depuis le lancement."))
+        d.lay.addWidget(etiquette("Aucun changement de statut ni modification après lancement."))
     f = bouton("Fermer", d.accept, accent=True)
     f.setDefault(True)
     d.boutons.addWidget(f)

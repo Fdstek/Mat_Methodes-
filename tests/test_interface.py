@@ -557,3 +557,41 @@ def test_retour_liste_sans_fenetre_en_trop_et_initiales(fen, qapp):
     fen.ctrl.actualiser_presence()
     p = fen.ctrl.presents[0]
     assert fen.ctrl.initiales_de(p["utilisateur"], p) == "AL" and fen.ctrl.nom_present(p) == "Alice LIMOGES"
+
+
+def test_historique_des_statuts_et_ecran_d_ouverture(fen, tmp_path):
+    import docx
+    import pdfplumber
+
+    from mat_methode.domain.models import Personne
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.protocole import ecrire_protocole
+    from mat_methode.exports.word import ecrire_docx
+    from mat_methode.ui.demarrage import EcranDemarrage
+    r = fen.ctrl.reglages
+    r.personnes.append(Personne(nom="Claire LACOUX", initiales="CL", igg="PIERRE"))  # IGG du poste de test : « pierre »
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    fen.p_flux._statut("validee")
+    c = m.statuts[-1]
+    assert (c.de, c.vers, c.par) == ("brouillon", "validee", "pierre")
+    textes = [w.text() for w in fen.p_flux.bandeau.findChildren(type(fen.titre))]
+    assert any(t.startswith("Validée le ") and t.endswith("par Claire LACOUX") for t in textes)  # nom complet, bien visible
+    from mat_methode.domain.reglages_ops import journal_complet
+    assert journal_complet(r, m)[0][1:] == ("CL", "Statut : Brouillon → Validée")
+    d = exporter(m, r)
+    assert d["statuts"][-1]["vers"] == "Validée" and d["statuts"][-1]["nom"] == "Claire LACOUX"
+    for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
+        ecrire(d, tmp_path / f"{i}.pdf")
+        with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
+            t = " ".join(p.extract_text() for p in pdf.pages)
+        assert "Historique des statuts" in t and "Claire LACOUX" in t
+    ecrire_docx(d, tmp_path / "r.docx")
+    w = docx.Document(str(tmp_path / "r.docx"))
+    assert "Brouillon → Validée" in "\n".join(c.text for tb in w.tables for row in tb.rows for c in row.cells)
+    e = EcranDemarrage("Mat & Méthode", "1.0.0")
+    e.avancer(55, "Lecture des réglages et des manips…")
+    assert e.barre.value() == 55 and e.etape.text().startswith("Lecture")
+    e.close()

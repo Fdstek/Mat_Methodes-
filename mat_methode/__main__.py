@@ -81,12 +81,19 @@ def main() -> int:
     icone = icone or QIcon()
     app.setWindowIcon(icone)
 
+    from mat_methode.ui.demarrage import EcranDemarrage
+    accueil = EcranDemarrage(NOM_APPLICATION, VERSION, icone)  # écran d'ouverture avec barre de progression
+    accueil.show()
+    accueil.avancer(10, "Préparation des dossiers…")
     st = Stockage(racine, utilisateur(), poste())
     ctrl = Controleur(st)
+    accueil.avancer(30, "Mise en forme de l’interface…")
     theme.appliquer(app)
     fen = Fenetre(ctrl)
     fen.setWindowIcon(icone)
+    accueil.avancer(55, "Lecture des réglages et des manips…")
     ctrl.demarrer()
+    accueil.avancer(85, "Ouverture de la fenêtre…")
 
     def suivre_theme(*_):
         theme.appliquer(app)
@@ -100,7 +107,9 @@ def main() -> int:
     if isinstance(taille, list) and len(taille) == 2:
         fen.resize(max(fen.minimumWidth(), int(taille[0])), max(fen.minimumHeight(), int(taille[1])))
     fen.aller("manips")
+    accueil.avancer(100, "Prêt")
     fen.show()
+    accueil.close()
     import logging
     logging.getLogger("mat_methode").info("Icône : %s ; barre des tâches : %s", source_icone or "introuvable", icone_barre_des_taches(fen))
     code = app.exec()

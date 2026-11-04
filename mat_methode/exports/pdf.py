@@ -390,6 +390,20 @@ def cartouche(data: dict, s: dict) -> Table:
     return t
 
 
+def bloc_statuts(data: dict, s: dict) -> list:
+    """Historique des changements de statut (date, qui, de → vers), s'il y en a."""
+    st = data.get("statuts") or []
+    if not st:
+        return []
+    cell = s["cell"]
+    lignes = [[Paragraph(f"<b>{h}</b>", cell) for h in ("Date et heure", "Par", "Changement de statut")]]
+    lignes += [[Paragraph(fmt_dt(c["t"]), cell), Paragraph(escape(c.get("nom") or c.get("par") or ""), cell),
+                Paragraph(f"{escape(c.get('de', ''))} → <b>{escape(c.get('vers', ''))}</b>", cell)] for c in st]
+    t = Table(lignes, colWidths=[36 * mm, 50 * mm, 88 * mm], repeatRows=1)
+    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), TEAL_L), ("GRID", (0, 0), (-1, -1), 0.4, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    return [KeepTogether([Paragraph("Historique des statuts", s["h2"]), t])]
+
+
 def volumes(data: dict) -> dict:
     """Volumes depuis le JSON d'échange : prélevé en amont (avant traitement, hors volume engagé), engagé, prélevé pendant
     le flux, restant, total à prévoir, et le reste après chaque échantillon (None pour un échantillon pris en amont)."""
@@ -523,4 +537,5 @@ def ecrire_pdf(data: dict, chemin) -> None:
             story.append(tj)
         else:
             story.append(Paragraph("Aucune modification depuis le lancement.", corps))
+    story += bloc_statuts(data, s)
     doc.build(story, onFirstPage=pied, onLaterPages=pied)

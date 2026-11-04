@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` et `donnees\manips\<id>.json` : écriture atomique, contrôle de `rev`, fusion à trois voies des Réglages (`storage/fusion.py`, `LISTES`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
 - `exports\Rapports\` et `exports\Protocoles\` (partagés, pas de dossier par personne ; le document s'ouvre après l'export). On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
-- `SCHEMA_DONNEES = 11` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags` ; 10 : `Reglages.couleurs_types` ; 11 : `Contexte.emplacement`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
+- `SCHEMA_DONNEES = 12` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags` ; 10 : `Reglages.couleurs_types` ; 11 : `Contexte.emplacement` ; 12 : `Manip.statuts` (historique des statuts)) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
 ## Carte du code (`mat_methode/`)
@@ -65,9 +65,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `tests/` : pytest et pytest-qt. Les références `docs/cahier_des_charges/exemples/rapport_attendu.md/.html` sont à régénérer si le texte du rapport change.
 
 ## État au 02/11/2026
-- Lots livrés et fusionnés jusqu'à la PR n° 26 ; la construction de l'exe sous Windows réussit (02/11).
-- Lot du 04/11 09h13 (import d'un ancien Mat & Méthode en PDF ; auteur du journal en initiales — `Controleur.initiales_utilisateur`,
-  `reglages_ops.auteur` à l'affichage et à l'export ; `Contexte.emplacement` de la charge ; « ← » ferme la manip partout) : poussé sur la branche.
+- Lots livrés et fusionnés jusqu'à la PR n° 28 ; la construction de l'exe sous Windows réussit (02/11).
+- Lot du 04/11 11h38 (écran d'ouverture `ui/demarrage.py` ; historique des statuts `Manip.statuts`, `regles.noter_statut`,
+  `reglages_ops.texte_statut / journal_complet`, bandeau, Rapport, journal, export JSON « statuts », PDF / Word / protocole
+  « Historique des statuts ») : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

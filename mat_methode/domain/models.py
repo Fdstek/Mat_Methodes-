@@ -273,6 +273,14 @@ class LigneJournal(_Modele):
     txt: str
 
 
+class ChangementStatut(_Modele):
+    """Qui a changé le statut, quand, et de quoi vers quoi (visible dans l'application, pas dans les documents)."""
+    t: str
+    par: str  # IGG de la personne (le nom est retrouvé dans les Réglages à l'affichage)
+    de: str
+    vers: str
+
+
 class Groupe(_Modele):
     """Grande étape (ex. Degumming) : regroupe des étapes consécutives du flux."""
     id: str = Field(default_factory=nouvel_id)
@@ -317,6 +325,7 @@ class Manip(_Modele):
     groupes: list[Groupe] = Field(default_factory=list)
     a_faire: list[Tache] = Field(default_factory=list)
     rapports: list[RapportEmis] = Field(default_factory=list)  # documents émis, le plus récent en dernier
+    statuts: list[ChangementStatut] = Field(default_factory=list)  # historique des changements de statut
 
     model_config = ConfigDict(extra="ignore", populate_by_name=True, validate_assignment=True)
 
