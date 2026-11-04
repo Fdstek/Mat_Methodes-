@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLineEdit, QMenu, QSizePolicy, QVBoxLayout, QWidget
 
 from mat_methode.domain import reglages_ops as O
+from mat_methode.domain import regles as R
 from mat_methode.domain.models import ARCHIVEE, STATUTS_DEFINITION
 from mat_methode.domain.regles import tous_les_tags
 from mat_methode.domain.texte import fmt_dt, norm
@@ -261,6 +262,8 @@ class PageManips(QWidget):
             st.setMinimumWidth(0)
             st.setMinimumContentsLength(6)
             st.choisi.connect(lambda v, m=m: self._statut(m, v))
+            if m.statuts:
+                st.setToolTip(O.texte_statut(self.ctrl.reglages, m.statuts[-1]))
             g.addWidget(self._fixe(st, 4), 0, 4)
         g.addWidget(self._fixe(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True,
                                       tip=f"Ouvrir le flux de {m.nom}"), 5), 0, 5)
@@ -294,7 +297,9 @@ class PageManips(QWidget):
                 self, "Archiver cette manip ?", f"« {m.nom} » passera dans l’onglet Archivées. Elle reste consultable et peut être restaurée.",
                 "Archiver", danger=False):
             return
+        avant = m.etat
         a = O.archiver_ou_restaurer(self.ctrl.reglages, m)
+        R.noter_statut(m, avant, m.etat, self.ctrl.st.utilisateur)
         self.ctrl.toucher(m)
         self.ctrl.enregistrer_tout()
         self.ctrl.toast.emit("Archivée" if a else "Restaurée")

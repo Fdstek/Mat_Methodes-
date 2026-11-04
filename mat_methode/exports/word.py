@@ -340,5 +340,10 @@ def ecrire_docx(data: dict, chemin) -> None:
             doc.add_heading("Modifications après lancement", level=2)
             ecrire(doc.add_paragraph(), "Aucune modification depuis le lancement.")
 
+    if data.get("statuts"):
+        tableau("Historique des statuts", ["Date et heure", "Par", "Changement de statut"],
+                [[fmt_dt(c["t"]), c.get("nom") or c.get("par"), f"{c.get('de', '')} → {c.get('vers', '')}"] for c in data["statuts"]],
+                [3.6, 4.6, 8.8])
+
     ecrire(sec.footer.paragraphs[0], "Document généré automatiquement - à relire avant diffusion", 8, couleur=MUTED)
     doc.save(str(chemin))

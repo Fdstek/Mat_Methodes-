@@ -430,6 +430,7 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     c.rev, c.lancee, c.journal, c.base = 1, None, [], None
     c.a_faire = []  # la liste « à faire » est propre à chaque manip
     c.rapports = []
+    c.statuts = []  # nouvel historique des statuts
     c.maj = maintenant_iso()
     c.contexte.ref = ""
     c.contexte.lot = ""
@@ -459,9 +460,17 @@ def protocoles(manips: list[Manip], ordre: list[str], statuts=A_REALISER) -> lis
     return sorted(ms, key=lambda m: (m.id not in rang, rang.get(m.id, 0), m.maj))
 
 
-def changer_statut(m: Manip, statut: str, reglages: Reglages) -> bool:
-    """Change le statut ; une manip qui devient « Validée » ou « En cours » prend la dernière place de la liste Protocole.
-    Retourne True si l'ordre des protocoles (Réglages) a changé."""
+def noter_statut(m: Manip, avant: str, apres: str, par: str = "") -> None:
+    """Ajoute le changement de statut à l'historique (qui, quand, de quoi vers quoi)."""
+    from mat_methode.domain.models import ChangementStatut
+    if avant != apres:
+        m.statuts = m.statuts + [ChangementStatut(t=maintenant_iso(), par=par, de=avant, vers=apres)]
+
+
+def changer_statut(m: Manip, statut: str, reglages: Reglages, par: str = "") -> bool:
+    """Change le statut (noté dans l'historique avec `par`) ; une manip qui devient « Validée » ou « En cours » prend la
+    dernière place de la liste Protocole. Retourne True si l'ordre des protocoles (Réglages) a changé."""
+    noter_statut(m, m.etat, statut, par)
     m.etat = statut
     if statut in A_REALISER and m.id not in reglages.ordre_protocoles:
         reglages.ordre_protocoles = reglages.ordre_protocoles + [m.id]

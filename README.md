@@ -91,6 +91,12 @@ décroissant, puis ordre d'origine. Chaque type a une couleur (Réglages › Typ
 **Retour à la liste** : dans Flux, Édition et Rapport de la manip, le bouton « ← » à gauche du titre ferme la manip en
 cours (enregistrée, verrou libéré, plus « ouverte » pour les autres) et revient à la liste de la section.
 
+**Écran d'ouverture** : comme Word, une fenêtre avec le logo et une barre de progression s'affiche pendant le chargement.
+
+**Changements de statut** : chacun est enregistré avec la personne et l'heure. Le dernier s'affiche en clair dans le bandeau
+(« Validée le 04/11/2026 à 11:40 par Pierre BURGUN ») et dans l'onglet Rapport ; l'historique complet est dans le journal
+de l'application, dans l'onglet Rapport et dans les documents (PDF du rapport et du protocole, Word : « Historique des statuts »).
+
 **Journal des modifications** : l'auteur de chaque ligne (et du lancement) est noté par ses initiales ; les anciennes
 lignes écrites avec un IGG ou un nom s'affichent aussi en initiales quand la personne est dans Réglages › Personnes.
 

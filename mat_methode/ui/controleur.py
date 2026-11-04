@@ -395,7 +395,7 @@ class Controleur(QObject):
             return f"Impossible : « {m.nom} » est modifiée en ce moment par {self.nom_de(v.utilisateur)}"
         from mat_methode.domain import journal as J
         from mat_methode.domain.models import ENCOURS
-        if R.changer_statut(m, statut, self.reglages):
+        if R.changer_statut(m, statut, self.reglages, self.st.utilisateur):
             self.toucher_reglages()
         if statut == ENCOURS and not m.lancee:
             J.lancer(m, par=self.operateur(m))

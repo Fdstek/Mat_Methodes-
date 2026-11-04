@@ -19,7 +19,7 @@ from mat_methode.domain.models import (
     Vide,
 )
 from mat_methode.domain.prototype import contexte_depuis
-from mat_methode.domain.reglages_ops import auteur
+from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat
 from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, numero_etape
 from mat_methode.domain.texte import cap, minuscule_initiale
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
@@ -71,6 +71,9 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
         "titre": m.nom, "contexte": contexte_vers(m), "version": m.rev, "enregistree_le": m.maj,
         "lancee": ({**m.lancee.model_dump(), "par": auteur(reglages, m.lancee.par)} if m.lancee else None),
         "journal": [{**j.model_dump(), "par": auteur(reglages, j.par)} for j in m.journal],
+        **({"statuts": [{"t": c.t, "par": auteur(reglages, c.par), "nom": nom_auteur(reglages, c.par),
+                         "de": nom_etat(reglages, c.de)[0], "vers": nom_etat(reglages, c.vers)[0]} for c in m.statuts]}
+           if m.statuts else {}),
         "etapes": etapes,
         "sous_sections": [{"titre": s.titre, "texte": vers_markdown(s.texte)} for s in r.sections],
         "materiel": materiel,

@@ -145,6 +145,9 @@ class PageProtocoles(QWidget):
         st.setMinimumWidth(0)
         st.setMinimumContentsLength(6)
         st.choisi.connect(lambda val, m=m: self._statut(m, val))
+        if m.statuts:
+            from mat_methode.domain.reglages_ops import texte_statut
+            st.setToolTip(texte_statut(self.ctrl.reglages, m.statuts[-1]))
         cel.append(st)
         if not self.clotures:
             haut = icone("↑", f"Réaliser avant : {m.nom}", lambda m=m: self.ctrl.deplacer_protocole(m, -1))

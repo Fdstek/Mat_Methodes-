@@ -22,6 +22,7 @@ from mat_methode.exports.pdf import (
     TEAL_L,
     Flux,
     avec_reperes,
+    bloc_statuts,
     cartouche,
     document,
     legende_flux,
@@ -164,6 +165,7 @@ def ecrire_protocole(data: dict, chemin) -> None:
               Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros Scirius / Aramis à noter à la main).", petit)]
     story.append(KeepTogether(entete + phases[:1]))  # le titre reste avec la première phase
     story += phases[1:]
+    story += bloc_statuts(data, s)  # qui a changé le statut, et quand
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
 
 

@@ -321,6 +321,26 @@ def auteur(r: Reglages | None, par: str) -> str:
     return p.sigle() if p else par
 
 
+def nom_auteur(r: Reglages | None, igg: str) -> str:
+    p = r.personne_igg(igg) if r is not None else None
+    return p.nom if p else igg
+
+
+def texte_statut(r: Reglages | None, c) -> str:
+    """« Validée le 04/11/2026 à 11:40 par Pierre BURGUN » (nom complet si la personne est dans les Réglages)."""
+    from mat_methode.domain.texte import fmt_dt
+    p = r.personne_igg(c.par) if r is not None else None
+    return f"{nom_etat(r, c.vers)[0]} le {fmt_dt(c.t)} par {p.nom if p else (c.par or '?')}"
+
+
+def journal_complet(r: Reglages | None, m: Manip) -> list[tuple[str, str, str]]:
+    """Journal de l'application : modifications après lancement + changements de statut, du plus récent au plus ancien.
+    (date ISO, auteur en initiales, texte). Les changements de statut ne vont pas dans les documents exportés."""
+    lignes = [(j.t, auteur(r, j.par), j.txt) for j in m.journal]
+    lignes += [(c.t, auteur(r, c.par), f"Statut : {nom_etat(r, c.de)[0]} → {nom_etat(r, c.vers)[0]}") for c in m.statuts]
+    return sorted(lignes, key=lambda x: x[0], reverse=True)
+
+
 def couleur_type(r: Reglages, typ: str) -> str:
     """Couleur d'un type de demande : celle choisie dans les Réglages, sinon une couleur fixe tirée de son nom."""
     import zlib

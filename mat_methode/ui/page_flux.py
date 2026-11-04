@@ -19,7 +19,7 @@ from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
 from mat_methode.domain.models import ANNULEE, ARCHIVEE, BROUILLON, ENCOURS, REALISEE, STATUTS, STATUTS_DEFINITION, STATUTS_PROTOCOLE, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
-from mat_methode.domain.reglages_ops import auteur
+from mat_methode.domain.reglages_ops import auteur, texte_statut
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
 from mat_methode.report.rapport import autres_conditions, resume_conditions
@@ -287,6 +287,12 @@ class PageFlux(QWidget):
             st = liste_statut(m, choix)
             st.choisi.connect(self._statut)
             h.addWidget(st)
+        if m.statuts:  # bien visible : qui a mis ce statut, et quand
+            dernier = etiquette(texte_statut(self.ctrl.reglages, m.statuts[-1]))
+            dernier.setObjectName("dernierStatut")
+            dernier.setStyleSheet(f"QLabel#dernierStatut{{color:{theme.P.texte};font-weight:600;}}")
+            dernier.setToolTip("Dernier changement de statut (historique complet : bouton « Journal »)")
+            h.addWidget(dernier)
         if m.lancee:
             n = len(m.journal)
             infos = [etiquette(f"lancée le {fmt_dt(m.lancee.le)[:10]} par {auteur(self.ctrl.reglages, m.lancee.par)}", secondaire=True)]
@@ -302,6 +308,8 @@ class PageFlux(QWidget):
                                    + " ; passe-la « En cours » au démarrage de la manip.", secondaire=True))
         elif m.etat == BROUILLON:
             h2.addWidget(etiquette("Passe-la « Validée » quand le Mat & Méthode est prêt : elle arrivera dans Protocole.", secondaire=True))
+        if m.statuts and not (m.lancee and m.journal):  # « Voir le journal » est déjà là après des modifications
+            h2.addWidget(bouton("Journal", self._journal, lien=True, tip="Changements de statut et modifications après lancement"))
         h.addStretch(1)
         h2.addStretch(1)
         autres = self.ctrl.presents_sur(m.id)
@@ -339,7 +347,7 @@ class PageFlux(QWidget):
                      "demande) sera notée avec la date, l’heure et ton nom, et signalée dans le rapport.", "Lancer", danger=False):
             J.lancer(self.m, par=self.ctrl.operateur(self.m))
             if self.m.etat in (BROUILLON, VALIDEE):
-                if R.changer_statut(self.m, ENCOURS, self.ctrl.reglages):  # le statut suit le lancement
+                if R.changer_statut(self.m, ENCOURS, self.ctrl.reglages, self.ctrl.st.utilisateur):  # le statut suit le lancement
                     self.ctrl.toucher_reglages()
             self._toucher(True)
             self.ctrl.toast.emit("Manip lancée")
@@ -347,6 +355,7 @@ class PageFlux(QWidget):
     def _annuler_lancement(self):
         if J.annuler_lancement(self.m):
             if self.m.etat == ENCOURS:
+                R.noter_statut(self.m, ENCOURS, VALIDEE, self.ctrl.st.utilisateur)
                 self.m.etat = VALIDEE  # revient « à réaliser » dans Protocole
             self._toucher(True)
             self.ctrl.toast.emit("Lancement annulé")

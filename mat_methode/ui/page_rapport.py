@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import regles as R
-from mat_methode.domain.reglages_ops import auteur
+from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat, texte_statut
 from mat_methode.domain.texte import fmt_dt, fmt_vol
 from mat_methode.report.rapport import REPERE, construire, markdown, mention_modifiee
 from mat_methode.ui import theme
@@ -116,6 +116,8 @@ class PageRapport(QWidget):
         if m.lancee:
             v += f" · lancée le {fmt_dt(m.lancee.le)} par {auteur(r, m.lancee.par)}"
         self.lay.addWidget(etiquette(v, secondaire=True))
+        if m.statuts:  # dans l'application seulement (pas dans les documents)
+            self.lay.addWidget(etiquette("Statut : " + texte_statut(r, m.statuts[-1]), wrap=True))
         if mention_modifiee(m):
             self.lay.addWidget(InfoBar("Détail en bas du rapport.", titre=mention_modifiee(m),
                                        actions=[bouton("Voir le journal", self.journal.emit)]))
@@ -200,6 +202,10 @@ class PageRapport(QWidget):
             self.lay.addWidget(table(["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Laboratoire", "Analyses"],
                                      [[x.id, x.etape, x.moment, f"{fmt_vol(x.volume or 0)} mL", x.scirius, x.aramis, x.labo, ", ".join(x.analyses)]
                                       for x in rap.echantillons]))
+        if m.statuts:
+            self.lay.addWidget(etiquette("Historique des statuts", "sousTitre"))
+            self.lay.addWidget(table(["Date et heure", "Par", "Changement de statut"],
+                                     [[fmt_dt(c.t), nom_auteur(r, c.par), f"{nom_etat(r, c.de)[0]} → {nom_etat(r, c.vers)[0]}"] for c in m.statuts]))
         if m.lancee:
             self.lay.addWidget(etiquette("Modifications après lancement", "sousTitre"))
             if m.journal:
