@@ -88,7 +88,9 @@ class Controleur(QObject):
             self.statut.emit("Non enregistré : dossier inaccessible", True)
 
     def _charger_liste(self) -> None:
+        precedentes = {m.id: m for m in self.manips}
         self.liste = self.st.lister()
+        self.liste.manips += [precedentes[i] for i in self.liste.occupes if i in precedentes]  # fichier tenu un instant : version déjà connue
         en_memoire = {m.id: m for m in self.manips if m.id in self.sales or m.id == self.courante_id}
         self.manips = [en_memoire.get(m.id, m) for m in self.liste.manips]
         self.manips += [m for i, m in en_memoire.items() if i not in {x.id for x in self.manips}]

@@ -108,7 +108,7 @@ def test_fichiers_illisibles_et_conflits(tmp_path, ethanol):
     (d / "futur.json").write_text(json.dumps({"schema": 99, "id": "futur"}))
     liste = s.lister()
     assert [m.id for m in liste.manips] == [ethanol.id]
-    assert liste.conflits == [f"{ethanol.id}-PC-MARIE.json"] and "casse.json" in liste.illisibles
+    assert liste.conflits == [f"{ethanol.id}-PC-MARIE.json"] and any(x.startswith("casse.json") for x in liste.illisibles)
     assert any("plus récente" in x for x in liste.illisibles)
     assert (d / f"{ethanol.id}-PC-MARIE.json").exists()  # jamais supprimé
 
@@ -161,3 +161,33 @@ def test_presence_des_autres(tmp_path):
     assert moi.presences_autres(plus_tard) == []  # plus de battement depuis 3 min : absente
     autre.retirer_presence()
     assert moi.presences_autres() == []
+
+
+def test_fichier_illisible_donne_sa_raison(tmp_path):
+    st = Stockage(tmp_path, "pierre", "PC")
+    st.initialiser()
+    (st.d_manips / "aaaaaaaa.json").write_text('{"id": "aaaaaaaa", "etapes": [', encoding="utf-8")
+    (st.d_manips / "bbbbbbbb.json").write_text('{"id": "bbbbbbbb", "etat": 5}', encoding="utf-8")
+    texte = " | ".join(st.lister().illisibles)
+    assert "aaaaaaaa.json (fichier incomplet" in texte and "bbbbbbbb.json (champ « etat »" in texte
+
+
+def test_fichier_occupe_n_est_pas_illisible(tmp_path, monkeypatch):
+    import builtins
+
+    st = Stockage(tmp_path, "pierre", "PC")
+    st.initialiser()
+    (st.d_manips / "cccccccc.json").write_text('{"id": "cccccccc"}', encoding="utf-8")
+    ouvrir = builtins.open
+
+    def occupe(chemin, *a, **k):
+        if str(chemin).endswith("cccccccc.json"):
+            e = PermissionError(13, "utilisé par un autre processus")
+            e.winerror = 32
+            raise e
+        return ouvrir(chemin, *a, **k)
+
+    monkeypatch.setattr(builtins, "open", occupe)
+    monkeypatch.setattr("mat_methode.storage.stockage.time.sleep", lambda s: None)
+    liste = st.lister()
+    assert liste.occupes == ["cccccccc"] and liste.illisibles == []

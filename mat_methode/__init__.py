@@ -1,9 +1,11 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 DATE_VERSION = "04/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.1.2", "04/11/2026", ["Fichier tenu un instant par OneDrive ou un autre poste : relu automatiquement, plus de faux « fichier illisible »",
+                             "Fichier vraiment illisible : la cause est indiquée"]),
     ("1.1.1", "04/11/2026", ["Menu : Mat & Méthode › Édition, plus de place pour les pages", "Icônes du menu visibles",
                              "Donneurs d'ordre et attribués : prénoms en tags de couleur ; colonne Étapes en tags",
                              "Listes à choix multiples qui restent ouvertes entre deux choix",

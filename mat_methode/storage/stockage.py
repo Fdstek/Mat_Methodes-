@@ -16,6 +16,7 @@ import logging
 import os
 import re
 import shutil
+import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -44,12 +45,32 @@ def ecrire_atomique(chemin: Path, contenu: str) -> None:
         f.write(contenu)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, chemin)
+    for essai in range(8):  # Windows : le fichier peut être tenu un instant par la synchronisation OneDrive / SharePoint
+        try:
+            os.replace(tmp, chemin)
+            return
+        except PermissionError:
+            if essai == 7:
+                raise
+            time.sleep(0.25)
 
 
-def lire_json(chemin: Path) -> dict:
-    with open(chemin, encoding="utf-8") as f:
-        return json.load(f)
+def fichier_occupe(ex: BaseException) -> bool:
+    """Vrai si le fichier est simplement tenu par un autre processus (WinError 32 ou 5) : à relire dans un instant."""
+    return isinstance(ex, PermissionError) or getattr(ex, "winerror", None) in (5, 32)
+
+
+def lire_json(chemin: Path, essais: int = 6, attente: float = 0.25) -> dict:
+    """Lit un fichier JSON ; s'il est occupé par un autre processus, réessaie quelques fois avant d'abandonner."""
+    for k in range(essais):
+        try:
+            with open(chemin, encoding="utf-8") as f:
+                return json.load(f)
+        except OSError as ex:
+            if not fichier_occupe(ex) or k == essais - 1:
+                raise
+            time.sleep(attente)
+    raise OSError(f"{chemin.name} : lecture impossible")  # inatteignable
 
 
 def _dumps(d) -> str:
@@ -77,6 +98,19 @@ def etats_v6(etats: list) -> list:
     pos = next((k + 1 for k, e in enumerate(etats) if isinstance(e, dict) and e.get("id") == "encours"), len(etats))
     etats.insert(pos, {"id": "realisee", "nom": "Réalisée", "ton": "ok"})
     return etats
+
+
+def raison_illisible(ex: Exception) -> str:
+    """Cause d'un fichier illisible, en une phrase courte (affichée dans la liste et gardée dans les logs)."""
+    if isinstance(ex, json.JSONDecodeError):
+        return "fichier incomplet ou abîmé, souvent une synchronisation interrompue"
+    if hasattr(ex, "errors"):
+        try:
+            e = ex.errors()[0]
+            return f"champ « {'.'.join(str(x) for x in e['loc'])} » : {e['msg']}"
+        except Exception:
+            pass
+    return f"{type(ex).__name__} : {str(ex)[:80]}"
 
 
 def migrer(d: dict, chemin: Path) -> dict:
@@ -123,6 +157,7 @@ class Liste:
     manips: list[Manip] = field(default_factory=list)
     illisibles: list[str] = field(default_factory=list)
     conflits: list[str] = field(default_factory=list)  # fichiers de conflit SharePoint / OneDrive
+    occupes: list[str] = field(default_factory=list)  # identifiants des fichiers tenus un instant par un autre processus (relus plus tard)
 
 
 class Stockage:
@@ -266,14 +301,22 @@ class Stockage:
             return res
         for f in sorted(self.d_manips.glob("*.json")):
             try:
-                d = lire_json(f)
+                d = lire_json(f, essais=3, attente=0.15)
                 m = Manip.model_validate(migrer(d, f))
+            except OSError as ex:
+                if fichier_occupe(ex):  # pas un fichier abîmé : on garde la version en mémoire et on relit au prochain passage
+                    log.info("fichier occupé %s : relu plus tard", f.name)
+                    res.occupes.append(f.stem)
+                    continue
+                log.warning("fichier illisible %s : %s", f.name, ex)
+                res.illisibles.append(f"{f.name} ({raison_illisible(ex)})")
+                continue
             except DonneesTropRecentes as ex:
                 res.illisibles.append(str(ex))
                 continue
             except Exception as ex:  # un fichier illisible n'empêche jamais l'ouverture des autres
                 log.warning("fichier illisible %s : %s", f.name, ex)
-                res.illisibles.append(f.name)
+                res.illisibles.append(f"{f.name} ({raison_illisible(ex)})")
                 continue
             if f.stem != m.id or not NOM_VALIDE.match(f.name):
                 res.conflits.append(f.name)  # ex. « k97omty-PC-MARIE.json », « k97omty (1).json »
