@@ -29,7 +29,7 @@ def _ligne_cadre(derniere: bool) -> tuple[QFrame, QGridLayout]:
     w.setStyleSheet("" if derniere else f"QFrame#ligneManip{{border-bottom:1px solid {theme.P.trait};}}")
     g = QGridLayout(w)
     g.setContentsMargins(14, 10, 14, 10)
-    g.setHorizontalSpacing(12)
+    g.setHorizontalSpacing(16)
     return w, g
 
 
@@ -108,7 +108,7 @@ class PageProtocoles(QWidget):
         self.lay.addWidget(w)
         self.lay.addWidget(etiquette(
             "Les manips réalisées ou annulées. Une manip réalisée apparaît dans Rapport." if self.clotures else
-            "Les manips validées dans « Définition Mat & Méthode », dans l’ordre de réalisation (↑ ↓ pour le changer). "
+            "Les manips validées dans « Mat & Méthode », dans l’ordre de réalisation (↑ ↓ pour le changer). "
             "Passe le statut à « En cours » au démarrage, puis à « Réalisée » : elle part dans Rapport.", secondaire=True, wrap=True))
         base = clos if self.clotures else a_faire
         self.lay.addWidget(self.filtres.barre(base, r, self._actualiser, tous_les_tags(base, r.ordre_tags)))
@@ -119,7 +119,7 @@ class PageProtocoles(QWidget):
         f, v = _cadre_liste()
         if not liste:
             vide = etiquette("Aucun protocole ne correspond aux filtres." if base else "Aucun protocole clôturé." if self.clotures else
-                             "Aucun protocole à réaliser : valide une manip dans « Définition Mat & Méthode ».", secondaire=True)
+                             "Aucun protocole à réaliser : valide une manip dans « Mat & Méthode ».", secondaire=True)
             vide.setContentsMargins(16, 24, 16, 24)
             v.addWidget(vide)
         else:

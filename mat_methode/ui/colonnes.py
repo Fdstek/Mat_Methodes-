@@ -8,17 +8,17 @@ from typing import Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QMenu, QPushButton, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QMenu, QPushButton, QToolButton, QVBoxLayout, QWidget, QWidgetAction
 
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
-from mat_methode.domain.texte import norm
+from mat_methode.domain.texte import norm, prenom
 from mat_methode.ui import theme
 from mat_methode.ui.widgets import bouton, etiquette, flux_widgets
 
-LARG_DONNEUR, LARG_ATTRIBUE, LARG_TYPE, LARG_ETAPES, LARG_TAGS = 135, 95, 80, 105, 135
-COMMUNES = (("DONNEUR D’ORDRE", LARG_DONNEUR), ("ATTRIBUÉ À", LARG_ATTRIBUE), ("TYPE", LARG_TYPE), ("ÉTAPES", LARG_ETAPES), ("TAGS", LARG_TAGS))
-TRIABLES = {"DONNEUR D’ORDRE": "donneur", "ATTRIBUÉ À": "attribue", "TYPE": "type", "ÉTAPES": "etapes"}
+LARG_DONNEUR, LARG_ATTRIBUE, LARG_TYPE, LARG_ETAPES, LARG_TAGS = 105, 85, 80, 105, 130
+COMMUNES = (("DONNEUR", LARG_DONNEUR), ("ATTRIBUÉ", LARG_ATTRIBUE), ("TYPE", LARG_TYPE), ("ÉTAPES", LARG_ETAPES), ("TAGS", LARG_TAGS))
+TRIABLES = {"DONNEUR": "donneur", "ATTRIBUÉ": "attribue", "TYPE": "type", "ÉTAPES": "etapes"}
 Tri = tuple[str, bool] | None  # (« donneur » ou « type », croissant)
 
 
@@ -98,8 +98,8 @@ def pilule(texte: str, couleur: str, clic: Callable | None = None, tip: str = ""
 def cellule_donneur(m, r, trier: Callable[[str], None] | None = None) -> QWidget:
     if not m.contexte.donneur:
         return boite(etiquette("—", secondaire=True), LARG_DONNEUR)
-    b = Pilule(m.contexte.donneur, O.couleur_donneur(r, m.contexte.donneur), (lambda: trier("donneur")) if trier else None,
-               "Trier par donneur d’ordre" if trier else "", LARG_DONNEUR)
+    b = Pilule(prenom(m.contexte.donneur), O.couleur_donneur(r, m.contexte.donneur), (lambda: trier("donneur")) if trier else None,
+               f"{m.contexte.donneur} : trier par donneur d’ordre" if trier else m.contexte.donneur, LARG_DONNEUR)
     return boite(b, LARG_DONNEUR)
 
 
@@ -124,28 +124,28 @@ def cellule_tags(m, r, clic: Callable[[str], None] | None = None) -> QWidget:
     return fixe(flux_widgets([bouton_tag(t, r, (lambda t=t: clic(t)) if clic else None) for t in m.tags], centre=True), LARG_TAGS)
 
 
-def _texte_centre(texte: str, largeur: int, tip: str = "", clic: Callable | None = None) -> QWidget:
-    if not texte:
-        return boite(etiquette("—", secondaire=True), largeur)
-    lab = etiquette(texte, wrap=True)
-    lab.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-    lab.setToolTip(tip)
-    return fixe(lab, largeur)
-
-
-def cellule_attribue(m, trier: Callable[[str], None] | None = None) -> QWidget:
-    return _texte_centre(m.contexte.attribue, LARG_ATTRIBUE, "Manip attribuée à " + m.contexte.attribue)
+def cellule_attribue(m, r, trier: Callable[[str], None] | None = None) -> QWidget:
+    """Prénom de la personne à qui la manip est attribuée, en tag de couleur (cliquable : tri)."""
+    nom = m.contexte.attribue
+    if not nom:
+        return boite(etiquette("—", secondaire=True), LARG_ATTRIBUE)
+    return boite(Pilule(prenom(nom), O.couleur_donneur(r, nom), (lambda: trier("attribue")) if trier else None,
+                        f"Attribuée à {nom}" + (" : trier par attribution" if trier else ""), LARG_ATTRIBUE), LARG_ATTRIBUE)
 
 
 def cellule_etapes(m) -> QWidget:
-    """Initiale de chaque grande étape et matériel de sa première sous-étape (« D : R1 »), un repère par ligne."""
+    """Un tag de couleur par grande étape : initiale et matériel de sa première sous-étape (« D : R1 »)."""
     rep = R.reperes_etapes(m)
-    return _texte_centre("\n".join(f"{i} : {mat}" if mat else i for i, _, mat in rep), LARG_ETAPES,
-                         "\n".join(f"{g} : {mat or 'matériel non indiqué'}" for _, g, mat in rep))
+    if not rep:
+        return boite(etiquette("—", secondaire=True), LARG_ETAPES)
+    palette = O.PALETTE_DONNEURS
+    puces = [Pilule(f"{i} : {mat}" if mat else i, palette[sum(ord(c) for c in g.lower()) % len(palette)], None,
+                    f"{g} : {mat or 'matériel non indiqué'}", LARG_ETAPES) for i, g, mat in rep]
+    return fixe(flux_widgets(puces, centre=True), LARG_ETAPES)
 
 
 def cellules_communes(m, r, clic_tag: Callable[[str], None] | None = None, trier: Callable[[str], None] | None = None) -> list[QWidget]:
-    return [cellule_donneur(m, r, trier), cellule_attribue(m, trier), cellule_type(m, r, trier), cellule_etapes(m), cellule_tags(m, r, clic_tag)]
+    return [cellule_donneur(m, r, trier), cellule_attribue(m, r, trier), cellule_type(m, r, trier), cellule_etapes(m), cellule_tags(m, r, clic_tag)]
 
 
 def sous_titre_manip(m) -> str:
@@ -173,19 +173,8 @@ def entetes_communes(tri: Tri = None, trier: Callable[[str], None] | None = None
 
 
 # ------------------------------------------------------------------ filtres (choix multiples)
-class _MenuCoche(QMenu):
-    """Menu dont les cases se cochent sans le fermer (plusieurs choix à la suite)."""
-
-    def mouseReleaseEvent(self, e):
-        a = self.actionAt(e.position().toPoint())
-        if a is not None and a.isCheckable() and a.isEnabled():
-            a.toggle()
-            return
-        super().mouseReleaseEvent(e)
-
-
 class ListeMulti(QToolButton):
-    """Liste déroulante à choix multiples : « Tous les types » ou « Type : A, B »."""
+    """Liste déroulante à choix multiples : « Tous les types » ou « Type : A, B ». La liste reste ouverte entre deux choix."""
     change = Signal()
 
     def __init__(self, vide: str, options: list[str], choisis: set[str], nom: str):
@@ -196,17 +185,29 @@ class ListeMulti(QToolButton):
         self.setToolTip(nom + " (plusieurs choix possibles)")
         self.setMinimumWidth(130)
         self.setStyleSheet("QToolButton::menu-indicator{subcontrol-position:right center;right:8px;}QToolButton{padding:5px 26px 5px 10px;text-align:left;}")
-        menu = _MenuCoche(self)
+        menu = QMenu(self)
+        self._cases: list[QCheckBox] = []
         for o in options:
-            a = menu.addAction(o)
-            a.setCheckable(True)
-            a.setChecked(o in choisis)
-            a.toggled.connect(lambda on, o=o: self._basculer(o, on))
+            case = QCheckBox(o)  # une case dans le menu : cliquer ne ferme pas la liste
+            case.setChecked(o in choisis)
+            case.setStyleSheet("QCheckBox{padding:5px 14px;}")
+            case.toggled.connect(lambda on, o=o: self._basculer(o, on))
+            act = QWidgetAction(menu)
+            act.setDefaultWidget(case)
+            menu.addAction(act)
+            self._cases.append(case)
         if options:
             menu.addSeparator()
             menu.addAction("Tout décocher", self._vider)
         self.setMenu(menu)
+        self._en_attente = False
+        menu.aboutToHide.connect(self._fermee)  # la liste n'est reconstruite qu'à la fermeture du menu (sinon elle se refermerait)
         self._texte()
+
+    def _fermee(self):
+        if self._en_attente:
+            self._en_attente = False
+            self.change.emit()
 
     def _texte(self):
         n = len(self._choisis)
@@ -216,17 +217,16 @@ class ListeMulti(QToolButton):
     def _basculer(self, o: str, on: bool):
         (self._choisis.add if on else self._choisis.discard)(o)
         self._texte()
-        self.change.emit()
+        self._en_attente = True
 
     def _vider(self):
         self._choisis.clear()
-        for a in self.menu().actions():
-            if a.isCheckable():
-                a.blockSignals(True)
-                a.setChecked(False)
-                a.blockSignals(False)
+        for c in self._cases:
+            c.blockSignals(True)
+            c.setChecked(False)
+            c.blockSignals(False)
         self._texte()
-        self.change.emit()
+        self._en_attente = True
 
 
 class Filtres:

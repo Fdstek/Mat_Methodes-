@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication, QKeySequence, QShortcut
+from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QFont, QFontDatabase, QGuiApplication, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -24,6 +24,7 @@ from mat_methode.domain.texte import nom_fichier
 from mat_methode.exports.echange import ImportInvalide, importer
 from mat_methode.exports.echange import exporter as exporter_json
 from mat_methode.ui import dialogues as D
+from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.page_demandes import PageDemandes
 from mat_methode.ui.page_flux import PageFlux
@@ -38,13 +39,29 @@ from mat_methode.ui.widgets import Toast, avatar, bouton, etiquette, pastille, v
 ICONES = {"manips": ("\ue8fd", "≡"), "flux": ("\ue8ab", "⇄"),
           "protocoles": ("\ue9d5", "☑"), "protocole": ("\ue70f", "✎"), "rapports": ("\ue8a5", "▤"), "rapport": ("\ue7c3", "▭"), "reglages": ("\ue713", "⚙"), "demandes": ("\ue8f2", "✉")}
 # Menu : (clé, libellé, sous-section ?) ; une sous-section concerne la manip ouverte.
-NAV = [("manips", "Définition Mat && Méthode", False), ("flux", "Flux", True),
+NAV = [("manips", "Mat && Méthode", False), ("flux", "Édition", True),
        ("protocoles", "Protocole", False), ("protocole", "Édition", True),
-       ("rapports", "Rapport", False), ("rapport", "Rapport de la manip", True),
+       ("rapports", "Rapport", False), ("rapport", "Édition", True),
        ("reglages", "Réglages", False)]
+LARGEUR_VOLET = 215  # menu de gauche : le reste de la fenêtre sert aux pages
 PAGES_MANIP = ("flux", "protocole", "rapport")  # pages qui demandent une manip ouverte
-TITRES = {"manips": "Définition Mat & Méthode", "protocoles": "Protocole", "rapports": "Rapport", "reglages": "Réglages",
+TITRES = {"manips": "Mat & Méthode", "protocoles": "Protocole", "rapports": "Rapport", "reglages": "Réglages",
           "demandes": "Bugs et idées"}
+
+
+def icone_menu(glyphe: str, famille: str | None, couleur: str) -> QIcon:
+    """Icône du menu : le symbole est dessiné (police Segoe Fluent Icons si présente), visible quel que soit le texte du bouton."""
+    from PySide6.QtGui import QColor, QPainter, QPixmap
+    pm = QPixmap(40, 40)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    f = QFont(famille) if famille else QFont()
+    f.setPixelSize(30)
+    p.setFont(f)
+    p.setPen(QColor(couleur))
+    p.drawText(pm.rect(), Qt.AlignmentFlag.AlignCenter, glyphe)
+    p.end()
+    return QIcon(pm)
 
 
 def police_icones() -> str | None:
@@ -76,7 +93,7 @@ class Fenetre(QMainWindow):
         # ---- volet de navigation
         self.volet = QWidget()
         self.volet.setObjectName("volet")
-        self.volet.setFixedWidth(272)
+        self.volet.setFixedWidth(LARGEUR_VOLET)
         v = QVBoxLayout(self.volet)
         v.setContentsMargins(8, 12, 8, 12)
         v.setSpacing(4)
@@ -111,7 +128,7 @@ class Fenetre(QMainWindow):
         cv.setContentsMargins(0, 0, 0, 0)
         cv.setSpacing(0)
         tete = QHBoxLayout()
-        tete.setContentsMargins(36, 22, 36, 6)
+        tete.setContentsMargins(24, 22, 24, 6)
         titres = QVBoxLayout()
         self.titre = etiquette("", "titrePage", wrap=True)
         # « ← » : quitter la manip choisie et revenir à la liste de la section (Flux, Édition, Rapport de la manip)
@@ -137,7 +154,7 @@ class Fenetre(QMainWindow):
         cv.addLayout(tete)
         self.zone_fixe = QWidget()  # bandeau de statut de Flux / Édition : ne défile pas avec la page
         zf = QVBoxLayout(self.zone_fixe)
-        zf.setContentsMargins(36, 4, 36 + 16, 4)
+        zf.setContentsMargins(24, 4, 24 + 16, 4)
         cv.addWidget(self.zone_fixe)
         self.pile = QStackedWidget()
         cv.addWidget(self.pile, 1)
@@ -166,7 +183,7 @@ class Fenetre(QMainWindow):
             boite = QWidget()
             boite.setObjectName("page")
             bl = QVBoxLayout(boite)
-            bl.setContentsMargins(36, 8, 36, 36)
+            bl.setContentsMargins(24, 8, 24, 36)
             bl.addWidget(p)
             s.setWidget(boite)
             self.pile.addWidget(s)
@@ -219,12 +236,11 @@ class Fenetre(QMainWindow):
         b.setProperty("sous", sous)
         b.setAccessibleName(texte.replace("&&", "&"))
         b.setToolTip(texte.replace("&&", "&"))
-        icone = ICONES[k][0] if pi else ICONES[k][1]
-        b._textes = (f"{icone}    {texte}", icone)
+        b._glyphe = (ICONES[k][0], pi) if pi else (ICONES[k][1], None)
+        b._textes = (texte, "")
         b.setText(b._textes[0])
-        if pi:
-            f = QFont(b.font())
-            b.setFont(f)
+        b.setIconSize(QSize(20, 20))
+        b.setIcon(icone_menu(*b._glyphe, theme.P.texte))
         b.clicked.connect(lambda *_: self.aller(k))
         self.nav[k] = b
         return b
@@ -323,7 +339,7 @@ class Fenetre(QMainWindow):
         if self.page in PAGES_MANIP and self.choisie(self.page) is None:
             self.page = listes[self.page]  # la manip a quitté la liste de la section (statut changé, supprimée…)
             self.pile.setCurrentIndex(list(self.pages).index(self.page))
-        aides = {"flux": "Choisis une manip dans Définition Mat & Méthode", "protocole": "Ouvre un protocole dans la liste Protocole",
+        aides = {"flux": "Choisis une manip dans Mat & Méthode", "protocole": "Ouvre un protocole dans la liste Protocole",
                  "rapport": "Ouvre un rapport dans la liste Rapport (manips réalisées)"}
         for k, b in self.nav.items():
             b.setProperty("actif", k == self.page)
@@ -333,6 +349,8 @@ class Fenetre(QMainWindow):
                 b.setToolTip(f"{b.accessibleName()} : {self.choisie(k).nom}" if ok else aides[k])
             b.style().unpolish(b)
             b.style().polish(b)
+        for b in list(self.nav.values()):
+            b.setIcon(icone_menu(*b._glyphe, theme.P.texte if b.isEnabled() else theme.P.texte2))
         self._bandeau()
         self._carte()
         self.retour.setVisible(self.page in PAGES_MANIP)
@@ -459,10 +477,10 @@ class Fenetre(QMainWindow):
     def resizeEvent(self, e):
         super().resizeEvent(e)
         etroit = self.width() < 1000  # volet replié en icônes
-        self.volet.setFixedWidth(64 if etroit else 272)
+        self.volet.setFixedWidth(64 if etroit else LARGEUR_VOLET)
         self.carte_manip.setVisible(False)
         for b in self.nav.values():
-            b.setText(b._textes[1] if etroit else b._textes[0])
+            b.setText(b._textes[1] if etroit else b._textes[0])  # replié : icônes seules
 
     # ------------------------------------------------------------ actions
     def _recherche(self):

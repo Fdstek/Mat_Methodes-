@@ -1,6 +1,7 @@
 """Page « Bugs et idées » (bas du menu) : formulaire, liste des demandes avec leur statut, export en fichier .md."""
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -8,7 +9,7 @@ from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QPlainTextEdit, 
 
 from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain.demandes import STATUTS_DEMANDE, TYPES_DEMANDE, Demande, vers_markdown
-from mat_methode.domain.texte import fmt_dt, nom_fichier
+from mat_methode.domain.texte import fmt_dt
 from mat_methode.storage import demandes as S
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.widgets import ChampTexte, Liste, bouton, carte, champ, etiquette, pastille, vider
@@ -52,7 +53,7 @@ class PageDemandes(QWidget):
             b.setProperty("actif", self.filtre == val)
             barre.addWidget(b)
         barre.addStretch(1)
-        barre.addWidget(bouton("Exporter en fichier .md", self._exporter, tip="Enregistre toutes les demandes dans un fichier .md"))
+        barre.addWidget(bouton("Exporter les nouvelles (.md)", self._exporter, tip="Enregistre les demandes « Nouvelle » dans un fichier .md daté ; elles passent à « À vérifier »"))
         w = QWidget()
         w.setLayout(barre)
         self.lay.addWidget(w)
@@ -170,14 +171,25 @@ class PageDemandes(QWidget):
         self._actualiser()
 
     def _exporter(self):
-        defaut = str(self.ctrl.st.donnees / "exports" / f"{nom_fichier('Bugs et idees')}.md")
-        chemin, _ = QFileDialog.getSaveFileName(self, "Exporter les demandes", defaut, "Fichier Markdown (*.md)")
+        """Exporte seulement les demandes « Nouvelle » ; une fois exportées, elles passent à « À vérifier »."""
+        nouvelles = [d for d in self._demandes() if d.statut == "Nouvelle"]
+        if not nouvelles:
+            self.ctrl.toast.emit("Aucune nouvelle demande à exporter")
+            return
+        horodatage = datetime.now().strftime("%Y-%m-%d_%Hh%M")
+        defaut = str(self.ctrl.st.donnees / "exports" / f"Bugs_et_idees_{horodatage}.md")
+        chemin, _ = QFileDialog.getSaveFileName(self, f"Exporter les {len(nouvelles)} nouvelle(s) demande(s)", defaut, "Fichier Markdown (*.md)")
         if not chemin:
             return
         try:
-            Path(chemin).write_text(vers_markdown(self._demandes(), self._nom, f"{NOM_APPLICATION} {VERSION}"), encoding="utf-8")
+            Path(chemin).write_text(vers_markdown(nouvelles, self._nom, f"{NOM_APPLICATION} {VERSION}"), encoding="utf-8")
         except OSError as ex:
             self.ctrl.toast.emit(f"Export impossible : {ex}")
             return
-        self.ctrl.toast.emit("Demandes exportées")
+        for d in nouvelles:  # exportée : passe à « À vérifier »
+            frais = S.relire(self.ctrl.st, d.id) or d
+            if frais.changer_statut("À vérifier", self.ctrl.st.utilisateur):
+                S.enregistrer(self.ctrl.st, frais)
+        self.ctrl.toast.emit(f"{len(nouvelles)} demande(s) exportée(s), passées à « À vérifier »")
+        self._actualiser()
         self.ouvrir_fichier.emit(chemin)

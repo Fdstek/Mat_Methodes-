@@ -1,13 +1,13 @@
 """Journal des bugs et des bonnes idées : une demande par fichier (`donnees\\demandes\\<id>.json`), pièces jointes à côté."""
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from mat_methode.domain.models import maintenant_iso, nouvel_id
 from mat_methode.domain.texte import fmt_dt
 
 TYPES_DEMANDE = ("Bug", "Bonne idée")
-STATUTS_DEMANDE = ("Nouvelle", "En cours", "Traitée", "Refusée")
+STATUTS_DEMANDE = ("Nouvelle", "À vérifier", "Traitée", "Refusée")  # « À vérifier » : exportée, en attente de contrôle
 
 
 class ChangementDemande(BaseModel):
@@ -30,6 +30,11 @@ class Demande(BaseModel):
     maj: str = Field(default_factory=maintenant_iso)
     pieces: list[str] = Field(default_factory=list)  # noms des fichiers joints
     historique: list[ChangementDemande] = Field(default_factory=list)
+
+    @field_validator("statut", mode="before")
+    @classmethod
+    def _ancien_statut(cls, v):
+        return "À vérifier" if v == "En cours" else v  # ancien nom du statut
 
     def changer_statut(self, statut: str, par: str) -> bool:
         if statut == self.statut or statut not in STATUTS_DEMANDE:

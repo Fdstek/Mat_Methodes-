@@ -503,7 +503,7 @@ def test_tag_cree_dans_les_reglages_et_ordre_des_cartes(fen, monkeypatch):
     fen.aller("manips")
     from PySide6.QtWidgets import QPushButton
     textes = [w.text() for w in fen.p_manips.findChildren(type(fen.titre))] + [b.text() for b in fen.p_manips.findChildren(QPushButton)]
-    assert {"DONNEUR D’ORDRE ⇅", "TYPE ⇅", "TAGS", "STATUT"} <= set(textes)  # en-têtes triables : flèche
+    assert {"DONNEUR ⇅", "TYPE ⇅", "TAGS", "STATUT"} <= set(textes)  # en-têtes triables : flèche
 
 
 def test_tri_couleur_des_types_presence_et_defilement(fen, qtbot, tmp_path):
@@ -657,3 +657,32 @@ def test_experience_attribution_etapes_filtres_et_demandes(fen, tmp_path):
     lst = S.lister(fen.ctrl.st)
     assert lst[0].statut == "Traitée" and lst[0].historique[-1].par == "pierre"
     assert "Bouton trop petit" in vers_markdown(lst, fen.ctrl.nom_de) and isinstance(lst[0], Demande)
+
+
+def test_export_des_nouvelles_demandes_et_fait_des_manips(fen, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    from mat_methode.domain.demandes import Demande
+    from mat_methode.domain.models import Personne
+    from mat_methode.domain.texte import prenom
+    from mat_methode.storage import demandes as S
+    st = fen.ctrl.st
+    S.enregistrer(st, Demande(titre="A", texte="un", auteur="pierre"))
+    ancien = Demande(titre="B", texte="deux", auteur="pierre", statut="En cours")  # ancien nom du statut
+    S.enregistrer(st, ancien)
+    assert S.relire(st, ancien.id).statut == "À vérifier"
+    cible = tmp_path / "export.md"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(cible), "")))
+    fen.aller("demandes")
+    fen.p_demandes.ouvrir_fichier.disconnect()
+    fen.p_demandes._exporter()
+    texte = cible.read_text(encoding="utf-8")
+    assert "un" in texte and "deux" not in texte  # seulement les nouvelles
+    assert {d.titre: d.statut for d in S.lister(st)} == {"A": "À vérifier", "B": "À vérifier"}
+    # « Fait des manips » remonte la personne en tête
+    r = fen.ctrl.reglages
+    r.personnes += [Personne(nom="Anne DUPONT"), Personne(nom="Zoé MARTIN")]
+    fen.aller("reglages")
+    fen.p_reglages._fait_des_manips(r.personne("Zoé MARTIN"), True)
+    assert r.personnes[0].nom == "Zoé MARTIN" and r.attributions[0] == "Zoé MARTIN"
+    assert prenom("Pierre BURGUN") == "Pierre" and prenom("Interne · R&D") == "Interne · R&D"
