@@ -72,6 +72,7 @@ class Personne(_Modele):
     nom: str
     initiales: str = ""
     igg: str = ""
+    manipule: bool = False  # fait des manips : proposé en tête de la liste « Attribué à »
 
     def sigle(self) -> str:
         return (self.initiales or initiales_de(self.nom)).strip().upper()
@@ -147,6 +148,11 @@ class Reglages(_Modele):
     @property
     def donneurs_ordre(self) -> list[str]:
         return [p.nom for p in self.personnes]
+
+    @property
+    def attributions(self) -> list[str]:
+        """Personnes proposées dans « Attribué à » : celles qui font des manips d'abord (ordre des Réglages), puis les autres."""
+        return [p.nom for p in self.personnes if p.manipule] + [p.nom for p in self.personnes if not p.manipule]
 
     def personne(self, nom: str | None) -> Optional[Personne]:
         return next((p for p in self.personnes if p.nom == nom), None)
@@ -254,6 +260,8 @@ class Contexte(_Modele):
     scirius: str = ""  # n° Scirius de la charge de départ
     fournisseur: str = ""  # fournisseur de la charge de départ
     emplacement: str = ""  # où est stockée la charge de départ (armoire, chambre froide…)
+    experience: str = ""  # n° d'expérience (sous le titre de la manip, dans les listes et les PDF)
+    attribue: str = ""  # personne à qui la manip est attribuée (nom, voir Réglages › Personnes)
 
 
 class Communes(_Modele):

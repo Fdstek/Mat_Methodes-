@@ -39,7 +39,7 @@ def contexte_depuis(c: dict) -> Contexte:
         date=c.get("date") or "", operateur=c.get("operateur") or "",
         volume_depart_ml=c.get("volumeDepart", c.get("volume_depart_ml")),
         matiere=c.get("matiere") or "", lot=c.get("lot") or "", scirius=c.get("scirius") or "", fournisseur=c.get("fournisseur") or "",
-        emplacement=c.get("emplacement") or "")
+        emplacement=c.get("emplacement") or "", experience=c.get("experience") or "", attribue=c.get("attribue") or "")
 
 
 def etape_depuis(e: dict) -> Etape:

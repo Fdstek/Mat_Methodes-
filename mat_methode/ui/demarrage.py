@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QApplication, QFrame, QLabel, QProgressBar, QVBoxL
 
 
 class EcranDemarrage(QWidget):
-    def __init__(self, nom: str, version: str, icone: QIcon | None = None):
+    def __init__(self, nom: str, version: str, icone: QIcon | None = None, date: str = ""):
         super().__init__(None, Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setObjectName("demarrage")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -29,7 +29,7 @@ class EcranDemarrage(QWidget):
         titre = QLabel(nom)
         titre.setStyleSheet("font-size:22pt;font-weight:700;")
         v.addWidget(titre)
-        sous = QLabel(f"Matériel et méthodes · version {version}")
+        sous = QLabel(f"Matériel et méthodes · version {version}" + (f" · mise à jour du {date}" if date else ""))
         sous.setStyleSheet("font-size:10pt;color:rgba(255,255,255,0.85);")
         v.addWidget(sous)
         v.addStretch(1)

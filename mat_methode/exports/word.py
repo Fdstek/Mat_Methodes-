@@ -232,6 +232,16 @@ def ecrire_docx(data: dict, chemin) -> None:
     ecrire(p0, f"{manque(ctx.get('ref'))}     ")
     ecrire(p0, "Date : ", gras=True)
     ecrire(p0, str(ctx.get("date", "")))
+    if ctx.get("experience") or ctx.get("attribue"):
+        pe = c0.add_paragraph()
+        ecrire(pe, "N° d’expérience : ", gras=True)
+        ecrire(pe, f"{ctx.get('experience') or '-'}     ")
+        ecrire(pe, "Attribuée à : ", gras=True)
+        ecrire(pe, ctx.get("attribue") or "-")
+    if ctx.get("reperes"):
+        pr = c0.add_paragraph()
+        ecrire(pr, "Étapes : ", gras=True)
+        ecrire(pr, " ; ".join(f"{x['initiale']} : {x['materiel']}" if x["materiel"] else x["initiale"] for x in ctx["reperes"]))
     if ctx.get("tags"):
         p1 = c0.add_paragraph()
         ecrire(p1, "Tags : ", gras=True)

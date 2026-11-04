@@ -234,6 +234,21 @@ def blocs(m: Manip) -> list[tuple[Groupe | None, list[int]]]:
     return out
 
 
+def reperes_etapes(m: Manip) -> list[tuple[str, str, str]]:
+    """Un repère par grande étape : (initiale, nom de la grande étape, matériel de sa première sous-étape)."""
+    out = []
+    for g, idx in blocs(m):
+        if g is None or not idx:
+            continue
+        out.append(((g.nom.strip()[:1] or "?").upper(), g.nom.strip(), ", ".join(m.etapes[idx[0]].equipements)))
+    return out
+
+
+def texte_reperes(m: Manip) -> str:
+    """« D : R1 ; F : Filtre 5 » : initiale de la grande étape et matériel de sa première sous-étape."""
+    return " ; ".join(f"{i} : {mat}" if mat else i for i, _, mat in reperes_etapes(m))
+
+
 def creer_groupe(m: Manip, nom: str) -> Groupe:
     g = Groupe(nom=nom.strip() or "Grande étape")
     m.groupes.append(g)
@@ -434,6 +449,7 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     c.maj = maintenant_iso()
     c.contexte.ref = ""
     c.contexte.lot = ""
+    c.contexte.experience = ""  # chaque expérience a son numéro
     corresp, groupes = {}, {}
     for g in c.groupes:
         groupes[g.id] = g.id = nouvel_id()

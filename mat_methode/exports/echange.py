@@ -20,7 +20,7 @@ from mat_methode.domain.models import (
 )
 from mat_methode.domain.prototype import contexte_depuis
 from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat
-from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, numero_etape
+from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, numero_etape, reperes_etapes
 from mat_methode.domain.texte import cap, minuscule_initiale
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
 
@@ -41,7 +41,13 @@ def contexte_vers(m: Manip) -> dict:
         d["fournisseur"] = c.fournisseur
     if c.emplacement:
         d["emplacement"] = c.emplacement
+    if c.experience:
+        d["experience"] = c.experience
+    if c.attribue:
+        d["attribue"] = c.attribue
     d["tags"] = list(m.tags)
+    if reperes_etapes(m):
+        d["reperes"] = [{"initiale": i, "groupe": g, "materiel": mat} for i, g, mat in reperes_etapes(m)]
     return d
 
 
