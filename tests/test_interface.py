@@ -503,7 +503,7 @@ def test_tag_cree_dans_les_reglages_et_ordre_des_cartes(fen, monkeypatch):
     fen.aller("manips")
     from PySide6.QtWidgets import QPushButton
     textes = [w.text() for w in fen.p_manips.findChildren(type(fen.titre))] + [b.text() for b in fen.p_manips.findChildren(QPushButton)]
-    assert {"DONNEUR D’ORDRE ⇅", "TYPE ⇅", "TAGS", "STATUT"} <= set(textes)  # en-têtes triables : flèche
+    assert {"DONNEUR ⇅", "TYPE ⇅", "TAGS", "STATUT"} <= set(textes)  # en-têtes triables : flèche
 
 
 def test_tri_couleur_des_types_presence_et_defilement(fen, qtbot, tmp_path):
