@@ -374,6 +374,11 @@ def cartouche(data: dict, s: dict) -> Table:
     lanc, jr = data.get("lancee"), data.get("journal") or []
     meta = [[("Donneur d’ordre", _ou(ctx.get("donneur"))), ("Réf. demande", _ou(ctx.get("ref")))],
             [("Type", escape(ctx.get("type") or "-")), ("Date", escape(ctx.get("date") or "-"))]]
+    if ctx.get("experience") or ctx.get("attribue"):
+        meta.append([("N° d’expérience", escape(ctx.get("experience") or "-")), ("Attribuée à", escape(ctx.get("attribue") or "-"))])
+    rep = ctx.get("reperes") or []
+    if rep:
+        meta.append([("Étapes", escape(" ; ".join(f"{x['initiale']} : {x['materiel']}" if x["materiel"] else x["initiale"] for x in rep))), ("", "")])
     if ctx.get("tags"):
         meta.append([("Tags", escape("  ".join("#" + t for t in ctx["tags"]))), ("", "")])
     ver = f"{data.get('version', 1)} · enregistrée le {fmt_dt(data.get('enregistree_le'))}"
@@ -386,7 +391,7 @@ def cartouche(data: dict, s: dict) -> Table:
     t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), TEAL_L), ("BOX", (0, 0), (-1, -1), 0.5, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                            ("SPAN", (1, len(rows) - 1), (3, len(rows) - 1)),
                            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]
-                          + ([("SPAN", (1, 2), (3, 2))] if ctx.get("tags") else [])))
+                          + [("SPAN", (1, k), (3, k)) for k in range(2, len(rows) - 1) if meta[k][1] == ("", "")]))
     return t
 
 

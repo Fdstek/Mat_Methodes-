@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QVBoxLayout, QWi
 
 from mat_methode.domain import regles as R
 from mat_methode.domain.models import ANNULEE, REALISEE, STATUTS_PROTOCOLE
+from mat_methode.domain.regles import tous_les_tags
 from mat_methode.domain.texte import fmt_dt
 from mat_methode.ui import colonnes as C
 from mat_methode.ui import theme
@@ -39,7 +40,7 @@ def _resume(m, *lignes: str, marques: list | None = None) -> QWidget:
     v.setContentsMargins(0, 0, 0, 0)
     v.setSpacing(2)
     v.addWidget(etiquette(m.nom, "titreCarte", wrap=True))
-    for t in (m.contexte.ref, *lignes):
+    for t in (C.sous_titre_manip(m), m.contexte.ref, *lignes):
         if t:
             v.addWidget(etiquette(t, secondaire=True, wrap=True))
     if marques:
@@ -81,6 +82,7 @@ class PageProtocoles(QWidget):
         self.ctrl = ctrl
         self.clotures = False
         self.tri = None  # tri par donneur d'ordre ou type (clic sur l'en-tête)
+        self.filtres = C.Filtres()
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
@@ -108,13 +110,15 @@ class PageProtocoles(QWidget):
             "Les manips réalisées ou annulées. Une manip réalisée apparaît dans Rapport." if self.clotures else
             "Les manips validées dans « Définition Mat & Méthode », dans l’ordre de réalisation (↑ ↓ pour le changer). "
             "Passe le statut à « En cours » au démarrage, puis à « Réalisée » : elle part dans Rapport.", secondaire=True, wrap=True))
-        liste = C.trier_manips(clos if self.clotures else a_faire, self.tri)
+        base = clos if self.clotures else a_faire
+        self.lay.addWidget(self.filtres.barre(base, r, self._actualiser, tous_les_tags(base, r.ordre_tags)))
+        liste = C.trier_manips(self.filtres.appliquer(base), self.tri)
         if self.tri and not self.clotures and liste:
             self.lay.addWidget(etiquette("Tableau trié : ↑ ↓ (ordre de réalisation) sont désactivées. Clique de nouveau l’en-tête "
                                          "pour revenir à l’ordre de réalisation.", secondaire=True, wrap=True))
         f, v = _cadre_liste()
         if not liste:
-            vide = etiquette("Aucun protocole clôturé." if self.clotures else
+            vide = etiquette("Aucun protocole ne correspond aux filtres." if base else "Aucun protocole clôturé." if self.clotures else
                              "Aucun protocole à réaliser : valide une manip dans « Définition Mat & Méthode ».", secondaire=True)
             vide.setContentsMargins(16, 24, 16, 24)
             v.addWidget(vide)
@@ -193,11 +197,20 @@ class PageRapports(QWidget):
 
     def rafraichir(self):
         vider(self.lay)
-        liste = C.trier_manips(R.rapports_clotures(self.ctrl.manips), getattr(self, "tri", None))
+        base = R.rapports_clotures(self.ctrl.manips)
+        if not hasattr(self, "filtres"):
+            self.filtres = C.Filtres()
+        liste = C.trier_manips(self.filtres.appliquer(base), getattr(self, "tri", None))
         self.lay.addWidget(etiquette("Les manips réalisées (protocoles clôturés dans Protocole), la plus récente d’abord.",
                                      secondaire=True, wrap=True))
+        if base:
+            self.lay.addWidget(self.filtres.barre(base, self.ctrl.reglages, self._actualiser, tous_les_tags(base, self.ctrl.reglages.ordre_tags)))
         f, v = _cadre_liste()
-        if not liste:
+        if not liste and base:
+            vide = etiquette("Aucun rapport ne correspond aux filtres.", secondaire=True)
+            vide.setContentsMargins(16, 24, 16, 24)
+            v.addWidget(vide)
+        elif not liste:
             vide = etiquette("Aucun rapport : passe un protocole au statut « Réalisée » dans Protocole.", secondaire=True)
             vide.setContentsMargins(16, 24, 16, 24)
             v.addWidget(vide)

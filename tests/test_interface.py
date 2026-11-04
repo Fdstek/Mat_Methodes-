@@ -8,6 +8,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QFrame, QPushButton  # noqa: E402
 
 from mat_methode.storage.stockage import Stockage  # noqa: E402
@@ -595,3 +596,64 @@ def test_historique_des_statuts_et_ecran_d_ouverture(fen, tmp_path):
     e.avancer(55, "Lecture des réglages et des manips…")
     assert e.barre.value() == 55 and e.etape.text().startswith("Lecture")
     e.close()
+
+
+def test_experience_attribution_etapes_filtres_et_demandes(fen, tmp_path):
+    import pdfplumber
+
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.demandes import Demande, vers_markdown
+    from mat_methode.domain.models import Personne
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.storage import demandes as S
+    from mat_methode.ui import colonnes as C
+    r = fen.ctrl.reglages
+    r.personnes.append(Personne(nom="Claire LACOUX", initiales="CL", igg="PIERRE", manipule=False))
+    r.personnes.append(Personne(nom="Zoé MARTIN", initiales="ZM", manipule=True))
+    assert r.attributions[0] == "Zoé MARTIN"  # ceux qui font des manips d'abord
+    m = ethanol(fen)
+    m.contexte.experience, m.contexte.attribue = "EXP-2026-014", "Zoé MARTIN"
+    # duplicata : la personne connectée devient donneur d'ordre
+    c = fen.ctrl.dupliquer(m.id)
+    assert c.contexte.donneur == "Claire LACOUX" and c.contexte.experience == ""
+    c.contexte.attribue = ""
+    # repères de grandes étapes
+    g = R.creer_groupe(m, "Degumming")
+    R.placer_dans_groupe(m, m.etapes[0].id, g.id)
+    m.etapes[0].equipements = ["R1"]
+    assert R.texte_reperes(m) == "D : R1"
+    d = exporter(m, r)
+    assert d["contexte"]["experience"] == "EXP-2026-014" and d["contexte"]["attribue"] == "Zoé MARTIN"
+    ecrire_pdf(d, tmp_path / "r.pdf")
+    with pdfplumber.open(tmp_path / "r.pdf") as pdf:
+        t = " ".join(p.extract_text() for p in pdf.pages)
+    assert "EXP-2026-014" in t and "Zoé MARTIN" in t
+    # filtres à choix multiples
+    f = C.Filtres()
+    f.attribue = {"Zoé MARTIN", "Autre"}
+    assert f.appliquer([m, c]) == [m]
+    f.attribue = set()
+    f.donneur = {m.contexte.donneur, c.contexte.donneur}
+    assert len(f.appliquer([m, c])) == 2
+    assert C.trier_manips([c, m], ("attribue", False))[0] is m
+    # listes : le numéro d'expérience et la colonne Étapes ne cassent pas la mise en page
+    fen.resize(1400, 860)
+    for page in ("manips", "protocoles", "rapports"):
+        fen.aller(page)
+        QTest.qWait(50)
+        assert fen.pages[page].minimumSizeHint().width() <= fen.width() - 272
+    # demandes
+    fen.aller("demandes")
+    p = fen.p_demandes
+    p.titre_saisi, p.texte_saisi = "Bouton trop petit", "Dans Réglages"
+    pj = tmp_path / "capture.png"
+    pj.write_bytes(b"png")
+    p.joints = [str(pj)]
+    p._envoyer()
+    lst = S.lister(fen.ctrl.st)
+    assert len(lst) == 1 and lst[0].pieces == ["capture.png"] and lst[0].statut == "Nouvelle"
+    p._statut(lst[0], "Traitée")
+    lst = S.lister(fen.ctrl.st)
+    assert lst[0].statut == "Traitée" and lst[0].historique[-1].par == "pierre"
+    assert "Bouton trop petit" in vers_markdown(lst, fen.ctrl.nom_de) and isinstance(lst[0], Demande)

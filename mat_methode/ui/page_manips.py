@@ -14,10 +14,8 @@ from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.widgets import (
     InfoBar,
-    Liste,
     avatar,
     bouton,
-    bouton_tag_couleur,
     etiquette,
     flux_widgets,
     liste_statut,
@@ -42,9 +40,7 @@ class PageManips(QWidget):
         super().__init__()
         self.ctrl = ctrl
         self.archives = False
-        self.f_donneur = ""
-        self.f_type = ""
-        self.f_tag = ""
+        self.filtres_liste = C.Filtres()  # choix multiples : donneurs d'ordre, attribués, types, tags
         self.tri = None  # (« donneur » | « type », croissant) : clic sur l'en-tête de colonne
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -115,23 +111,14 @@ class PageManips(QWidget):
             if (m.etat == ARCHIVEE) != self.archives:
                 continue
             c = m.contexte
-            if q and q not in norm(" ".join([m.nom, c.donneur, c.ref, c.type, c.objectif, c.idee, " ".join(m.tags)])):
-                continue
-            if self.f_donneur and c.donneur != self.f_donneur:
-                continue
-            if self.f_type and c.type != self.f_type:
-                continue
-            if self.f_tag and not any(norm(t) == norm(self.f_tag) for t in m.tags):
+            if q and q not in norm(" ".join([m.nom, c.donneur, c.attribue, c.experience, c.ref, c.type, c.objectif, c.idee, " ".join(m.tags)])):
                 continue
             out.append(m)
+        out = self.filtres_liste.appliquer(out)
         return C.trier_manips(sorted(out, key=lambda m: m.maj, reverse=True), self.tri)
 
     def _trier(self, cle: str):
         self.tri = C.basculer_tri(self.tri, cle)
-        self._actualiser()
-
-    def _filtre_donneur(self, nom: str):
-        self.f_donneur = "" if nom == self.f_donneur else nom
         self._actualiser()
 
     # ------------------------------------------------------------ affichage
@@ -147,25 +134,8 @@ class PageManips(QWidget):
             b.style().polish(b)
 
         vider(self.filtres)
-        self.filtres.addWidget(etiquette("Donneur d’ordre", secondaire=True))
-        tous = bouton("Tous", lambda: self._filtre_donneur(""))
-        tous.setProperty("chip", True)
-        tous.setCheckable(True)
-        tous.setChecked(not self.f_donneur)
-        self.filtres.addWidget(tous)
-        for nom in r.donneurs_ordre:
-            n = sum(1 for m in ctrl.manips if m.contexte.donneur == nom and (m.etat == ARCHIVEE) == self.archives)
-            self.filtres.addWidget(bouton_tag_couleur(nom, O.couleur_donneur(r, nom), n, self.f_donneur == nom,
-                                                      lambda nom=nom: self._filtre_donneur(nom)))
-        types = Liste(r.types_demande, self.f_type, vide="Tous les types")
-        types.setAccessibleName("Filtrer par type de demande")
-        types.choisi.connect(lambda v: (setattr(self, "f_type", v), self.rafraichir()))
-        self.filtres.addWidget(types)
-        tags = Liste(tous_les_tags(ctrl.manips, ctrl.reglages.ordre_tags), self.f_tag, vide="Tous les tags")
-        tags.setAccessibleName("Filtrer par tag")
-        tags.choisi.connect(lambda v: (setattr(self, "f_tag", v), self.rafraichir()))
-        self.filtres.addWidget(tags)
-        self.filtres.addStretch(1)
+        de_la_liste = [m for m in ctrl.manips if (m.etat == ARCHIVEE) == self.archives]
+        self.filtres.addWidget(self.filtres_liste.barre(de_la_liste, r, self._actualiser, tous_les_tags(de_la_liste, ctrl.reglages.ordre_tags)), 1)
 
         vider(self.bandeaux)
         if ctrl.liste.conflits:
@@ -188,7 +158,7 @@ class PageManips(QWidget):
             self.l_liste.addWidget(self._ligne(m, i == len(lignes) - 1))
 
     # colonnes alignées sur l'en-tête : donneur, type, tags, statut, Ouvrir, « … »
-    LARGEURS = (C.LARG_DONNEUR, C.LARG_TYPE, C.LARG_TAGS, 125, 75, 40)
+    LARGEURS = tuple(lg for _, lg in C.COMMUNES) + (125, 75, 40)
 
     def _grille(self, g: QGridLayout):
         g.setContentsMargins(14, 12, 14, 12)
@@ -211,8 +181,9 @@ class PageManips(QWidget):
         g.addWidget(etiquette("MANIP", "etiquetteChamp"), 0, 0)
         for k, x in enumerate(C.entetes_communes(self.tri, self._trier), start=1):
             g.addWidget(x, 0, k)
-        g.addWidget(self._fixe(etiquette("STATUT", "etiquetteChamp"), 4), 0, 4)
-        for k in (5, 6):
+        k0 = len(C.COMMUNES) + 1
+        g.addWidget(self._fixe(etiquette("STATUT", "etiquetteChamp"), k0), 0, k0)
+        for k in (k0 + 1, k0 + 2):
             g.addWidget(self._fixe(QWidget(), k), 0, k)
         return w
 
@@ -226,6 +197,8 @@ class PageManips(QWidget):
         gauche = QVBoxLayout()
         gauche.setSpacing(3)
         gauche.addWidget(etiquette(m.nom, "titreCarte", wrap=True))  # titre complet, sur plusieurs lignes si besoin
+        if m.contexte.experience:
+            gauche.addWidget(etiquette(C.sous_titre_manip(m), secondaire=True, wrap=True))
         if m.contexte.objectif:
             o = etiquette(m.contexte.objectif, secondaire=True, wrap=True)  # en entier, sur plusieurs lignes si besoin
             o.setStyleSheet("font-style:italic;")
@@ -253,10 +226,11 @@ class PageManips(QWidget):
         cg.setLayout(gauche)
         gauche.setContentsMargins(0, 0, 0, 0)
         g.addWidget(cg, 0, 0)
-        for k, x in enumerate(C.cellules_communes(m, r, lambda t: (setattr(self, "f_tag", t), self._actualiser()), self._trier), start=1):
+        for k, x in enumerate(C.cellules_communes(m, r, lambda t: (self.filtres_liste.tag.add(t), self._actualiser()), self._trier), start=1):
             g.addWidget(x, 0, k)
+        k0 = len(C.COMMUNES) + 1
         if m.etat == ARCHIVEE:
-            g.addWidget(self._fixe(etiquette("Archivée", secondaire=True), 4), 0, 4)
+            g.addWidget(self._fixe(etiquette("Archivée", secondaire=True), k0), 0, k0)
         else:
             st = liste_statut(m, STATUTS_DEFINITION)
             st.setMinimumWidth(0)
@@ -264,9 +238,9 @@ class PageManips(QWidget):
             st.choisi.connect(lambda v, m=m: self._statut(m, v))
             if m.statuts:
                 st.setToolTip(O.texte_statut(self.ctrl.reglages, m.statuts[-1]))
-            g.addWidget(self._fixe(st, 4), 0, 4)
+            g.addWidget(self._fixe(st, k0), 0, k0)
         g.addWidget(self._fixe(bouton("Ouvrir", lambda: self.ouvrir.emit(m.id, "comp" if m.etapes else "def"), accent=True,
-                                      tip=f"Ouvrir le flux de {m.nom}"), 5), 0, 5)
+                                      tip=f"Ouvrir le flux de {m.nom}"), k0 + 1), 0, k0 + 1)
         plus = bouton("…", tip=f"Autres actions pour {m.nom}")
         menu = QMenu(plus)
         menu.addAction("Modifier le flux (étapes)", lambda: self.ouvrir.emit(m.id, "def"))
@@ -277,9 +251,9 @@ class PageManips(QWidget):
             menu.addAction("Supprimer", lambda: self._supprimer(m))
         plus.setMenu(menu)
         plus.setStyleSheet("QPushButton::menu-indicator{width:0;}")
-        self._fixe(plus, 6)
-        g.addWidget(plus, 0, 6)
-        for k in range(1, 7):
+        self._fixe(plus, k0 + 2)
+        g.addWidget(plus, 0, k0 + 2)
+        for k in range(1, k0 + 3):
             g.setAlignment(g.itemAtPosition(0, k).widget(), Qt.AlignmentFlag.AlignVCenter)
         return w
 

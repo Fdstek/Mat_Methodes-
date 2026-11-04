@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from mat_methode import NOM_APPLICATION
+from mat_methode import DATE_VERSION, NOM_APPLICATION, NOUVEAUTES, VERSION
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.models import ARCHIVEE, REALISEE, STATUTS_PROTOCOLE
 from mat_methode.domain.texte import nom_fichier
@@ -25,6 +25,7 @@ from mat_methode.exports.echange import ImportInvalide, importer
 from mat_methode.exports.echange import exporter as exporter_json
 from mat_methode.ui import dialogues as D
 from mat_methode.ui.controleur import Controleur
+from mat_methode.ui.page_demandes import PageDemandes
 from mat_methode.ui.page_flux import PageFlux
 from mat_methode.ui.page_listes import PageProtocoles, PageRapports
 from mat_methode.ui.page_manips import PageManips
@@ -35,14 +36,15 @@ from mat_methode.ui.widgets import Toast, avatar, bouton, etiquette, pastille, v
 
 # Segoe Fluent Icons (Windows 11) ; repli sur des symboles simples
 ICONES = {"manips": ("\ue8fd", "≡"), "flux": ("\ue8ab", "⇄"),
-          "protocoles": ("\ue9d5", "☑"), "protocole": ("\ue70f", "✎"), "rapports": ("\ue8a5", "▤"), "rapport": ("\ue7c3", "▭"), "reglages": ("\ue713", "⚙")}
+          "protocoles": ("\ue9d5", "☑"), "protocole": ("\ue70f", "✎"), "rapports": ("\ue8a5", "▤"), "rapport": ("\ue7c3", "▭"), "reglages": ("\ue713", "⚙"), "demandes": ("\ue8f2", "✉")}
 # Menu : (clé, libellé, sous-section ?) ; une sous-section concerne la manip ouverte.
 NAV = [("manips", "Définition Mat && Méthode", False), ("flux", "Flux", True),
        ("protocoles", "Protocole", False), ("protocole", "Édition", True),
        ("rapports", "Rapport", False), ("rapport", "Rapport de la manip", True),
        ("reglages", "Réglages", False)]
 PAGES_MANIP = ("flux", "protocole", "rapport")  # pages qui demandent une manip ouverte
-TITRES = {"manips": "Définition Mat & Méthode", "protocoles": "Protocole", "rapports": "Rapport", "reglages": "Réglages"}
+TITRES = {"manips": "Définition Mat & Méthode", "protocoles": "Protocole", "rapports": "Rapport", "reglages": "Réglages",
+          "demandes": "Bugs et idées"}
 
 
 def police_icones() -> str | None:
@@ -96,6 +98,11 @@ class Fenetre(QMainWindow):
         for k, t, sous in NAV:
             v.addWidget(self._nav(k, t, pi, sous))
         v.addStretch(1)
+        v.addWidget(self._nav("demandes", "Bugs et idées", pi, False))  # en bas du menu, comme dans l'application Claude
+        self.version = bouton(f"Version {VERSION} · {DATE_VERSION}", self._nouveautes, lien=True,
+                              tip=f"Version {VERSION}, mise à jour du {DATE_VERSION} : voir les nouveautés")
+        self.version.setAccessibleName("Version de l’application et nouveautés")
+        v.addWidget(self.version)
         h.addWidget(self.volet)
 
         # ---- contenu
@@ -143,8 +150,9 @@ class Fenetre(QMainWindow):
         self.p_reglages = PageReglages(ctrl)
         self.p_protocoles = PageProtocoles(ctrl)
         self.p_rapports = PageRapports(ctrl)
+        self.p_demandes = PageDemandes(ctrl)
         self.pages = {"manips": self.p_manips, "flux": self.p_flux, "protocoles": self.p_protocoles, "protocole": self.p_protocole,
-                      "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages}
+                      "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages, "demandes": self.p_demandes}
         self._bandeau()  # les bandeaux de statut entrent tout de suite dans la fenêtre (jamais de fenêtre à part)
         for k, page in self.pages.items():  # actions dans une page : reconstruction sans remonter en haut
             page.sur_place = lambda k=k: self._sur_place(k)
@@ -195,6 +203,7 @@ class Fenetre(QMainWindow):
         self.p_protocole.exporter_pdf.connect(lambda: self.exporter_fichier("protocole"))
         self.p_protocole.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_protocole.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents(protocole=True))))
+        self.p_demandes.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_rapport.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents())))
         self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante, ctrl.reglages))
@@ -219,6 +228,10 @@ class Fenetre(QMainWindow):
         b.clicked.connect(lambda *_: self.aller(k))
         self.nav[k] = b
         return b
+
+    def _nouveautes(self):
+        texte = "\n\n".join(f"Version {v} — {d}\n" + "\n".join(f"  • {x}" for x in lignes) for v, d, lignes in NOUVEAUTES)
+        D.informer(self, f"Nouveautés · version {VERSION} du {DATE_VERSION}", texte)
 
     # ------------------------------------------------------------ navigation
     def choisie(self, page: str):

@@ -379,6 +379,9 @@ class Controleur(QObject):
     def dupliquer(self, ident: str) -> Manip:
         c = R.dupliquer(self.manip(ident), self.reglages)
         c.contexte.date = maintenant_iso()[:10]
+        moi = self.reglages.personne_igg(self.st.utilisateur)
+        if moi is not None:
+            c.contexte.donneur = moi.nom  # celui qui duplique devient le donneur d'ordre de la copie
         R.reference_auto(c, self.reglages, self.manips)
         self.manips.append(c)
         self.sales.add(c.id)

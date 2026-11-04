@@ -392,6 +392,12 @@ class PageFlux(QWidget):
         op = ChampTexte(c.operateur, "Nom d’utilisateur Windows")
         op.modifie.connect(lambda v: (setattr(c, "operateur", v), self._toucher()))
         g.addWidget(champ("Opérateur (nom d’utilisateur Windows)", op), 2, 1, 1, 2)
+        exp = ChampTexte(c.experience, "ex. EXP-2026-014")
+        exp.modifie.connect(lambda v: (setattr(c, "experience", v.strip()), self._toucher()))
+        g.addWidget(champ("N° d’expérience", exp), 3, 0)
+        att = Liste(r.attributions, c.attribue, vide="Non attribuée")
+        att.choisi.connect(lambda v: (setattr(c, "attribue", v), self._toucher()))
+        g.addWidget(champ("Attribuée à (liste : Réglages › Personnes)", att), 3, 1, 1, 2)
         for k in range(3):
             g.setColumnStretch(k, 1)
         lay.addLayout(g)

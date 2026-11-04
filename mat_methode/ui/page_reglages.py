@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QGridLayout, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QFrame, QGridLayout, QVBoxLayout, QWidget
 
 from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain import reglages_ops as O
@@ -191,7 +191,8 @@ class PageReglages(QWidget):
     def _personnes(self):
         x = self._section("Personnes (donneurs d’ordre)", f"{len(self.r.personnes)}")
         x.ajouter(etiquette("Les donneurs d’ordre proposés dans « Ma demande ». Les initiales forment la référence des manips "
-                            "(ex. PB-2026-10-31-01). L’IGG (identifiant Windows) permet de reconnaître la personne connectée : "
+                            "(ex. PB-2026-10-31-01). « Fait des manips » place la personne en tête de la liste « Attribuée à » des manips. "
+                            "L’IGG (identifiant Windows) permet de reconnaître la personne connectée : "
                             f"sur ce poste, l’IGG est {self.ctrl.st.utilisateur}.", secondaire=True, wrap=True))
         n_p = len(self.r.personnes)
         for i, p in enumerate(self.r.personnes):
@@ -204,8 +205,12 @@ class PageReglages(QWidget):
             igg.setMaximumWidth(160)
             igg.modifie.connect(lambda v, p=p: (setattr(p, "igg", v.strip().upper()), self.ctrl.toucher_reglages()))
             nb = sum(1 for m in self.ctrl.manips if m.contexte.donneur == p.nom)
+            fait = QCheckBox("Fait des manips")
+            fait.setChecked(p.manipule)
+            fait.setToolTip("Coché : la personne est proposée en tête de la liste « Attribuée à » (dans l’ordre de cette liste)")
+            fait.toggled.connect(lambda on, p=p: (setattr(p, "manipule", on), self.ctrl.toucher_reglages()))
             moi = pastille("c’est vous", "ok") if p.igg and p.igg.upper() == self.ctrl.st.utilisateur else None
-            x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg),
+            x.ajouter(ligne(champ("Prénom NOM", nom), champ("Initiales", ini), champ("IGG", igg), fait,
                             etiquette(f"{nb} manip{'s' if nb > 1 else ''}", secondaire=True), *( [moi] if moi else []), "stretch",
                             *self._fleches(self.r.personnes, i, n_p, p.nom),
                             icone("✕", f"Supprimer {p.nom}", lambda p=p: self._suppr_personne(p), danger=True)))

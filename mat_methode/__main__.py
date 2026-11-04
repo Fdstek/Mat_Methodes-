@@ -60,11 +60,7 @@ def main() -> int:
     from PySide6.QtGui import QGuiApplication, QIcon
     from PySide6.QtWidgets import QApplication
 
-    from mat_methode import NOM_APPLICATION, VERSION
-    from mat_methode.storage.stockage import Stockage
-    from mat_methode.ui import theme
-    from mat_methode.ui.controleur import Controleur
-    from mat_methode.ui.fenetre import Fenetre
+    from mat_methode import DATE_VERSION, NOM_APPLICATION, VERSION
 
     if sys.platform == "win32":  # avant toute fenêtre : la barre des tâches regroupe sous l'icône de l'application
         try:
@@ -82,8 +78,13 @@ def main() -> int:
     app.setWindowIcon(icone)
 
     from mat_methode.ui.demarrage import EcranDemarrage
-    accueil = EcranDemarrage(NOM_APPLICATION, VERSION, icone)  # écran d'ouverture avec barre de progression
+    accueil = EcranDemarrage(NOM_APPLICATION, VERSION, icone, DATE_VERSION)  # écran d'ouverture, avant les modules lourds
     accueil.show()
+    accueil.avancer(5, "Chargement des modules…")
+    from mat_methode.storage.stockage import Stockage
+    from mat_methode.ui import theme
+    from mat_methode.ui.controleur import Controleur
+    from mat_methode.ui.fenetre import Fenetre
     accueil.avancer(10, "Préparation des dossiers…")
     st = Stockage(racine, utilisateur(), poste())
     ctrl = Controleur(st)
