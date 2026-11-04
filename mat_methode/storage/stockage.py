@@ -79,6 +79,19 @@ def etats_v6(etats: list) -> list:
     return etats
 
 
+def raison_illisible(ex: Exception) -> str:
+    """Cause d'un fichier illisible, en une phrase courte (affichée dans la liste et gardée dans les logs)."""
+    if isinstance(ex, json.JSONDecodeError):
+        return "fichier incomplet ou abîmé, souvent une synchronisation interrompue"
+    if hasattr(ex, "errors"):
+        try:
+            e = ex.errors()[0]
+            return f"champ « {'.'.join(str(x) for x in e['loc'])} » : {e['msg']}"
+        except Exception:
+            pass
+    return f"{type(ex).__name__} : {str(ex)[:80]}"
+
+
 def migrer(d: dict, chemin: Path) -> dict:
     """Vérifie le numéro de schéma ; sauvegarde puis migre les données anciennes."""
     s = d.get("schema", 1)
@@ -273,7 +286,7 @@ class Stockage:
                 continue
             except Exception as ex:  # un fichier illisible n'empêche jamais l'ouverture des autres
                 log.warning("fichier illisible %s : %s", f.name, ex)
-                res.illisibles.append(f.name)
+                res.illisibles.append(f"{f.name} ({raison_illisible(ex)})")
                 continue
             if f.stem != m.id or not NOM_VALIDE.match(f.name):
                 res.conflits.append(f.name)  # ex. « k97omty-PC-MARIE.json », « k97omty (1).json »
