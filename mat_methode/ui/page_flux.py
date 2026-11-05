@@ -1294,7 +1294,10 @@ class PageFlux(QWidget):
                 defil.verticalScrollBar().valueChanged.connect(lambda _v: self._epingler())
                 self._defil_connecte = defil
             contenu = zone.widget()
-            haut_contenu = contenu.layout().totalHeightForWidth(312) if contenu.layout() else contenu.sizeHint().height()
+            largeur = contenu.width() if contenu.width() > 100 else 312
+            haut_contenu = contenu.layout().totalHeightForWidth(largeur) if contenu.layout() else contenu.sizeHint().height()
+            if contenu.layout() and haut_contenu > 0 and contenu.minimumHeight() != haut_contenu:
+                contenu.setMinimumHeight(haut_contenu)  # jamais moins que la hauteur réellement nécessaire à cette largeur (textes à la ligne) : cartes non écrasées
             vue = defil.viewport().height() - 16
             haut = max(120, min(max(haut_contenu, contenu.minimumSizeHint().height()) + 4, vue))
             hote.setMinimumHeight(haut)
