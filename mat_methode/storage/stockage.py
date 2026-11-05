@@ -125,6 +125,11 @@ def migrer(d: dict, chemin: Path) -> dict:
             d["etats"] = etats_v5(d["etats"])
         if s < 6 and isinstance(d.get("etats"), list):  # Réglages, 5 -> 6 : état « Réalisée » ; manips : commentaire d'échantillon
             d["etats"] = etats_v6(d["etats"])
+        if s < 16 and isinstance(d.get("operations"), list):  # Réglages, 15 -> 16 : conditions par défaut des opérations
+            from mat_methode.domain.models import DEFAUTS_OPERATIONS
+            for o in d["operations"]:
+                if isinstance(o, dict) and "defauts" not in o and o.get("nom") in DEFAUTS_OPERATIONS:
+                    o["defauts"] = dict(DEFAUTS_OPERATIONS[o["nom"]])
         d["schema"] = SCHEMA_DONNEES
     return d
 

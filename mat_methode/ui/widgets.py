@@ -259,18 +259,19 @@ class ChoixVitesse(SansMolette, QComboBox):
     """Vitesse (tr/min) choisie dans la liste des Réglages, ou « Autre valeur… ». Une valeur hors liste reste affichée."""
     choisi = Signal(object)
 
-    def __init__(self, vitesses: list[float], valeur: float | None):
+    def __init__(self, vitesses: list[float], valeur: float | None, unite: str = "tr/min"):
         super().__init__()
         from mat_methode.domain.texte import fmt_num
         opts = sorted(set(vitesses) | ({valeur} if valeur is not None else set()))
         for v in opts:
-            self.addItem(f"{fmt_num(v)} tr/min" + ("" if v in vitesses else "  (hors liste)"), float(v))
+            self.addItem(f"{fmt_num(v)} {unite}" + ("" if v in vitesses else "  (hors liste)"), float(v))
         self.addItem("Autre valeur…", "autre")
         if valeur is None:
             self.insertItem(0, "Choisir…", None)
             self.setCurrentIndex(0)
         else:
             self.setCurrentIndex(self.findData(float(valeur)))
+        self._unite = unite
         self._courant = self.currentIndex()
         self.activated.connect(self._active)
         self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
@@ -281,7 +282,7 @@ class ChoixVitesse(SansMolette, QComboBox):
         d = self.itemData(i)
         if d == "autre":
             from PySide6.QtWidgets import QInputDialog
-            val, ok = QInputDialog.getDouble(self, "Autre vitesse", "Vitesse (tr/min)", 0, 0, 100000, 0)
+            val, ok = QInputDialog.getDouble(self, "Autre vitesse", f"Vitesse ({self._unite})", 0, 0, 1000000, 0)
             if ok and val > 0:
                 self.choisi.emit(float(val))
             else:

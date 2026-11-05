@@ -110,7 +110,7 @@ def resume_conditions(e: Etape) -> str:
     if e.duree_min is not None:
         out.append(fmt_dur(e.duree_min))
     if e.agitation_trmin is not None:
-        out.append(f"{fmt_num(e.agitation_trmin)} tr/min")
+        out.append(f"{fmt_num(e.agitation_trmin)} {e.vitesse_unite}")
     if e.vide is not None:
         out.append("sous vide" + (f" {fmt_num(e.vide.mbar)} mbar" if e.vide.mbar else ""))
     if e.filtre_um is not None:
@@ -148,8 +148,8 @@ def clause_etape(e: Etape, reglages: Reglages | None = None) -> str:
     if e.duree_min is not None:
         b.append(f"pendant {fmt_dur(e.duree_min)}")
     if e.agitation_trmin is not None:
-        b.append(f"à {fmt_num(e.agitation_trmin)} tr/min" if est_centrifugation(e.operation)
-                 else f"sous agitation à {fmt_num(e.agitation_trmin)} tr/min")
+        b.append(f"à {fmt_num(e.agitation_trmin)} {e.vitesse_unite}" if est_centrifugation(e.operation)
+                 else f"sous agitation à {fmt_num(e.agitation_trmin)} {e.vitesse_unite}")
     b += autres_conditions(e)
     rem = e.remarque.strip()
     part = reglages.participe(e.operation) if reglages is not None else participe(e.operation)

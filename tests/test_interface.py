@@ -85,6 +85,10 @@ def test_parcours_nouvelle_manip(fen, qtbot, monkeypatch):
     assert [e.operation for e in m.etapes] == ["chauffage", "neutralisation"]
     fen.p_flux._vers_completer()
     fen.p_flux.aller(m.etapes[0].id)
+    assert m.etapes[0].temperature_c == 60 and m.etapes[0].agitation_trmin == 300  # conditions par défaut de « chauffage » (Réglages)
+    t = next(x for x in fen.p_flux.findChildren(ToggleSwitch) if x.text() == "Chauffage")
+    t.click()
+    assert m.etapes[0].temperature_c is None
     t = next(x for x in fen.p_flux.findChildren(ToggleSwitch) if x.text() == "Chauffage")
     t.click()
     assert m.etapes[0].temperature_c == 60
@@ -847,3 +851,73 @@ def test_etapes_en_parallele_dans_l_editeur_les_documents_et_unites(fen, tmp_pat
     for section in ("unites", "vitesses"):
         fen.p_reglages.ouvrir(section)
         QTest.qWait(30)
+
+
+def test_matiere_par_voie_unites_de_duree_vitesses_en_g_et_conditions_par_defaut(fen, tmp_path):
+    import pdfplumber
+    from PySide6.QtWidgets import QFrame
+
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import DUREES, Matiere
+    from mat_methode.domain.volumes import volumes_par_etape
+    from mat_methode.exports.echange import exporter, importer
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.report.rapport import construire
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    ids = [e.id for e in m.etapes]
+    p = R.creer_parallele(m)
+    R.placer_dans_voie(m, ids[1], p.id, p.voies[0].id)
+    R.placer_dans_voie(m, ids[2], p.id, p.voies[1].id)
+    p.voies[0].part, p.voies[0].autres = 40, [Matiere(nom="Éthanol", quantite="200", unite="mL")]
+    p.voies[1].part = 60
+    conv = m.etapes[3]
+    conv.apports = {p.voies[1].id: 300}
+    v = {lg.indice: lg for lg in volumes_par_etape(m)}
+    assert v[1].entree == 400 and v[1].ajoute == 200 and v[2].entree == 600 and v[3].entree == v[1].sortie + 300
+    # l'éditeur affiche les cartes de matière par voie, la réunion des voies et le tableau « Volumes par étape »
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    page.rafraichir()
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    assert "Matière reçue" in textes and "matière reçue des voies en parallèle" in textes and "Volumes par étape" in textes
+    voies_ui = lambda: [f for f in page.findChildren(QFrame) if f.objectName() == "voie"]  # noqa: E731
+    assert not any(f.findChild(QFrame, "menuAjout") for f in voies_ui())  # par défaut, le choix reste en bas de page
+    page._viser_voie(p.id, p.voies[1].id)
+    QTest.qWait(50)
+    assert any(f.findChild(QFrame, "menuAjout") for f in voies_ui())  # le choix s'ouvre sous la voie concernée
+    # export / import : parts, autres matières et quantités prises
+    d = exporter(m, r)
+    m2, _ = importer(d, r)
+    p2 = m2.paralleles[0]
+    assert p2.voies[0].part == 40 and p2.voies[0].autres[0].nom == "Éthanol" and list(m2.etapes[3].apports.values()) == [300.0]
+    # copie : les quantités prises suivent les nouvelles voies
+    c = R.dupliquer(m, r)
+    assert list(c.etapes[3].apports) == [c.paralleles[0].voies[1].id]
+    # le repère « Étapes » des listes contient les voies en parallèle
+    assert [x[0] for x in R.reperes_etapes(m)] == ["∥A", "∥B"]
+    # unités de durée : 2 h saisies = 120 min stockées ; la liste est gérée dans Réglages
+    assert set(r.unites_duree) == set(DUREES) and not O.retirer_unite_duree(type("R", (), {"unites_duree": ["min"]})(), "min")
+    assert O.retirer_unite_duree(r, "semaine") and "semaine" not in r.unites_duree and O.ajouter_unite_duree(r, "semaine")
+    e = m.etapes[4]
+    e.duree_unite, e.duree_min = "h", 120
+    page.ouvrir("comp")
+    page.etape_id = e.id
+    page.rafraichir()
+    # vitesse en g (RCF) : texte du rapport et des PDF
+    cen = R.ajouter_etape(m, "centrifugation", None, reglages=r)
+    cen.vitesse_unite, cen.agitation_trmin = "g", 3000
+    assert "000\u202fg" in construire(m, r).sections[2].texte.replace(" g.", "\u202fg.").replace("3\u202f000 g", "3\u202f000\u202fg") or " g." in construire(m, r).sections[2].texte
+    ecrire_pdf(exporter(m, r), tmp_path / "g.pdf")
+    with pdfplumber.open(tmp_path / "g.pdf") as pdf:
+        assert " g" in " ".join(pg.extract_text() for pg in pdf.pages)
+    assert O.ajouter_vitesse(r, 4000, "g") and 4000 in r.vitesses_rcf and 4000 not in r.vitesses_agitation
+    # conditions par défaut d'une opération (Réglages) : appliquées à l'ajout d'une étape
+    assert O.regler_defauts_operation(r, "lavage", {"temperature_c": 25.0, "vide": 0.0})
+    lav = R.ajouter_etape(m, "lavage", None, reglages=r)
+    assert lav.temperature_c == 25 and lav.vide is not None and lav.vide.mbar is None
+    ch = R.ajouter_etape(m, "chauffage", None, reglages=r)
+    assert ch.temperature_c == 60 and ch.agitation_trmin == 300

@@ -174,10 +174,23 @@ def copier_conditions_precedentes(m: Manip, etape_id: str) -> Etape | None:
         return None
     src, e = m.etapes[ids.index(etape_id) - 1], m.etape(etape_id)
     e.temperature_c, e.duree_min, e.filtre_um = src.temperature_c, src.duree_min, src.filtre_um
-    e.agitation_trmin = src.agitation_trmin
+    e.agitation_trmin, e.vitesse_unite, e.duree_unite = src.agitation_trmin, src.vitesse_unite, src.duree_unite
     e.vide = src.vide.model_copy() if src.vide else None
     e.autres = [a.model_copy() for a in src.autres]
     return src
+
+
+def appliquer_defauts_operation(e: Etape, reglages: Reglages) -> None:
+    """Active d'office les conditions prévues pour cette opération dans Réglages (sans écraser ce qui est déjà renseigné)."""
+    o = reglages.operation(e.operation)
+    if o is None:
+        return
+    for cle, val in o.defauts.items():
+        if cle == "vide":
+            if e.vide is None:
+                e.vide = Vide(mbar=val or None)
+        elif getattr(e, cle, None) is None:
+            setattr(e, cle, val)
 
 
 def heriter_communes(m: Manip, e: Etape) -> None:
@@ -191,12 +204,14 @@ def heriter_communes(m: Manip, e: Etape) -> None:
 
 
 # ------------------------------------------------------------------ flux
-def ajouter_etape(m: Manip, operation: str, apres: int | None = None, groupe_id: str | None = None) -> Etape:
+def ajouter_etape(m: Manip, operation: str, apres: int | None = None, groupe_id: str | None = None, reglages: Reglages | None = None) -> Etape:
     """Ajoute une étape à la fin, ou après l'index « apres » (-1 = au début). Hérite des communes.
 
     Sans grande étape demandée, une étape insérée au milieu d'une grande étape en fait partie."""
     e = Etape(operation=operation.strip(), groupe_id=groupe_id)
     heriter_communes(m, e)
+    if reglages is not None:
+        appliquer_defauts_operation(e, reglages)
     if apres is None:
         m.etapes.append(e)
     else:
@@ -237,12 +252,23 @@ def blocs(m: Manip) -> list[tuple[Groupe | None, list[int]]]:
 
 
 def reperes_etapes(m: Manip) -> list[tuple[str, str, str]]:
-    """Un repère par grande étape : (initiale, nom de la grande étape, matériel de sa première sous-étape)."""
+    """Un repère par grande étape et par voie en parallèle : (initiale, nom, matériel de sa première sous-étape).
+    Une voie en parallèle donne « ∥A » (lettre de la voie) ; le nom est « En parallèle · voie A »."""
     out = []
-    for g, idx in blocs(m):
-        if g is None or not idx:
+    bl = blocs(m)
+    for genre, par, voies in segments(m):
+        if genre == "par":
+            for k, idx in enumerate(voies):
+                if idx:
+                    lettre = lettre_voie(m, par.id, par.voies[k].id)
+                    nom = par.voies[k].nom.strip()
+                    out.append((f"∥{lettre}", f"En parallèle · voie {lettre}" + (f" ({nom})" if nom else ""), ", ".join(m.etapes[idx[0]].equipements)))
             continue
-        out.append(((g.nom.strip()[:1] or "?").upper(), g.nom.strip(), ", ".join(m.etapes[idx[0]].equipements)))
+        dans = set(voies)
+        for g, idx in bl:
+            if g is None or not idx or idx[0] not in dans:
+                continue
+            out.append(((g.nom.strip()[:1] or "?").upper(), g.nom.strip(), ", ".join(m.etapes[idx[0]].equipements)))
     return out
 
 
@@ -283,6 +309,20 @@ def segments(m: Manip) -> list[tuple[str, object, list]]:
         if p.id not in vus:
             out.append(("par", p, [[] for _ in p.voies]))
     return out
+
+
+def numero_prochaine_etape_voie(m: Manip, parallele_id: str, voie_id: str) -> int:
+    """Numéro que prendra une étape ajoutée dans cette voie (après la dernière étape de cette voie et des voies précédentes)."""
+    p = m.parallele(parallele_id)
+    if p is None:
+        return len(m.etapes) + 1
+    ordre = {v.id: k for k, v in enumerate(p.voies)}
+    cible = ordre.get(voie_id, 0)
+    membres = [i for i, e in enumerate(m.etapes) if e.parallele_id == p.id]
+    if not membres:
+        return len(m.etapes) + 1
+    avant = [i for i in membres if ordre.get(m.etapes[i].voie_id, 0) <= cible]
+    return (max(avant) + 2) if avant else (min(membres) + 1)
 
 
 def creer_parallele(m: Manip, nvoies: int = 2) -> Parallele:
@@ -626,6 +666,8 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
             e.groupe_id = groupes.get(e.groupe_id)
         if e.parallele_id:
             e.parallele_id, e.voie_id = paralleles.get(e.parallele_id), voies.get(e.voie_id)
+        if e.apports:  # quantités prises de chaque voie : les voies ont de nouveaux identifiants
+            e.apports = {voies.get(k, k): v for k, v in e.apports.items()}
     for p in c.prelevements:
         p.id = nouvel_id()
         if p.etape_id:

@@ -18,10 +18,28 @@ from PySide6.QtWidgets import (
 from mat_methode.domain import journal as J
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
-from mat_methode.domain.models import ANNULEE, ARCHIVEE, BROUILLON, ENCOURS, REALISEE, STATUTS, STATUTS_DEFINITION, STATUTS_PROTOCOLE, VALIDEE, Condition, ReactifEtape, Tache, maintenant_iso
+from mat_methode.domain.models import (
+    ANNULEE,
+    ARCHIVEE,
+    BROUILLON,
+    DUREES,
+    ENCOURS,
+    REALISEE,
+    STATUTS,
+    STATUTS_DEFINITION,
+    STATUTS_PROTOCOLE,
+    UNITES_VITESSE,
+    VALIDEE,
+    Condition,
+    Matiere,
+    ReactifEtape,
+    Tache,
+    maintenant_iso,
+)
 from mat_methode.domain.reglages_ops import auteur, texte_statut
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
+from mat_methode.domain.volumes import part_voie, volumes_par_etape
 from mat_methode.report.rapport import autres_conditions, resume_conditions
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
@@ -576,6 +594,28 @@ class PageFlux(QWidget):
             lay.addWidget(w)
         else:
             lay.addWidget(etiquette("Aucun échantillon prévu : tout le volume engagé reste disponible.", secondaire=True))
+        lignes = volumes_par_etape(m) if m.etapes and b.depart else []
+        if lignes:  # volume étape par étape (voies en parallèle comprises)
+            lay.addWidget(etiquette("Volumes par étape", "titreCarte"))
+            g = QGridLayout()
+            g.setHorizontalSpacing(18)
+            g.setVerticalSpacing(4)
+            for k, t in enumerate(("Étape", "Entrée", "Ajouté", "Prélevé", "Sortie")):
+                g.addWidget(etiquette(t, "etiquetteChamp"), 0, k)
+            for rang, lg in enumerate(lignes, start=1):
+                e = m.etapes[lg.indice]
+                g.addWidget(etiquette(f"{lg.indice + 1} · {cap(e.operation)}" + (f" (voie {lg.voie})" if lg.voie else ""), wrap=True), rang, 0)
+                g.addWidget(etiquette(f"{fmt_vol(lg.entree)} mL"), rang, 1)
+                g.addWidget(etiquette(f"{fmt_vol(lg.ajoute)} mL" if lg.ajoute else "—"), rang, 2)
+                g.addWidget(etiquette(f"{fmt_vol(lg.preleve)} mL" if lg.preleve else "—"), rang, 3)
+                sortie = etiquette(f"{fmt_vol(lg.sortie)} mL" + (f" ⚠ {lg.alerte}" if lg.alerte else ""))
+                if lg.alerte:
+                    sortie.setStyleSheet(f"color:{p.danger};font-weight:600;")
+                g.addWidget(sortie, rang, 4)
+            g.setColumnStretch(0, 1)
+            wt = QWidget()
+            wt.setLayout(g)
+            lay.addWidget(wt)
 
     # ------------------------------------------------------------ 1 · Définir le flux
     def _definir(self) -> QWidget:
@@ -590,6 +630,8 @@ class PageFlux(QWidget):
                                secondaire=True, wrap=True))
         if m.etapes:
             cl.addWidget(ligne(bouton("+  Insérer une étape au début", lambda: self._inserer(-1)), "stretch"))
+            if self.inserer_apres == -1:
+                cl.addWidget(self._panneau_ajout("Insérer au début : que fais-tu ?", "Annuler l’insertion", lambda: self._inserer(None)))
         else:
             cl.addWidget(etiquette("Aucune étape pour l’instant.", secondaire=True))
         catalogue = [o.nom for o in self.ctrl.reglages.operations]
@@ -605,7 +647,7 @@ class PageFlux(QWidget):
                     continue
                 if g is None:
                     for i in idx:
-                        cl.addWidget(self._ligne_etape(i, catalogue))
+                        cl.addWidget(self._ligne_avec_menu(i, catalogue))
                     continue
                 groupes_vus.add(g.id)
                 cl.addWidget(self._bloc_groupe(g, idx, catalogue))
@@ -640,26 +682,53 @@ class PageFlux(QWidget):
             ou.setMinimumWidth(320)
             ou.choisi.connect(self._choisir_cible)
             cl.addWidget(ligne(champ("1. Où ajouter l’étape ? (grande étape ou voie en parallèle)", ou), "stretch"))
-        cl.addWidget(etiquette(("2. " if ia is None else "") + q, "titreCarte"))
-        if vc is not None:
-            cl.addWidget(ligne(bouton("Terminer le bloc en parallèle (l’étape suivante réunira les voies)", self._finir_voie), "stretch"))
-        elif gc is not None:
-            cl.addWidget(ligne(bouton(f"Terminer « {gc.nom} »", self._finir_groupe), "stretch"))
-        elif ia is not None:
-            cl.addWidget(ligne(bouton("Annuler l’insertion", lambda: self._inserer(None)), "stretch"))
-        grille = QGridLayout()
-        for k, o in enumerate(catalogue):
-            grille.addWidget(bouton(cap(o), lambda o=o: self._ajouter_etape(o)), k // 5, k % 5)
-        cl.addLayout(grille)
-        autre = ChampTexte("", "Ex. neutralisation")
-        autre.returnPressed.connect(lambda: self._ajouter_etape(autre.text()))
-        cl.addWidget(ligne(champ("Autre étape", autre), bouton("Ajouter", lambda: self._ajouter_etape(autre.text())), "stretch"))
+        if vc is None and gc is None and ia is None:  # pas d'endroit précis : le choix reste en bas (à la suite du flux)
+            cl.addWidget(self._panneau_ajout(q, None, None))
+        else:
+            cl.addWidget(etiquette("Le choix de l’étape à ajouter s’est ouvert juste sous l’endroit concerné.", secondaire=True))
         lay.addWidget(f)
         lay.addWidget(self._communes())
         b = bouton("Mon flux est prêt : compléter les étapes  →", self._vers_completer, accent=True)
         b.setEnabled(bool(m.etapes))
         lay.addWidget(ligne(b, "stretch"))
         return w
+
+    def _panneau_ajout(self, question: str, libelle_fin: str | None, fn_fin) -> QWidget:
+        """Choix de l'opération à ajouter : s'ouvre sous l'étape, la grande étape ou la voie concernée (ou en bas pour la suite du flux)."""
+        p = theme.P
+        f = QFrame()
+        f.setObjectName("menuAjout")
+        f.setStyleSheet(f"QFrame#menuAjout{{border:2px solid {p.accent};border-radius:8px;background:{p.info_fond};}}")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(10, 8, 10, 10)
+        v.setSpacing(6)
+        tete = [etiquette(question, "titreCarte"), "stretch"]
+        if libelle_fin:
+            tete.append(bouton(libelle_fin, fn_fin))
+        v.addWidget(ligne(*tete))
+        v.addWidget(flux_widgets([bouton(cap(o.nom), lambda o=o: self._ajouter_etape(o.nom)) for o in self.ctrl.reglages.operations]))
+        autre = ChampTexte("", "Ex. neutralisation")
+        autre.returnPressed.connect(lambda: self._ajouter_etape(autre.text()))
+        v.addWidget(ligne(champ("Autre étape", autre), bouton("Ajouter", lambda: self._ajouter_etape(autre.text())), "stretch"))
+        return f
+
+    def _ligne_avec_menu(self, i: int, catalogue: list[str], **kw) -> QWidget:
+        """Ligne d'étape ; si on vient de cliquer « + Insérer après » sur elle, le choix de l'opération s'ouvre juste dessous."""
+        ligne_w = self._ligne_etape(i, catalogue, **kw)
+        e = self.m.etapes[i]
+        reunit = i > 0 and self.m.etapes[i - 1].parallele_id is not None and e.parallele_id is None  # 1re étape après un bloc en parallèle
+        if (self.inserer_apres != i or self.consultation) and not reunit:
+            return ligne_w
+        c = QWidget()
+        v = QVBoxLayout(c)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
+        v.addWidget(ligne_w)
+        if reunit:
+            v.addWidget(self._panneau_convergence(i))
+        if self.inserer_apres == i and not self.consultation:
+            v.addWidget(self._panneau_ajout(f"Insérer après l’étape {i + 1} : que fais-tu ?", "Annuler l’insertion", lambda: self._inserer(None)))
+        return c
 
     def _ligne_etape(self, i: int, catalogue: list[str], dans_groupe: bool = False, dans_voie: bool = False) -> QWidget:
         m, e = self.m, self.m.etapes[i]
@@ -757,16 +826,103 @@ class PageFlux(QWidget):
                 if len(par.voies) > 2:
                     tete.append(icone("✕", f"Supprimer la voie {lettre}", lambda vo=vo: (R.supprimer_voie(m, par.id, vo.id), self._toucher(True)), danger=True))
             lv.addWidget(ligne(*tete))
+            lv.addWidget(self._carte_matiere_voie(par, vo, voies))
             for i in voies[k]:
-                lv.addWidget(self._ligne_etape(i, catalogue, dans_voie=True))
-            if not voies[k]:
+                lv.addWidget(self._ligne_avec_menu(i, catalogue, dans_voie=True))
+            if not voies[k] and not actif:
                 lv.addWidget(etiquette("Aucune étape : « + sous-étape » ou glisse une étape ici.", secondaire=True, wrap=True))
+            if actif and not self.consultation:
+                lv.addWidget(self._panneau_ajout(f"Voie {lettre} · étape {R.numero_prochaine_etape_voie(m, par.id, vo.id)} : que fais-tu ?", "Terminer le bloc", self._finir_voie))
             lv.addStretch(1)
             if not self.consultation:
                 rendre_cible(lane, {"etape": "dedans"}, lambda genre, ident, avant, vo=vo: self._deposer_dans_voie(ident, par.id, vo.id))
             cols.addWidget(lane, 1)
         v.addLayout(cols)
         v.addWidget(etiquette("Les voies sont réalisées en même temps ; l’étape qui suit ce cadre les réunit.", secondaire=True, wrap=True))
+        return f
+
+    def _sortie_avant_bloc(self, par) -> tuple[float, str]:
+        """(volume sortant de l'étape qui précède le bloc, texte « de l'étape N » ou « du volume de départ »)."""
+        m = self.m
+        membres = [i for i, e in enumerate(m.etapes) if e.parallele_id == par.id]
+        debut = min(membres) if membres else len(m.etapes)
+        if debut == 0:
+            return float(m.contexte.volume_depart_ml or 0), "du volume de départ (Ma demande)"
+        lignes = {lg.indice: lg for lg in volumes_par_etape(m)}
+        lg = lignes.get(debut - 1)
+        return (lg.sortie if lg else float(m.contexte.volume_depart_ml or 0)), f"de la sortie de l’étape {debut}"
+
+    def _carte_matiere_voie(self, par, vo, voies) -> QWidget:
+        """Matière reçue par la voie (part de la sortie précédente, en % ou mL) et autres matières ajoutées."""
+        r = self.ctrl.reglages
+        sortie, d_ou = self._sortie_avant_bloc(par)
+        f = QFrame()
+        f.setObjectName("sousCarte")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(10, 8, 10, 8)
+        v.setSpacing(6)
+        recu = part_voie(vo, sortie, len(par.voies))
+        part = NumberBox(vo.part, "", "égale")
+        part.setMaximumWidth(90)
+        part.valeur.connect(lambda val: setattr(vo, "part", val))
+        part.editingFinished.connect(lambda: self._toucher(True))
+        unite = Liste(["%", "mL"], vo.part_unite, vide=None)
+        unite.setMinimumWidth(80)
+        unite.setMaximumWidth(90)
+        unite.setAccessibleName("Unité de la part reçue")
+        unite.choisi.connect(lambda u: (setattr(vo, "part_unite", u), self._toucher(True)))
+        v.addWidget(etiquette(f"<b>Matière reçue</b> {d_ou}" + (f" = <b>{fmt_vol(recu)} mL</b>" if sortie else ""), wrap=True))
+        v.addWidget(ligne(champ("Part reçue", part), champ("Unité", unite), "stretch", espacement=8))
+        for k, mat in enumerate(vo.autres):
+            v.addWidget(ligne(ChipSupprimable(f"{mat.nom} · {mat.quantite} {mat.unite}".strip(" ·"),
+                                              lambda k=k: (vo.autres.pop(k), self._toucher(True)), f"Retirer {mat.nom}"), "stretch"))
+        nom = Liste([x.nom for x in r.reactifs], "", vide="Autre matière…")
+        nom.setMinimumWidth(120)
+        qte = ChampTexte("", "quantité", mono=True)
+        qte.setMaximumWidth(80)
+        u = Liste(r.unites_reactifs, (r.unites_reactifs or [""])[0], vide=None)
+        u.setMinimumWidth(70)
+        u.setMaximumWidth(90)
+        choisi = {"nom": "", "unite": u.currentData() or ""}
+        nom.choisi.connect(lambda val: choisi.update(nom=val))
+        u.choisi.connect(lambda val: choisi.update(unite=val))
+
+        def ajout():
+            if choisi["nom"].strip():
+                vo.autres.append(Matiere(nom=choisi["nom"].strip(), quantite=qte.text().strip(), unite=choisi["unite"]))
+                self._toucher(True)
+            else:
+                self.ctrl.toast.emit("Choisis la matière à ajouter")
+
+        v.addWidget(ligne(champ("Autres matières", nom), champ("Quantité", qte), champ("Unité", u), bouton("+ matière", ajout), "stretch", espacement=6))
+        return f
+
+    def _panneau_convergence(self, i: int) -> QWidget:
+        """Étape qui réunit les voies : quantité prise de chaque voie (par défaut toute la sortie)."""
+        m = self.m
+        e, prec = m.etapes[i], m.etapes[i - 1]
+        par = m.parallele(prec.parallele_id)
+        lignes = {lg.indice: lg for lg in volumes_par_etape(m)}
+        f = QFrame()
+        f.setObjectName("sousCarte")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(12, 8, 12, 8)
+        v.setSpacing(4)
+        v.addWidget(etiquette(f"Étape {i + 1} · matière reçue des voies en parallèle", "titreCarte"))
+        for vo in par.voies:
+            idx = [k for k, x in enumerate(m.etapes) if x.parallele_id == par.id and x.voie_id == vo.id]
+            if not idx:
+                continue
+            sortie = lignes[idx[-1]].sortie if idx[-1] in lignes else 0.0
+            lettre = R.lettre_voie(m, par.id, vo.id)
+            pris = e.apports.get(vo.id)
+            qte = NumberBox(pris, "mL", "tout")
+            qte.setMaximumWidth(140)
+            qte.valeur.connect(lambda val, vo=vo, e=e: (e.apports.pop(vo.id, None) if val is None else e.apports.__setitem__(vo.id, float(val)), self._toucher()))
+            qte.editingFinished.connect(lambda: self._toucher(True))
+            reste = sortie - (pris if pris is not None else sortie)
+            v.addWidget(ligne(etiquette(f"Voie {lettre} (étape {idx[-1] + 1}) · sortie {fmt_vol(sortie)} mL"), "stretch", champ("Quantité prise", qte),
+                              etiquette(f"{fmt_vol(reste)} mL non repris" if reste > 0.0005 else "toute la sortie", secondaire=True)))
         return f
 
     def _deposer_dans_voie(self, ident: str, pid: str, vid: str):
@@ -806,9 +962,13 @@ class PageFlux(QWidget):
                           icone("⧉", f"Dupliquer la grande étape {g.nom} (choix du nombre de copies)", lambda: self._dupliquer_groupe(g)),
                           bouton("Défaire", lambda: self._defaire_groupe(g), tip=f"Défaire la grande étape {g.nom} (ses étapes restent dans le flux)")))
         for i in idx:
-            v.addWidget(self._ligne_etape(i, catalogue, dans_groupe=True))
-        if not idx:
-            v.addWidget(etiquette("Aucune sous-étape : choisis une opération ci-dessous.", secondaire=True))
+            v.addWidget(self._ligne_avec_menu(i, catalogue, dans_groupe=True))
+        if not idx and self.groupe_cible != g.id:
+            v.addWidget(etiquette("Aucune sous-étape : « + Ajouter une sous-étape » pour choisir une opération.", secondaire=True))
+        if self.groupe_cible == g.id and not self.consultation:
+            nums = R.numeros_groupe(self.m, g.id)
+            v.addWidget(self._panneau_ajout(f"{g.nom} · étape {(nums[-1] + 1) if nums else len(self.m.etapes) + 1} : que fais-tu dans cette grande étape ?",
+                                            f"Terminer « {g.nom} »", self._finir_groupe))
         return f
 
     def _dupliquer_groupe(self, g):
@@ -924,7 +1084,7 @@ class PageFlux(QWidget):
             setattr(c, cle, v)
         self._toucher()
 
-    def _condition(self, libelle, on, basculer, valeur, lib_v, unite, changer, choix: list[float] | None = None) -> QWidget:
+    def _condition(self, libelle, on, basculer, valeur, lib_v, unite, changer, choix: list[float] | None = None, extra: QWidget | None = None) -> QWidget:
         sf = QFrame()
         sf.setObjectName("sousCarte")
         v = QVBoxLayout(sf)
@@ -933,9 +1093,9 @@ class PageFlux(QWidget):
         t.toggled.connect(lambda *_: basculer())
         v.addWidget(t)
         if on and choix is not None:  # vitesse choisie dans la liste des Réglages (ou « Autre valeur… »)
-            lv = ChoixVitesse(choix, valeur)
+            lv = ChoixVitesse(choix, valeur, unite)
             lv.choisi.connect(lambda val: (changer(val), self._toucher(val is None or val not in choix)))
-            v.addWidget(champ(lib_v, lv))
+            v.addWidget(champ(lib_v, lv) if extra is None else ligne(champ(lib_v, lv), champ("Unité", extra), espacement=10))
         elif on:
             nb = NumberBox(valeur, unite)
             nb.valeur.connect(changer)
@@ -955,13 +1115,13 @@ class PageFlux(QWidget):
             return
         gc = self.m.groupe(self.groupe_cible)
         if self.voie_cible and self.m.parallele(self.voie_cible[0]):  # ajout dans une voie du bloc en parallèle
-            e = R.ajouter_etape(self.m, op, None)
+            e = R.ajouter_etape(self.m, op, None, reglages=self.ctrl.reglages)
             R.placer_dans_voie(self.m, e.id, *self.voie_cible)
         elif gc is not None:  # ajout dans la grande étape en cours, après sa dernière sous-étape
             nums = R.numeros_groupe(self.m, gc.id)
-            R.ajouter_etape(self.m, op, nums[-1] - 1 if nums else None, groupe_id=gc.id)
+            R.ajouter_etape(self.m, op, nums[-1] - 1 if nums else None, groupe_id=gc.id, reglages=self.ctrl.reglages)
         else:
-            R.ajouter_etape(self.m, op, self.inserer_apres)
+            R.ajouter_etape(self.m, op, self.inserer_apres, reglages=self.ctrl.reglages)
             if self.inserer_apres is not None:
                 self.inserer_apres += 1
         self._toucher(True)
@@ -1237,14 +1397,27 @@ class PageFlux(QWidget):
         for k, (cle, lib, lib_v, unite) in enumerate(defs):
             on = (e.vide is not None) if cle == "vide" else getattr(e, cle) is not None
             val = (e.vide.mbar if e.vide else None) if cle == "vide" else getattr(e, cle)
-            g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_condition(e, cle), self._toucher(True)), val, lib_v, unite,
-                                        lambda v, cle=cle: self._set_cond(e, cle, v),
-                                        self.ctrl.reglages.vitesses_agitation if cle == "agitation_trmin" else None), k // 2, k % 2)
+            choix, extra, u = None, None, unite
+            if cle == "agitation_trmin":  # vitesse choisie dans la liste des Réglages ; centrifugation : tr/min ou RCF (g)
+                u = e.vitesse_unite if e.vitesse_unite in UNITES_VITESSE else "tr/min"
+                choix = self.ctrl.reglages.vitesses_rcf if u == "g" else self.ctrl.reglages.vitesses_agitation
+                if est_centrifugation(e.operation):
+                    extra = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})
+                    extra.setMinimumWidth(110)
+                    extra.setAccessibleName("Unité de la vitesse de centrifugation")
+                    extra.choisi.connect(lambda nouv, e=e: self._changer_unite_vitesse(e, nouv))
+            g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_condition(e, cle), self._toucher(True)), val, lib_v, u,
+                                        lambda v, cle=cle: self._set_cond(e, cle, v), choix, extra), k // 2, k % 2)
         wg = QWidget()
         wg.setLayout(g)
         x.ajouter(wg)
-        duree = NumberBox(e.duree_min, "min", "ex. 30")
-        duree.valeur.connect(lambda v: (setattr(e, "duree_min", v), self._toucher()))
+        du = e.duree_unite if e.duree_unite in DUREES else "min"  # durée stockée en minutes, saisie dans l'unité choisie
+        duree = NumberBox(None if e.duree_min is None else round(e.duree_min / DUREES[du], 4), "", "ex. 30")
+        duree.valeur.connect(lambda v: (setattr(e, "duree_min", None if v is None else v * DUREES[du]), self._toucher()))
+        unites_d = Liste([u for u in DUREES if u in self.ctrl.reglages.unites_duree or u == du], du, vide=None)
+        unites_d.setMinimumWidth(110)
+        unites_d.setAccessibleName("Unité de la durée (liste dans Réglages › Unités de durée)")
+        unites_d.choisi.connect(lambda u, e=e: (setattr(e, "duree_unite", u), self._toucher(True)))
         mat = [ChipSupprimable(q, lambda k=k: self._retirer_materiel(e, k)) for k, q in enumerate(e.equipements)]
         proposes = [q for q in self.ctrl.reglages.materiels if q not in e.equipements]
         nouveau = ListeSaisie(proposes, "Choisir ou taper un matériel")
@@ -1253,7 +1426,7 @@ class PageFlux(QWidget):
         mat += [nouveau, bouton("+ Ajouter", lambda: self._ajouter_materiel(e, nouveau.currentText())),
                 bouton("Liste du matériel", lambda: self.voir_reglages.emit("materiel"), lien=True)]
         duree.setMaximumWidth(200)
-        x.ajouter(champ("Durée de l’étape", duree))
+        x.ajouter(ligne(champ("Durée de l’étape", duree), champ("Unité", unites_d), "stretch", espacement=10))
         x.ajouter(champ("Matériel utilisé", flux_widgets(mat)))
         for k, a in enumerate(e.autres):
             n = ChampTexte(a.nom, "ex. pH, atmosphère")
@@ -1267,6 +1440,15 @@ class PageFlux(QWidget):
         rem.modifie.connect(lambda v: (setattr(e, "remarque", v), self._toucher()))
         x.ajouter(champ("Remarque (facultatif)", rem))
         return x
+
+    def _changer_unite_vitesse(self, e, unite: str):
+        """tr/min <-> RCF (g) : la vitesse repart de la 1re valeur de la liste de la nouvelle unité."""
+        r = self.ctrl.reglages
+        liste = r.vitesses_rcf if unite == "g" else r.vitesses_agitation
+        e.vitesse_unite = unite
+        if e.agitation_trmin is not None and liste:
+            e.agitation_trmin = liste[0]
+        self._toucher(True)
 
     def _copier_conditions(self, e):
         self.ctrl.memoriser_manip()

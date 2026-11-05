@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QCheckBox, QFrame, QGridLayout, QVBoxLayout, QWidg
 
 from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain import reglages_ops as O
-from mat_methode.domain.models import Personne, initiales_de
+from mat_methode.domain.models import CONDITIONS_OPERATION, Personne, initiales_de
 from mat_methode.domain.regles import basculer_analyse, deplacer_tag, tous_les_tags
 from mat_methode.domain.texte import fmt_num, libelle_volume, norm
 from mat_methode.ui.controleur import Controleur
@@ -69,7 +69,8 @@ class PageReglages(QWidget):
             ("reactifs", "Réactifs", "Noms des réactifs proposés dans les étapes", f"{len(r.reactifs)}", self._reactifs),
             ("volumes", "Volumes d’échantillon", "30 mL … 1 L", f"{len(r.volumes_ml)}", self._volumes),
             ("unites", "Unités des réactifs", "mL, g, µL, % … proposées à côté des quantités", f"{len(r.unites_reactifs)}", self._unites),
-            ("vitesses", "Vitesses d’agitation", "100, 200, 300 tr/min … proposées dans les étapes", f"{len(r.vitesses_agitation)}", self._vitesses),
+            ("vitesses", "Vitesses d’agitation", "tr/min et RCF (g) proposés dans les étapes", f"{len(r.vitesses_agitation) + len(r.vitesses_rcf)}", self._vitesses),
+            ("durees", "Unités de durée", "s, min, h, jour, semaine : proposées pour la durée d’une étape", f"{len(r.unites_duree)}", self._durees),
             ("analyses", "Analyses", "Analyses disponibles pour les laboratoires", f"{len(r.analyses)}", self._analyses),
             ("types", "Types de demande", "Support, R&D, Test d’idée…", f"{len(r.types_demande)}", self._types),
             ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
@@ -353,7 +354,10 @@ class PageReglages(QWidget):
             haut.setEnabled(i > 0)
             bas = icone("↓", f"Descendre {o.nom}", lambda i=i: (O.deplacer_operation(self.r, i, 1), self._changer(), self._actualiser()))
             bas.setEnabled(i < n - 1)
-            x.ajouter(ligne(champ("Opération", nom), champ("Participe passé (texte)", part),
+            resume = ", ".join(f"{lib.lower()} {fmt_num(o.defauts[cle])} {u}".replace(" 0 mbar", "") for cle, lib, u in CONDITIONS_OPERATION if cle in o.defauts)
+            cond = bouton("Conditions par défaut…", lambda o=o: self._conditions_operation(o),
+                          tip=f"Conditions activées d’office quand on ajoute « {o.nom} » : {resume or 'aucune'}")
+            x.ajouter(ligne(champ("Opération", nom), champ("Participe passé (texte)", part), cond,
                             etiquette(f"{nb} étape{'s' if nb > 1 else ''}", secondaire=True), "stretch", haut, bas,
                             icone("✕", f"Supprimer {o.nom}", lambda o=o: self._suppr_operation(o), danger=True)))
         nouveau = ChampTexte("", "ex. neutralisation")
@@ -396,22 +400,43 @@ class PageReglages(QWidget):
                            renommer=self._ren(O.renommer_unite, lambda: self.r.unites_reactifs))
 
     def _vitesses(self):
-        vs = self.r.vitesses_agitation
-        x = self._section("Vitesses d’agitation", f"{len(vs)}")
-        x.ajouter(etiquette("Vitesses proposées pour l’agitation et la centrifugation (tr/min). Retirer une vitesse ne change pas les étapes existantes.",
-                            secondaire=True, wrap=True))
-        x.ajouter(flux_widgets([ChipSupprimable(f"{fmt_num(v)} tr/min", lambda v=v: (O.supprimer_vitesse(self.r, v), self._changer(), self._actualiser()),
-                                                f"Retirer {fmt_num(v)} tr/min") for v in vs]) if vs else etiquette("Aucune", secondaire=True))
-        nouveau = NumberBox(None, "tr/min", "ex. 650")
-        nouveau.setMaximumWidth(200)
+        x = self._section("Vitesses d’agitation et de centrifugation", f"{len(self.r.vitesses_agitation) + len(self.r.vitesses_rcf)}")
+        x.ajouter(etiquette("Vitesses proposées dans les étapes : en tr/min pour l’agitation et la centrifugation, en RCF (g, force centrifuge relative) "
+                            "pour la centrifugation. Retirer une vitesse ne change pas les étapes existantes.", secondaire=True, wrap=True))
+        for unite, vs, titre in (("tr/min", self.r.vitesses_agitation, "Vitesses en tr/min"), ("g", self.r.vitesses_rcf, "Vitesses en RCF (g)")):
+            x.ajouter(etiquette(titre, "etiquetteChamp"))
+            x.ajouter(flux_widgets([ChipSupprimable(f"{fmt_num(v)} {unite}", lambda v=v, u=unite: (O.supprimer_vitesse(self.r, v, u), self._changer(), self._actualiser()),
+                                                    f"Retirer {fmt_num(v)} {unite}") for v in vs]) if vs else etiquette("Aucune", secondaire=True))
+            nouveau = NumberBox(None, unite, "ex. 650" if unite == "tr/min" else "ex. 4000")
+            nouveau.setMaximumWidth(200)
 
-        def ajout():
-            if O.ajouter_vitesse(self.r, nouveau.lire()):
-                self._changer()
-                self._actualiser()
+            def ajout(nouveau=nouveau, unite=unite):
+                if O.ajouter_vitesse(self.r, nouveau.lire(), unite):
+                    self._changer()
+                    self._actualiser()
 
-        nouveau.returnPressed.connect(ajout)
-        x.ajouter(ligne(champ("Nouvelle vitesse", nouveau), bouton("Ajouter", ajout), "stretch"))
+            nouveau.returnPressed.connect(ajout)
+            x.ajouter(ligne(champ("Nouvelle vitesse", nouveau), bouton("Ajouter", ajout), "stretch"))
+
+    def _durees(self):
+        from mat_methode.domain.models import DUREES
+        x = self._section("Unités de durée", f"{len(self.r.unites_duree)}")
+        x.ajouter(etiquette("Unités proposées à côté de la durée d’une étape (la durée est gardée en minutes : changer d’unité ne change pas la durée). "
+                            "Il en faut au moins une.", secondaire=True, wrap=True))
+        x.ajouter(flux_widgets([ChipSupprimable(u, lambda u=u: (O.retirer_unite_duree(self.r, u), self._changer(), self._actualiser()), f"Retirer {u}")
+                                for u in self.r.unites_duree]))
+        absentes = [u for u in DUREES if u not in self.r.unites_duree]
+        if absentes:
+            x.ajouter(flux_widgets([bouton(f"+ {u}", lambda u=u: (O.ajouter_unite_duree(self.r, u), self._changer(), self._actualiser()), ajout=True)
+                                    for u in absentes]))
+
+    def _conditions_operation(self, o):
+        from mat_methode.ui.dialogues import conditions_operation
+        res = conditions_operation(self, o.nom, o.defauts)
+        if res is not None:
+            O.regler_defauts_operation(self.r, o.nom, res)
+            self._changer()
+            self._actualiser()
 
     def _renommer_operation(self, o, nouveau):
         nouveau = nouveau.strip()
