@@ -318,7 +318,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
                 f = _inv(reglages, r.nom)
                 rs.append(LigneReactif(nom=r.nom, quantite=r.quantite_complete, scirius=f.get("scirius", "") or r.reference, emplacement=f.get("emplacement", ""),
                                        fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1],
-                                       contact=r.contact.strip(), consigne=r.consigne.strip()))
+                                       contact=r.contact_complet, consigne=r.consigne.strip()))
         g = m.groupe(e.groupe_id)
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
         par = m.parallele(e.parallele_id)
@@ -338,7 +338,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
             phases.append(Phase(0, f"Départ · voie {lettre_voie(m, par.id, voie.id)}", f"{fmt_vol(vol)} mL" if vol else "matière et volume à saisir", [],
                                 [LigneReactif(nom=x.nom, quantite=x.quantite_complete, scirius=(_inv(reglages, x.nom).get("scirius", "") or x.reference),
                                               emplacement=_inv(reglages, x.nom).get("emplacement", ""), fournisseur=_inv(reglages, x.nom).get("fournisseur", ""),
-                                              lot=_inv(reglages, x.nom).get("lot", ""), etapes=[i + 1], contact=x.contact.strip(), consigne=x.consigne.strip())
+                                              lot=_inv(reglages, x.nom).get("lot", ""), etapes=[i + 1], contact=x.contact_complet, consigne=x.consigne.strip())
                                  for x in voie.autres if x.nom], [], parallele=en_parallele, depart_voie=True))
         reunion = ""
         if par is None and i > 0 and m.etapes[i - 1].parallele_id:

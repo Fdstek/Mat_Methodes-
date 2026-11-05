@@ -428,6 +428,10 @@ def ambre(texte: str, code: str | None = None) -> QWidget:
         cl.addWidget(b)
         t = QLabel(texte)
         t.setStyleSheet(f"color:{theme.P.ambre_texte};font-family:'Cascadia Mono',Consolas,monospace;font-size:9pt;border:none;background:transparent;")
+        t.ensurePolished()
+        if t.fontMetrics().horizontalAdvance(texte) > 235:  # nom long : passe à la ligne au lieu de dépasser de la carte
+            t.setWordWrap(True)
+            t.setMinimumWidth(235)
         cl.addWidget(t)
         lay.addWidget(cont)
     else:

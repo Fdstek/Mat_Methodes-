@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QCheckBox, QLabel, QMenu, QPushButton, QToolButton
 
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
+from mat_methode.domain.models import ARCHIVEE, STATUTS
 from mat_methode.domain.texte import norm, prenom
 from mat_methode.ui import theme
 from mat_methode.ui.widgets import bouton, etiquette, flux_widgets
@@ -240,14 +241,15 @@ class Filtres:
         self.attribue: set[str] = set()
         self.type: set[str] = set()
         self.tag: set[str] = set()
+        self.statut: set[str] = set()  # libellés des statuts (« Brouillon », « En cours »…)
 
     def actif(self) -> bool:
-        return bool(self.donneur or self.attribue or self.type or self.tag)
+        return bool(self.donneur or self.attribue or self.type or self.tag or self.statut)
 
     def passe(self, m) -> bool:
         c = m.contexte
         return ((not self.donneur or c.donneur in self.donneur) and (not self.attribue or c.attribue in self.attribue)
-                and (not self.type or c.type in self.type)
+                and (not self.type or c.type in self.type) and (not self.statut or O.nom_etat(None, m.etat)[0] in self.statut)
                 and (not self.tag or any(norm(t) in {norm(x) for x in self.tag} for t in m.tags)))
 
     def appliquer(self, manips: list) -> list:
@@ -289,6 +291,9 @@ class Filtres:
                 widgets.append(b)
         for vide, options, choisis, nom in (("Tous les types", [t for t in r.types_demande if any(m.contexte.type == t for m in manips)],
                                              self.type, "Filtrer par type de demande"),
+                                            ("Tous les statuts", [lib for ident, (lib, _) in STATUTS.items()
+                                                                  if any(m.etat == ident for m in manips)] + (["Archivée"] if any(m.etat == ARCHIVEE for m in manips) else []),
+                                             self.statut, "Filtrer par statut"),
                                             ("Tous les tags", tags, self.tag, "Filtrer par tag")):
             choisis &= set(options)
             lm = ListeMulti(vide, options, choisis, nom)

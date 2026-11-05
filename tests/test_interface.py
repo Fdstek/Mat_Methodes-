@@ -1102,3 +1102,52 @@ def test_unite_de_vitesse_tr_min_ou_g_pour_l_agitation_et_les_conditions_commune
     page.aller(e.id)
     QTest.qWait(50)
     assert any(c.findText("RCF (g)") >= 0 for c in page.findChildren(QComboBox))  # sélecteur tr/min ou RCF (g) sur une étape d’agitation
+
+
+def test_ton_flux_reste_en_place_pendant_le_defilement(fen, qtbot):
+    from PySide6.QtWidgets import QScrollArea
+    fen.resize(1400, 650)
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux._mode("comp")
+    fen.p_flux.aller(m.etapes[3].id)
+    qtbot.wait(150)
+    defil = fen.defilements["flux"]
+    assert isinstance(fen.p_flux._zone_flux, QScrollArea)
+    barre = defil.verticalScrollBar()
+    barre.setValue(barre.maximum())
+    hote, zone = fen.p_flux._hote_flux, fen.p_flux._zone_flux
+    qtbot.waitUntil(lambda: zone.y() > 0, timeout=3000)
+    # la colonne suit le défilement : elle a quitté le haut de son hôte et reste visible dans la page
+    haut_visible = zone.mapTo(defil.viewport(), zone.rect().topLeft()).y()
+    assert zone.y() > 0 and haut_visible + zone.height() > 0 and haut_visible < defil.viewport().height()
+    assert zone.y() + zone.height() <= hote.height()
+
+
+def test_carte_du_flux_ne_s_ecrase_pas_quand_on_ajoute_un_echantillon(fen, qtbot):
+    from mat_methode.domain.models import Prelevement
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux._mode("comp")
+    qtbot.wait(100)
+    e = m.etapes[4]
+    for labo in ("Ana CRES", "Biohub", "Laboratoire externe de caractérisation des corps gras"):
+        m.prelevements.append(Prelevement(etape_id=e.id, moment="effluent", volume_ml=60, labo=labo, analyses=[]))
+    fen.p_flux.rafraichir()
+    qtbot.wait(200)
+    contenu = fen.p_flux._zone_flux.widget()
+    assert contenu.height() >= contenu.layout().minimumHeightForWidth(contenu.width())  # jamais en dessous de la taille nécessaire
+
+
+def test_filtre_par_statut_comme_les_tags(fen, qtbot):
+    from mat_methode.ui import colonnes as C
+    manips = list(fen.ctrl.manips)
+    assert len({m.etat for m in manips}) >= 2
+    f = C.Filtres()
+    assert f.appliquer(manips) == manips and not f.actif()
+    f.statut = {"En cours"}
+    assert f.actif() and all(m.etat == "encours" for m in f.appliquer(manips)) and f.appliquer(manips)
+    f.statut = {"En cours", "Réalisée"}
+    assert {m.etat for m in f.appliquer(manips)} <= {"encours", "realisee"}
+    barre = f.barre(manips, fen.ctrl.reglages, lambda: None, [])
+    assert len(barre.findChildren(C.ListeMulti)) == 3  # types, statuts, tags

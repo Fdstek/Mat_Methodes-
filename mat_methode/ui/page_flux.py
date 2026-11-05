@@ -2,7 +2,7 @@
 compléter les étapes (maître-détail)."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -1216,11 +1217,65 @@ class PageFlux(QWidget):
         gl.addWidget(etiquette("Badge : la place sur la frise donne le moment du prélèvement ; le bord droit est la sortie de l’étape.",
                                secondaire=True, wrap=True))
         gl.addStretch(1)
-        gauche.setFixedWidth(320)
+        gauche.setFixedWidth(312)
         self._remplir_colonne()
-        h.addWidget(gauche, 0, Qt.AlignmentFlag.AlignTop)
+        # « Ton flux » reste en place quand on fait défiler le détail : il suit le défilement de la page (voir _epingler)
+        self._zone_flux = QScrollArea(w)
+        self._zone_flux.setWidget(gauche)
+        self._zone_flux.setWidgetResizable(True)  # le contenu ne descend jamais sous sa taille minimale : plus de cartes écrasées
+        self._zone_flux.setFrameShape(QFrame.Shape.NoFrame)
+        self._zone_flux.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._zone_flux.setStyleSheet("QScrollArea{background:transparent;}")
+        self._zone_flux.setFixedWidth(330)
+        self._hote_flux = QWidget()
+        self._hote_flux.setFixedWidth(330)
+        self._zone_flux.setParent(self._hote_flux)
+        self._hote_flux.installEventFilter(self)
+        gauche.installEventFilter(self)  # une carte change de taille (échantillon ajouté, texte long) : on recalcule la hauteur
+        h.addWidget(self._hote_flux)
         h.addWidget(self._editeur(), 1, Qt.AlignmentFlag.AlignTop)
+        QTimer.singleShot(0, self._epingler)
         return w
+
+    def _defilement_page(self):
+        p = self.parentWidget()
+        while p is not None and not isinstance(p, QScrollArea):
+            p = p.parentWidget()
+        return p
+
+    def eventFilter(self, obj, ev):
+        if ev.type() in (QEvent.Type.Resize, QEvent.Type.Show, QEvent.Type.LayoutRequest) and (
+                obj is getattr(self, "_hote_flux", None) or (getattr(self, "_zone_flux", None) is not None and obj is self._zone_flux.widget())):
+            QTimer.singleShot(0, self._epingler)
+        return super().eventFilter(obj, ev)
+
+    def _epingler(self):
+        """Place la colonne « Ton flux » en haut de ce qu'on voit : elle ne défile pas avec le détail ; trop longue, elle a son propre ascenseur."""
+        hote, zone = getattr(self, "_hote_flux", None), getattr(self, "_zone_flux", None)
+        if hote is None or zone is None:
+            return
+        try:
+            defil = self._defilement_page()
+            if defil is None:
+                return
+            if getattr(self, "_defil_connecte", None) is not defil:
+                defil.verticalScrollBar().valueChanged.connect(lambda _v: self._epingler())
+                self._defil_connecte = defil
+            contenu = zone.widget()
+            haut_contenu = contenu.layout().totalHeightForWidth(312) if contenu.layout() else contenu.sizeHint().height()
+            vue = defil.viewport().height() - 16
+            haut = max(120, min(max(haut_contenu, contenu.minimumSizeHint().height()) + 4, vue))
+            hote.setMinimumHeight(haut)
+            y_hote = hote.mapTo(defil.widget(), QPoint(0, 0)).y()
+            decalage = max(0, defil.verticalScrollBar().value() + 8 - y_hote)
+            decalage = min(decalage, max(0, hote.height() - haut))
+            zone.setGeometry(0, decalage, 330, haut)
+            sel = next((c for c in contenu.findChildren(QFrame) if c.objectName() == "carteFlux" and c.property("sel")), None)
+            if sel is not None and not getattr(self, "_sel_vue", None) == self.etape_id:
+                zone.ensureWidgetVisible(sel, 0, 20)
+                self._sel_vue = self.etape_id
+        except RuntimeError:
+            pass  # widgets détruits pendant une reconstruction
 
     def _remplir_colonne(self):
         m, lay = self.m, self._colonne.layout()
@@ -1299,7 +1354,7 @@ class PageFlux(QWidget):
             for r in e.reactifs:
                 if r.nom:
                     cl.addWidget(etiquette(f"• <b>{r.nom}</b> <span style='color:{theme.P.texte2}'>{r.quantite_complete}</span>"
-                                           + (f" · contact {r.contact.strip()}" if r.contact.strip() else ""), wrap=True))
+                                           + (f" · contact {r.contact_complet}" if r.contact_complet else ""), wrap=True))
                     if r.consigne.strip():
                         cl.addWidget(etiquette(f"<i>Consigne : {r.consigne.strip()}</i>", wrap=True))
             cond = " · ".join(x for x in [resume_conditions(e)] + autres_conditions(e) if x)
@@ -1316,6 +1371,8 @@ class PageFlux(QWidget):
             for p in ps:
                 cl.addWidget(pill(p))
             cible.addWidget(c)
+        if getattr(self, "_zone_flux", None) is not None:
+            QTimer.singleShot(0, self._epingler)  # la colonne a changé (échantillon ajouté…) : hauteur recalculée
 
     def _premiere_de_voie(self, i: int) -> bool:
         m, e = self.m, self.m.etapes[i]
@@ -1625,13 +1682,18 @@ class PageFlux(QWidget):
             lv.addWidget(ligne(origine, nom, icone("🔎", f"Chercher dans Scirius (ligne {k + 1})", lambda re_=re_: self._scirius_reactif(re_)),
                                icone("✕", f"Retirer le {mot} {k + 1}", lambda k=k: (liste.pop(k), self._toucher(True)), danger=True), espacement=6))
             lv.addWidget(ligne(ref, q, u, espacement=6))
-            ct = ChampTexte(re_.contact, "temps de contact (ex. 30 min)")
-            ct.setMaximumWidth(220)
+            ct = ChampTexte(re_.contact, "temps de contact")
+            ct.setMaximumWidth(130)
             ct.modifie.connect(lambda val, re_=re_: (setattr(re_, "contact", val), self._toucher()))
+            cu = Liste(r.unites_duree or list(DUREES), re_.contact_unite, vide=None)
+            cu.setMinimumWidth(90)
+            cu.setMaximumWidth(110)
+            cu.setAccessibleName("Unité du temps de contact (liste dans Réglages › Unités de durée)")
+            cu.choisi.connect(lambda val, re_=re_: (setattr(re_, "contact_unite", val), self._toucher()))
             cs = ChampTexte(re_.consigne, "consigne du réactif (visible dans le flux et les PDF)")
             cs.setMinimumWidth(280)
             cs.modifie.connect(lambda val, re_=re_: (setattr(re_, "consigne", val), self._toucher()))
-            lv.addWidget(ligne(ct, cs, espacement=6))
+            lv.addWidget(ligne(ct, cu, cs, espacement=6))
             sc = ChampTexte(inv.scirius if inv else "", "n° Scirius à saisir", mono=True)
             em = ChampTexte(inv.emplacement if inv else "", "emplacement (armoire, étagère…)")
             fo = ChampTexte(inv.fournisseur if inv else "", "fournisseur")

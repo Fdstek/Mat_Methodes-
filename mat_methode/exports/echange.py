@@ -71,7 +71,7 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
             par["vitesse_unite"] = e.vitesse_unite
         etapes.append({"n": i + 1, "operation": e.operation, "parametres": par, "equipement": list(e.equipements),
                        "reactifs": [minuscule_initiale(x.nom) for x in e.reactifs if x.nom],
-                       "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite_complete, **({"contact": x.contact} if x.contact.strip() else {}),
+                       "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite_complete, **({"contact": x.contact_complet} if x.contact_complet else {}),
                                            **({"consigne": x.consigne} if x.consigne.strip() else {})} for x in e.reactifs],
                        "autres": [a.model_dump() for a in e.autres if a.nom], "remarque": e.remarque})
         if m.groupe(e.groupe_id):

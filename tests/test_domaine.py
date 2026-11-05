@@ -62,3 +62,11 @@ def test_export_demandes_avec_pieces_jointes():
     d = Demande(auteur="x", type="Bug", titre="t", texte="d", pieces=["capture.png", "journal.txt"])
     md = vers_markdown([d], lambda a: a, "1.8.0", lambda dem, nom: f"export_pieces/{nom}")
     assert "![capture.png](export_pieces/capture.png)" in md and "[journal.txt](export_pieces/journal.txt)" in md
+
+
+def test_temps_de_contact_avec_unite():
+    from mat_methode.domain.models import ReactifEtape
+    assert ReactifEtape(nom="A", contact="30", contact_unite="min").contact_complet == "30 min"
+    assert ReactifEtape(nom="A", contact="1,5", contact_unite="h").contact_complet == "1,5 h"
+    assert ReactifEtape(nom="A", contact="une nuit", contact_unite="min").contact_complet == "une nuit"
+    assert ReactifEtape(nom="A").contact_complet == ""

@@ -26,6 +26,7 @@ from mat_methode.exports.pdf import (
     bloc_a_faire,
     bloc_statuts,
     cartouche,
+    couleur_phase,
     document,
     legende_flux,
     moment_texte,
@@ -49,7 +50,8 @@ def phases_a_remplir(data: dict, s: dict) -> list:
     for i, ph in enumerate(data.get("phases", [])):
         n = ph["n"] if "n" in ph else (0 if i == 0 else data["etapes"][i - 1]["n"])
         depart = _depart_commun(ph, i)
-        titre = (f"<font size='7' color='#8A4B00'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "") + \
+        trait, fond, texte_c = couleur_phase(ph)
+        titre = (f"<font size='7' color='{texte_c.hexval().replace('0x', '#')}'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "") + \
             (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + \
             f"<b>{escape(ph['titre'])}</b>" + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else "")
         if depart:
@@ -69,7 +71,7 @@ def phases_a_remplir(data: dict, s: dict) -> list:
                     + (f" · {escape(r['emplacement'])}" if r.get("emplacement") else "")
                     + (f"<br/><i>Consigne : {escape(r['consigne'])}</i>" if r.get("consigne") else "") for r in ph["reactifs"])
         tete = Table([[Paragraph(titre, cell), Paragraph(info, cell)]], colWidths=[40 * mm, 134 * mm])
-        tete.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), TEAL_L), ("BOX", (0, 0), (-1, -1), 0.5, LINE),
+        tete.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fond), ("BOX", (0, 0), (-1, -1), 1.2, trait),
                                   ("VALIGN", (0, 0), (-1, -1), "TOP")]))
         contenu = [tete]
         ps = [p for p in pre if p["apres_etape"] == n] if not ph.get("depart_voie") else []
@@ -87,7 +89,7 @@ def phases_a_remplir(data: dict, s: dict) -> list:
                     fusions.append(len(lignes))
                     lignes.append([Paragraph(f"<b>Commentaire {escape(p['id'])} :</b> {escape(p['commentaire'])}", cell), "", "", "", ""])
             t = Table(lignes, colWidths=[14 * mm, 38 * mm, 64 * mm, 29 * mm, 29 * mm], repeatRows=1)
-            t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
+            t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, trait), ("BACKGROUND", (0, 0), (-1, 0), fond),
                                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                                    ("TOPPADDING", (0, 1), (-1, -1), 9), ("BOTTOMPADDING", (0, 1), (-1, -1), 9)]
                                   + [c for k in fusions for c in (("SPAN", (0, k), (-1, k)), ("TOPPADDING", (0, k), (-1, k), 3),

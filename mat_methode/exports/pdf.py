@@ -407,6 +407,12 @@ def _ou(v):
     return escape(str(v)) if v not in (None, "") else MANQUE
 
 
+def couleur_phase(ph: dict):
+    """(trait, fond, texte) de la voie d'une phase « EN PARALLÈLE · VOIE B » ; couleurs habituelles pour les autres phases."""
+    mt = re.search(r"VOIE ([A-D])", ph.get("parallele") or "")
+    return COULEURS_VOIES[ord(mt.group(1)) - 65] if mt else (LINE, TEAL_L, AMBER)
+
+
 def _depart_commun(ph: dict, i: int) -> bool:
     """Phase « Départ » commune (matière et volume de la manip) ; un « Départ · voie X » se présente comme une étape de sa voie."""
     return not ph.get("depart_voie") and not ph.get("entree_voies") and (ph["n"] == 0 if "n" in ph else i == 0)
@@ -428,7 +434,8 @@ def blocs_phases(data: dict, corps) -> list:
             sous = escape(ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (
                 f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
                 f"<br/><i>Consigne / remarque : {escape(ph['remarque'])}</i>" if ph.get("remarque") else "")
-        tete = ((f"<font size='7' color='#8A4B00'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "")
+        trait, fond, texte_c = couleur_phase(ph)
+        tete = ((f"<font size='7' color='{texte_c.hexval().replace('0x', '#')}'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "")
                 + (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
                 + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else ""))
         lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
@@ -450,7 +457,7 @@ def blocs_phases(data: dict, corps) -> list:
         if not ph.get("depart_voie"):
             lignes.append([Paragraph("Échantillons", petit), Paragraph(txt, petit)])
         t = Table(lignes, colWidths=[34 * mm, 140 * mm])
-        t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
+        t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, trait), ("BACKGROUND", (0, 0), (-1, 0), fond), ("BOX", (0, 0), (-1, -1), 1.2, trait),
                                ("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
         blocs.append(KeepTogether([t, Spacer(1, 2.5 * mm)]))
     return blocs
