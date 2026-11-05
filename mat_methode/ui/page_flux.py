@@ -894,6 +894,7 @@ class PageFlux(QWidget):
         v.setContentsMargins(12, 8, 12, 8)
         v.setSpacing(4)
         v.addWidget(etiquette(f"Étape {i + 1} · matière reçue des voies en parallèle", "titreCarte"))
+        termes = []  # « A 40 mL », « B 25 mL » : volume réellement pris dans chaque voie, pour la somme affichée en bas
         for vo in par.voies:
             idx = [k for k, x in enumerate(m.etapes) if x.parallele_id == par.id and x.voie_id == vo.id]
             if not idx:
@@ -901,6 +902,7 @@ class PageFlux(QWidget):
             sortie = lignes[idx[-1]].sortie if idx[-1] in lignes else 0.0
             lettre = R.lettre_voie(m, par.id, vo.id)
             pris = e.apports.get(vo.id)
+            termes.append((lettre, min(pris, sortie) if pris is not None else sortie))
             qte = NumberBox(pris, "mL", "tout")
             qte.setMaximumWidth(140)
             qte.valeur.connect(lambda val, vo=vo, e=e: (e.apports.pop(vo.id, None) if val is None else e.apports.__setitem__(vo.id, float(val)), self._toucher()))
@@ -908,6 +910,17 @@ class PageFlux(QWidget):
             reste = sortie - (pris if pris is not None else sortie)
             v.addWidget(ligne(etiquette(f"Voie {lettre} (étape {idx[-1] + 1}) · sortie {fmt_vol(sortie)} mL"), "stretch", champ("Quantité prise", qte),
                               etiquette(f"{fmt_vol(reste)} mL non repris" if reste > 0.0005 else "toute la sortie", secondaire=True)))
+        if termes:
+            total = sum(x for _, x in termes)
+            lg = lignes.get(i)
+            texte = " + ".join(f"voie {lettre} {fmt_vol(x)} mL" for lettre, x in termes)
+            if lg is not None and lg.ajoute:
+                texte += f" + réactifs de l’étape {fmt_vol(lg.ajoute)} mL"
+                total += lg.ajoute
+            if lg is not None and lg.preleve:
+                texte += f" − prélevé {fmt_vol(lg.preleve)} mL"
+                total -= lg.preleve
+            v.addWidget(etiquette(f"Volume après réunion : {texte} = {fmt_vol(total)} mL", "titreCarte", wrap=True))
         return f
 
     def _deposer_dans_voie(self, ident: str, pid: str, vid: str):
@@ -1285,7 +1298,10 @@ class PageFlux(QWidget):
             cl = c.layout()
             for r in e.reactifs:
                 if r.nom:
-                    cl.addWidget(etiquette(f"<b>{r.nom}</b> <span style='color:{theme.P.texte2}'>{r.quantite_complete}</span>", wrap=True))
+                    cl.addWidget(etiquette(f"• <b>{r.nom}</b> <span style='color:{theme.P.texte2}'>{r.quantite_complete}</span>"
+                                           + (f" · contact {r.contact.strip()}" if r.contact.strip() else ""), wrap=True))
+                    if r.consigne.strip():
+                        cl.addWidget(etiquette(f"<i>Consigne : {r.consigne.strip()}</i>", wrap=True))
             cond = " · ".join(x for x in [resume_conditions(e)] + autres_conditions(e) if x)
             cl.addWidget(etiquette(cond, "conditions", wrap=True) if cond else etiquette("conditions à compléter", "aCompleter"))
             if e.equipements:
@@ -1609,6 +1625,13 @@ class PageFlux(QWidget):
             lv.addWidget(ligne(origine, nom, icone("🔎", f"Chercher dans Scirius (ligne {k + 1})", lambda re_=re_: self._scirius_reactif(re_)),
                                icone("✕", f"Retirer le {mot} {k + 1}", lambda k=k: (liste.pop(k), self._toucher(True)), danger=True), espacement=6))
             lv.addWidget(ligne(ref, q, u, espacement=6))
+            ct = ChampTexte(re_.contact, "temps de contact (ex. 30 min)")
+            ct.setMaximumWidth(220)
+            ct.modifie.connect(lambda val, re_=re_: (setattr(re_, "contact", val), self._toucher()))
+            cs = ChampTexte(re_.consigne, "consigne du réactif (visible dans le flux et les PDF)")
+            cs.setMinimumWidth(280)
+            cs.modifie.connect(lambda val, re_=re_: (setattr(re_, "consigne", val), self._toucher()))
+            lv.addWidget(ligne(ct, cs, espacement=6))
             sc = ChampTexte(inv.scirius if inv else "", "n° Scirius à saisir", mono=True)
             em = ChampTexte(inv.emplacement if inv else "", "emplacement (armoire, étagère…)")
             fo = ChampTexte(inv.fournisseur if inv else "", "fournisseur")

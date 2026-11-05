@@ -71,7 +71,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
             par["vitesse_unite"] = e.vitesse_unite
         etapes.append({"n": i + 1, "operation": e.operation, "parametres": par, "equipement": list(e.equipements),
                        "reactifs": [minuscule_initiale(x.nom) for x in e.reactifs if x.nom],
-                       "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite_complete} for x in e.reactifs],
+                       "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite_complete, **({"contact": x.contact} if x.contact.strip() else {}),
+                                           **({"consigne": x.consigne} if x.consigne.strip() else {})} for x in e.reactifs],
                        "autres": [a.model_dump() for a in e.autres if a.nom], "remarque": e.remarque})
         if m.groupe(e.groupe_id):
             etapes[-1]["groupe"] = m.groupe(e.groupe_id).nom
@@ -115,14 +116,16 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                           "volume_ml": _nombre(p.volume_ml), "scirius": p.scirius or None, "aramis": p.aramis or None,
                           "labo": p.labo, "analyses": list(p.analyses),
                           **({"commentaire": p.commentaire.strip()} if p.commentaire.strip() else {})} for p in echantillons_tries(m)],
-        "phases": [{"titre": ph.titre, "conditions": ph.conditions, "materiel": ph.materiel,
+        "phases": [{**({"n": ph.n} if any(x.depart_voie for x in r.phases) else {}), "titre": ph.titre, "conditions": ph.conditions, "materiel": ph.materiel,
                     "reactifs": [{"nom": x.nom, "quantite": x.quantite, "scirius": x.scirius, "emplacement": x.emplacement,
-                                  "fournisseur": x.fournisseur, "lot": x.lot} for x in ph.reactifs],
+                                  "fournisseur": x.fournisseur, "lot": x.lot,
+                                  **({"contact": x.contact} if x.contact else {}), **({"consigne": x.consigne} if x.consigne else {})} for x in ph.reactifs],
                     "echantillons": [{"id": x.id, "volume": _nombre(x.volume), "moment": x.moment, "labo": x.labo, "analyses": x.analyses,
                                       "scirius": x.scirius, "aramis": x.aramis,
                                       **({"commentaire": x.commentaire} if x.commentaire else {})} for x in ph.echantillons],
                     **({"remarque": ph.remarque} if ph.remarque else {}),
-                    **({"parallele": ph.parallele} if ph.parallele else {}), **({"reunion": ph.reunion} if ph.reunion else {})} for ph in r.phases],
+                    **({"parallele": ph.parallele} if ph.parallele else {}), **({"reunion": ph.reunion} if ph.reunion else {}),
+                    **({"depart_voie": True} if ph.depart_voie else {}), **({"entree_voies": True} if ph.entree_voies else {})} for ph in r.phases],
         "inventaire_reactifs": [{"nom": minuscule_initiale(n), **{k: (getattr(reglages.reactif(n), k, "") or None)
                                                                  for k in ("scirius", "emplacement", "fournisseur", "lot")}}
                                 for n, _ in used],
@@ -130,7 +133,7 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
     grands = [(g, idx) for g, idx in blocs(m) if g is not None]
     if grands:  # clé absente sans grande étape : format identique à celui du prototype
         d["grandes_etapes"] = [{"nom": g.nom, "etapes": [i + 1 for i in idx]} for g, idx in grands]
-        for ph, x in zip(r.phases[1:], d["phases"][1:]):
+        for ph, x in zip(r.phases, d["phases"]):
             if ph.groupe:
                 x["groupe"] = ph.groupe
     return d
@@ -178,7 +181,8 @@ def importer(d, reglages: Reglages) -> tuple[Manip, list[int]]:
                   vide=Vide(mbar=p.get("vide_mbar")) if p.get("vide") else None,
                   equipements=list(x.get("equipement") or []),
                   autres=[a for a in x.get("autres") or [] if isinstance(a, dict)],
-                  reactifs=[ReactifEtape(nom=rd.get("nom", ""), quantite=rd.get("quantite") or "") for rd in detail],
+                  reactifs=[ReactifEtape(nom=rd.get("nom", ""), quantite=rd.get("quantite") or "", contact=rd.get("contact") or "",
+                                           consigne=rd.get("consigne") or "") for rd in detail],
                   remarque=x.get("remarque") or "")
         if p.get("ratio") and len(e.reactifs) >= 1 and not e.reactifs[0].quantite:
             e.reactifs[0].quantite = f"{p['ratio'].replace(':', ' : ')} (v/v)" if ":" in p["ratio"] else p["ratio"]

@@ -21,6 +21,7 @@ from mat_methode.exports.pdf import (
     LINE,
     TEAL_L,
     Flux,
+    _depart_commun,
     avec_reperes,
     bloc_a_faire,
     bloc_statuts,
@@ -46,30 +47,35 @@ def phases_a_remplir(data: dict, s: dict) -> list:
     pre = data.get("prelevements", [])
     ctx = data.get("contexte", {})
     for i, ph in enumerate(data.get("phases", [])):
-        n = 0 if i == 0 else data["etapes"][i - 1]["n"]
+        n = ph["n"] if "n" in ph else (0 if i == 0 else data["etapes"][i - 1]["n"])
+        depart = _depart_commun(ph, i)
         titre = (f"<font size='7' color='#8A4B00'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "") + \
             (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + \
             f"<b>{escape(ph['titre'])}</b>" + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else "")
-        if i == 0:
+        if depart:
             info = escape(ctx.get("matiere") or "") + "" + (
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
                 f" · <b>emplacement :</b> {escape(ctx['emplacement'])}" if ctx.get("emplacement") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
-            info = escape(ph.get("conditions") or "conditions à compléter") + (
+            info = escape(ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (
                 f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
                 f"<br/><b>Consigne / remarque :</b> {escape(ph['remarque'])}" if ph.get("remarque") else "")
             if ph.get("reactifs"):
                 info += "<br/>" + "<br/>".join(
-                    f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
+                    f"• <b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
+                    + (f" · contact {escape(r['contact'])}" if r.get("contact") else "")
                     + (f" · n° Scirius {escape(r['scirius'])}" if r.get("scirius") else "")
-                    + (f" · {escape(r['emplacement'])}" if r.get("emplacement") else "") for r in ph["reactifs"])
+                    + (f" · {escape(r['emplacement'])}" if r.get("emplacement") else "")
+                    + (f"<br/><i>Consigne : {escape(r['consigne'])}</i>" if r.get("consigne") else "") for r in ph["reactifs"])
         tete = Table([[Paragraph(titre, cell), Paragraph(info, cell)]], colWidths=[40 * mm, 134 * mm])
         tete.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), TEAL_L), ("BOX", (0, 0), (-1, -1), 0.5, LINE),
                                   ("VALIGN", (0, 0), (-1, -1), "TOP")]))
         contenu = [tete]
-        ps = [p for p in pre if p["apres_etape"] == n]
-        if ps:
+        ps = [p for p in pre if p["apres_etape"] == n] if not ph.get("depart_voie") else []
+        if ph.get("depart_voie"):
+            pass  # le Départ d'une voie n'a pas d'échantillon : ceux de l'entrée sont dans le Départ commun
+        elif ps:
             lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis"]]]
             fusions = []  # lignes « Commentaire », sur toute la largeur
             for p in ps:

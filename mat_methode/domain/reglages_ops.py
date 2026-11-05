@@ -2,7 +2,9 @@
 (à enregistrer) et, si utile, un message court."""
 from __future__ import annotations
 
-from mat_methode.domain.models import ANNULEE, ARCHIVEE, STATUTS, Condition, ConditionMateriel, Laboratoire, Manip, Operation, Reglages
+import re
+
+from mat_methode.domain.models import ANNULEE, ARCHIVEE, STATUTS, Condition, ConditionMateriel, Laboratoire, Manip, Operation, Reglages, initiales_de
 from mat_methode.domain.texte import minuscule_initiale, norm
 
 
@@ -404,22 +406,25 @@ def couleur_tag_suivante(r: Reglages, tag: str) -> str:
 def auteur(r: Reglages | None, par: str) -> str:
     """Auteur d'une ligne du journal (ou du lancement) affiché par ses initiales : une personne des Réglages retrouvée
     par son IGG ou son nom ; sinon le texte tel quel (anciennes lignes)."""
-    if r is None or not par:
+    if not par:
         return par
-    p = r.personne_igg(par) or r.personne(par)
-    return p.sigle() if p else par
+    p = (r.personne_igg(par) or r.personne(par)) if r is not None else None
+    if p:
+        return p.sigle()
+    if " " in par.strip():  # un nom écrit en toutes lettres : ses initiales
+        return initiales_de(par)
+    return "?" if re.fullmatch(r"[A-Za-z]\w*\d\w*", par.strip()) else par  # jamais d'IGG à l'écran
 
 
 def nom_auteur(r: Reglages | None, igg: str) -> str:
-    p = r.personne_igg(igg) if r is not None else None
-    return p.nom if p else igg
+    """Initiales de l'auteur (jamais l'IGG), y compris pour l'historique des statuts."""
+    return auteur(r, igg)
 
 
 def texte_statut(r: Reglages | None, c) -> str:
     """« Validée le 04/11/2026 à 11:40 par Pierre BURGUN » (nom complet si la personne est dans les Réglages)."""
     from mat_methode.domain.texte import fmt_dt
-    p = r.personne_igg(c.par) if r is not None else None
-    return f"{nom_etat(r, c.vers)[0]} le {fmt_dt(c.t)} par {p.nom if p else (c.par or '?')}"
+    return f"{nom_etat(r, c.vers)[0]} le {fmt_dt(c.t)} par {auteur(r, c.par) or '?'}"
 
 
 def journal_complet(r: Reglages | None, m: Manip) -> list[tuple[str, str, str]]:

@@ -207,3 +207,30 @@ def test_journal_avec_initiales(reglages, ethanol):
     d = exporter(ethanol, reglages)
     assert d["journal"][0]["par"] == "AL"
     assert "| AL |" in markdown(ethanol, reglages)
+
+
+def test_contact_consigne_reactif_et_depart_par_voie(tmp_path, exemples):
+    import pdfplumber
+
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import ReactifEtape
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.protocole import ecrire_protocole
+    r, m = exemples[0], exemples[1][0].copie()
+    ids = [e.id for e in m.etapes]
+    p = R.creer_parallele(m)
+    R.placer_dans_voie(m, ids[0], p.id, p.voies[0].id)
+    R.placer_dans_voie(m, ids[1], p.id, p.voies[1].id)
+    p.voies[0].autres = [ReactifEtape(nom="Graisse", quantite="40", unite="mL")]
+    p.voies[1].autres = [ReactifEtape(nom="Éthanol", quantite="25", unite="mL")]
+    m.etapes[2].reactifs = [ReactifEtape(nom="Acide citrique", quantite="5", unite="mL", contact="30 min", consigne="Goutte à goutte")]
+    R.synchroniser_depart(m)
+    d = exporter(m, r)
+    titres = [ph["titre"] for ph in d["phases"]]
+    assert "Départ" not in titres and titres[1:3] == ["Départ · voie A", "1 · Chauffage"] or "Départ · voie A" in titres
+    assert [ph["titre"] for ph in d["phases"]].count("Départ · voie B") == 1
+    assert d["etapes"][2]["reactifs_detail"][0]["contact"] == "30 min"
+    ecrire_protocole(d, tmp_path / "p.pdf")
+    with pdfplumber.open(tmp_path / "p.pdf") as pdf:
+        t = " ".join(" ".join(pg.extract_text() for pg in pdf.pages).split())
+    assert "Départ · voie A" in t and "contact 30 min" in t and "Consigne : Goutte à goutte" in t

@@ -1,10 +1,11 @@
 """Page « Bugs et idées » (bas du menu) : formulaire, liste des demandes avec leur statut, export en fichier .md."""
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QPlainTextEdit, QVBoxLayout, QWidget
 
 from mat_methode import NOM_APPLICATION, VERSION
@@ -50,17 +51,14 @@ class PageDemandes(QWidget):
                                      "chacun peut en changer le statut (le nom et la date sont gardés).", secondaire=True, wrap=True))
         self.lay.addWidget(self._formulaire())
         toutes = self._demandes()
-        barre = QHBoxLayout()
+        barre = []
         for texte, val in [(f"Toutes ({len(toutes)})", "")] + [(f"{s} ({sum(1 for d in toutes if d.statut == s)})", s) for s in STATUTS_DEMANDE]:
             b = bouton(texte, lambda v=val: self._filtrer(v))
             b.setProperty("pivot", True)
             b.setProperty("actif", self.filtre == val)
-            barre.addWidget(b)
-        barre.addStretch(1)
-        barre.addWidget(bouton("Exporter les nouvelles (.md)", self._exporter, tip="Enregistre les demandes « Nouvelle » dans un fichier .md daté ; elles passent à « À vérifier »"))
-        w = QWidget()
-        w.setLayout(barre)
-        self.lay.addWidget(w)
+            barre.append(b)
+        barre.append(bouton("Exporter les nouvelles (.md)", self._exporter, tip="Enregistre les demandes « Nouvelle » dans un fichier .md daté (avec leurs pièces) ; elles passent à « À vérifier »"))
+        self.lay.addWidget(flux_widgets(barre))
         f, v = carte()
         v.setSpacing(0)
         liste = [d for d in toutes if not self.filtre or d.statut == self.filtre]
@@ -87,34 +85,29 @@ class PageDemandes(QWidget):
         texte.textChanged.connect(lambda: setattr(self, "texte_saisi", texte.toPlainText()))
         self._texte = texte
         menus = C.ListeMulti("Choisir le ou les menus", list(MENUS_DEMANDE), self.tags_saisis, "Menus concernés")
-        lay.addWidget(self._ligne_champs(champ("Type", typ), champ("Titre", titre), champ("Menus concernés (plusieurs choix)", menus)))
+        lay.addWidget(self._ligne_champs(champ("Type", typ), champ("Menus concernés (plusieurs choix)", menus)))
+        lay.addWidget(champ("Titre", titre))
         lay.addWidget(champ("Description", texte))
-        bas = QHBoxLayout()
-        bas.addWidget(bouton("Joindre un fichier…", self._joindre, tip="Capture d’écran, document, journal…"))
-        self.noms = etiquette(", ".join(Path(p).name for p in self.joints) or "Aucun fichier joint", secondaire=True, wrap=True)
-        bas.addWidget(self.noms, 1)
-        if self.edition:
-            bas.addWidget(bouton("Annuler", self._annuler_edition))
-        bas.addWidget(bouton("Enregistrer la modification" if self.edition else "Envoyer la demande", self._envoyer, accent=True))
-        w = QWidget()
-        w.setLayout(bas)
-        lay.addWidget(w)
+        self.noms = etiquette(", ".join(Path(p).name for p in self.joints) or "Aucun fichier joint", secondaire=True)
+        lay.addWidget(flux_widgets([bouton("Joindre un fichier…", self._joindre, tip="Capture d’écran, document, journal…"), self.noms]))
+        actions = [bouton("Annuler", self._annuler_edition)] if self.edition else []
+        actions.append(bouton("Enregistrer la modification" if self.edition else "Envoyer la demande", self._envoyer, accent=True))
+        lay.addWidget(flux_widgets(actions))
         return f
 
     @staticmethod
-    def _ligne_champs(a: QWidget, b: QWidget, c: QWidget) -> QWidget:
+    def _ligne_champs(a: QWidget, b: QWidget) -> QWidget:
         w = QWidget()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
         h.addWidget(a)
         h.addWidget(b, 1)
-        h.addWidget(c)
         return w
 
     def _ligne(self, d: Demande, derniere: bool) -> QWidget:
         w = QFrame()
         w.setObjectName("ligneManip")
-        h = QHBoxLayout(w)
+        h = QVBoxLayout(w)
         h.setContentsMargins(14, 10, 14, 10)
         gauche = QVBoxLayout()
         gauche.setSpacing(2)
@@ -129,19 +122,18 @@ class PageDemandes(QWidget):
         g = QWidget()
         g.setLayout(gauche)
         gauche.setContentsMargins(0, 0, 0, 0)
-        h.addWidget(g, 1)
-        for nom in d.pieces:
-            h.addWidget(bouton(f"📎 {nom}", lambda nom=nom, d=d: self.ouvrir_fichier.emit(str(S.dossier_pieces(self.ctrl.st, d) / nom)),
-                               tip="Ouvrir la pièce jointe", lien=True))
+        h.addWidget(g)
+        actions = [bouton(f"📎 {nom}", lambda nom=nom, d=d: self.ouvrir_fichier.emit(str(S.dossier_pieces(self.ctrl.st, d) / nom)),
+                          tip="Ouvrir la pièce jointe", lien=True) for nom in d.pieces]
         if d.type == "Bug":
-            h.addWidget(pastille("Bug", "warn"), 0, Qt.AlignmentFlag.AlignVCenter)
-        h.addWidget(bouton("Modifier", lambda d=d: self._modifier(d), tip="Changer le type, le titre, la description ou les menus"),
-                    0, Qt.AlignmentFlag.AlignVCenter)
+            actions.append(pastille("Bug", "warn"))
+        actions.append(bouton("Modifier", lambda d=d: self._modifier(d), tip="Changer le type, le titre, la description ou les menus"))
         st = Liste(list(STATUTS_DEMANDE), d.statut, vide=None)
         st.setMinimumWidth(130)
         st.setAccessibleName(f"Statut de la demande {d.titre}")
         st.choisi.connect(lambda v, d=d: self._statut(d, v))
-        h.addWidget(st, 0, Qt.AlignmentFlag.AlignVCenter)
+        actions.append(st)
+        h.addWidget(flux_widgets(actions))
         w.setStyleSheet("" if derniere else "QFrame#ligneManip{border-bottom:1px solid rgba(128,128,128,0.35);}")
         return w
 
@@ -211,7 +203,19 @@ class PageDemandes(QWidget):
         if not chemin:
             return
         try:
-            Path(chemin).write_text(vers_markdown(nouvelles, self._nom, f"{NOM_APPLICATION} {VERSION}"), encoding="utf-8")
+            cible = Path(chemin)
+            copies: dict[tuple[str, str], str] = {}
+            if any(d.pieces for d in nouvelles):  # les pièces jointes sont copiées dans un dossier voisin du .md
+                dossier = cible.with_name(cible.stem + "_pieces")
+                dossier.mkdir(parents=True, exist_ok=True)
+                for d in nouvelles:
+                    for nom in d.pieces:
+                        source = S.dossier_pieces(self.ctrl.st, d) / nom
+                        if source.exists():
+                            nouveau = f"{d.id[:6]}_{nom}"
+                            shutil.copy2(source, dossier / nouveau)
+                            copies[(d.id, nom)] = f"{dossier.name}/{nouveau}".replace(" ", "%20")
+            cible.write_text(vers_markdown(nouvelles, self._nom, f"{NOM_APPLICATION} {VERSION}", lambda d, nom: copies.get((d.id, nom))), encoding="utf-8")
         except OSError as ex:
             self.ctrl.toast.emit(f"Export impossible : {ex}")
             return

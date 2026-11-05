@@ -583,16 +583,16 @@ def test_historique_des_statuts_et_ecran_d_ouverture(fen, tmp_path):
     c = m.statuts[-1]
     assert (c.de, c.vers, c.par) == ("brouillon", "validee", "pierre")
     textes = [w.text() for w in fen.p_flux.bandeau.findChildren(type(fen.titre))]
-    assert any(t.startswith("Validée le ") and t.endswith("par Claire LACOUX") for t in textes)  # nom complet, bien visible
+    assert any(t.startswith("Validée le ") and t.endswith("par CL") for t in textes)  # initiales, jamais l’IGG
     from mat_methode.domain.reglages_ops import journal_complet
     assert journal_complet(r, m)[0][1:] == ("CL", "Statut : Brouillon → Validée")
     d = exporter(m, r)
-    assert d["statuts"][-1]["vers"] == "Validée" and d["statuts"][-1]["nom"] == "Claire LACOUX"
+    assert d["statuts"][-1]["vers"] == "Validée" and d["statuts"][-1]["nom"] == "CL"
     for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
         ecrire(d, tmp_path / f"{i}.pdf")
         with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
             t = " ".join(p.extract_text() for p in pdf.pages)
-        assert "Historique des statuts" in t and "Claire LACOUX" in t
+        assert "Historique des statuts" in t and " CL " in t and "PIERRE" not in t
     ecrire_docx(d, tmp_path / "r.docx")
     w = docx.Document(str(tmp_path / "r.docx"))
     assert "Brouillon → Validée" in "\n".join(c.text for tb in w.tables for row in tb.rows for c in row.cells)
