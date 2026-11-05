@@ -1281,6 +1281,20 @@ class PageFlux(QWidget):
             QTimer.singleShot(0, self._epingler)
         return super().eventFilter(obj, ev)
 
+    @staticmethod
+    def _figer_hauteurs(contenu: QWidget) -> bool:
+        """Chaque carte du flux (et chaque cadre : grande étape, voies en parallèle) garde au moins la hauteur dont elle a besoin à sa largeur :
+        quand la place manque, Qt rétrécit d'abord les plus grosses cartes sous leur taille minimale (titre, conditions et frise écrasés)."""
+        modifie = False
+        for f in reversed(contenu.findChildren(QFrame)):  # les cartes avant les cadres qui les contiennent
+            if f.objectName() in ("carteFlux", "groupe", "parallele", "voie") and f.layout() is not None and f.width() > 50:
+                lay = f.layout()
+                besoin = lay.totalHeightForWidth(f.width()) if lay.hasHeightForWidth() else lay.sizeHint().height()
+                if besoin > 0 and f.minimumHeight() != besoin:
+                    f.setMinimumHeight(besoin)
+                    modifie = True
+        return modifie
+
     def _epingler(self):
         """Place la colonne « Ton flux » en haut de ce qu'on voit : elle ne défile pas avec le détail ; trop longue, elle a son propre ascenseur."""
         hote, zone = getattr(self, "_hote_flux", None), getattr(self, "_zone_flux", None)
@@ -1294,6 +1308,15 @@ class PageFlux(QWidget):
                 defil.verticalScrollBar().valueChanged.connect(lambda _v: self._epingler())
                 self._defil_connecte = defil
             contenu = zone.widget()
+            if getattr(self, "_epingle_en_cours", False):
+                return
+            self._epingle_en_cours = True
+            try:
+                modifie = self._figer_hauteurs(contenu)
+            finally:
+                self._epingle_en_cours = False
+            if modifie:
+                QTimer.singleShot(0, self._epingler)  # une carte a changé de hauteur minimale : on revérifie une fois
             largeur = contenu.width() if contenu.width() > 100 else 312
             haut_contenu = contenu.layout().totalHeightForWidth(largeur) if contenu.layout() else contenu.sizeHint().height()
             if contenu.layout() and haut_contenu > 0 and contenu.minimumHeight() != haut_contenu:
