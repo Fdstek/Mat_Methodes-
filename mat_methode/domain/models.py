@@ -247,6 +247,8 @@ class ReactifEtape(_Modele):
     quantite: str = ""
     unite: str = ""  # unité choisie dans la liste des Réglages (vide = quantité écrite en texte libre)
     reference: str = ""  # référence saisie à la main (lot, n° interne…) quand la matière ne vient pas de Scirius
+    contact: str = ""  # temps de contact de ce réactif (« 30 min », « une nuit »)
+    consigne: str = ""  # consigne propre à ce réactif (visible dans le flux et les PDF)
 
     @property
     def quantite_complete(self) -> str:

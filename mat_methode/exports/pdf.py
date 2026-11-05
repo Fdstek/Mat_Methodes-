@@ -26,6 +26,11 @@ from mat_methode.exports.polices import trouver
 TEAL, TEAL_L = colors.HexColor("#0F6B5C"), colors.HexColor("#E1F0EC")
 INK, MUTED, LINE = colors.HexColor("#14201D"), colors.HexColor("#566360"), colors.HexColor("#BFCBC7")
 AMBER, AMBER_L = colors.HexColor("#8A4B00"), colors.HexColor("#FDF1DC")
+# une couleur par voie (A, B, C, D) : trait, fond clair, texte — les blocs d'une même voie se reconnaissent d'un coup d'œil
+COULEURS_VOIES = [(colors.HexColor("#2F6FB8"), colors.HexColor("#E6F0FA"), colors.HexColor("#1F4F86")),
+                  (colors.HexColor("#8A4FB0"), colors.HexColor("#F1E8F8"), colors.HexColor("#5E3380")),
+                  (colors.HexColor("#C4631A"), colors.HexColor("#FBEBDD"), colors.HexColor("#8A4400")),
+                  (colors.HexColor("#B03A6E"), colors.HexColor("#F8E6EE"), colors.HexColor("#7D234B"))]
 VERT, VERT_L, VERT_T = colors.HexColor("#4AA064"), colors.HexColor("#E8F6EE"), colors.HexColor("#1B6B2A")
 MANQUE = '<font color="#8A4B00"><b>à saisir</b></font>'
 
@@ -162,7 +167,14 @@ class Flux(Flowable):
         detail = e.get("reactifs_detail") or [{"nom": n, "quantite": ""} for n in e.get("reactifs", [])]
         cond = " · ".join(x for x in [conditions(e["parametres"])] + [f"{a['nom']} {a.get('valeur', '')}".strip() for a in e.get("autres", [])] if x)
         for echelle in (1.0, 0.9, 0.8):
-            textes = [((r["nom"] + (" " + r["quantite"] if r.get("quantite") else "")), self.fontb, 7.5 * echelle, INK) for r in detail if r.get("nom")]
+            textes = []
+            for r in detail:  # un point par réactif : nom et quantité, puis temps de contact et consigne
+                if r.get("nom"):
+                    textes.append(("• " + r["nom"] + (" " + r["quantite"] if r.get("quantite") else ""), self.fontb, 7.5 * echelle, INK))
+                    if r.get("contact"):
+                        textes.append((f"   contact {r['contact']}", self.font, 7 * echelle, MUTED))
+                    if r.get("consigne"):
+                        textes.append((f"   Consigne : {r['consigne']}", self.font, 7 * echelle, AMBER))
             textes.append((cond, self.font, 7.5 * echelle, TEAL))
             textes += [(eq, self.font, 7 * echelle, MUTED) for eq in e.get("equipement", [])]
             if e.get("remarque"):
@@ -179,7 +191,7 @@ class Flux(Flowable):
 
     def wrap(self, dispo_l=0, dispo_h=0, *_):
         """Un flux plus haut que la page (étapes en parallèle sur plusieurs lignes) est réduit pour tenir sur une page."""
-        cible = min(165 * mm, dispo_h - 22 * mm) if dispo_h else self.haut  # reste de la 1re page après l'en-tête, avec titre et légende
+        cible = min(215 * mm, dispo_h - 22 * mm) if dispo_h else self.haut  # reste de la 1re page après l'en-tête, avec titre et légende
         self.echelle = min(1.0, max(0.4, cible / self.haut))
         return self.largeur * self.echelle, self.haut * self.echelle
 
@@ -262,17 +274,19 @@ class Flux(Flowable):
         for i, e in enumerate(self.etapes):
             cx, cy, r, h = positions[i]
             ct = self.contenus[i]
-            c.setFillColor(VERT_L if e.get("virtuel") else colors.white)
-            c.setStrokeColor(VERT if e.get("virtuel") else LINE)
-            c.setLineWidth(1.4 if e.get("virtuel") else 1)
+            par_e = e.get("parallele") or None
+            voie_c = COULEURS_VOIES[par_e["voie"] % len(COULEURS_VOIES)] if par_e and par_e.get("voie") is not None else None
+            c.setFillColor(voie_c[1] if voie_c else (VERT_L if e.get("virtuel") else colors.white))
+            c.setStrokeColor(voie_c[0] if voie_c else (VERT if e.get("virtuel") else LINE))
+            c.setLineWidth(1.4 if e.get("virtuel") or voie_c else 1)
             c.roundRect(cx, cy, w, h, 2.5 * mm, stroke=1, fill=1)
             haut = cy + h
             if i in self.lettres:  # début d'une voie : « VOIE A » au-dessus de la carte
-                c.setFillColor(AMBER)
+                c.setFillColor(voie_c[2] if voie_c else AMBER)
                 c.setFont(self.fontb, 6.5)
                 c.drawString(cx + 1 * mm, cy + h + 1.3 * mm, f"VOIE {self.lettres[i]}")
             if e.get("virtuel"):  # Départ d'une voie : matières et volume
-                c.setFillColor(VERT_T)
+                c.setFillColor(voie_c[2] if voie_c else VERT_T)
                 c.setFont(self.fontb, ct["taille_t"])
                 c.drawString(cx + 3 * mm, haut - 6 * mm, ct["titre"][0])
                 y = haut - 11.5 * mm
@@ -393,12 +407,17 @@ def _ou(v):
     return escape(str(v)) if v not in (None, "") else MANQUE
 
 
+def _depart_commun(ph: dict, i: int) -> bool:
+    """Phase « Départ » commune (matière et volume de la manip) ; un « Départ · voie X » se présente comme une étape de sa voie."""
+    return not ph.get("depart_voie") and not ph.get("entree_voies") and (ph["n"] == 0 if "n" in ph else i == 0)
+
+
 def blocs_phases(data: dict, corps) -> list:
     """Une fiche par phase (jamais coupée entre deux pages)."""
     petit = ParagraphStyle("ph", parent=corps, fontSize=8.5, leading=11.5)
     blocs = []
     for i, ph in enumerate(data.get("phases", [])):
-        if i == 0:
+        if _depart_commun(ph, i):
             ctx = data.get("contexte", {})
             sous = escape(f"{ctx.get('matiere') or ''}") + (
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
@@ -406,16 +425,18 @@ def blocs_phases(data: dict, corps) -> list:
                 f" · emplacement {escape(ctx['emplacement'])}" if ctx.get("emplacement") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
         else:
-            sous = escape(ph.get("conditions") or "conditions à compléter") + (
+            sous = escape(ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (
                 f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
                 f"<br/><i>Consigne / remarque : {escape(ph['remarque'])}</i>" if ph.get("remarque") else "")
         tete = ((f"<font size='7' color='#8A4B00'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "")
                 + (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
                 + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else ""))
         lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
-        if i:
+        if not _depart_commun(ph, i) and not ph.get("entree_voies"):
             txt = "<br/>".join(
-                f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
+                f"• <b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
+                f"{' · contact ' + escape(r['contact']) if r.get('contact') else ''}"
+                f"{'<br/><i>Consigne : ' + escape(r['consigne']) + '</i>' if r.get('consigne') else ''}"
                 f"<br/><font color='#566360'>n° Scirius</font> {_ou(r.get('scirius'))} · <font color='#566360'>emplacement</font> {_ou(r.get('emplacement'))} · "
                 f"<font color='#566360'>fournisseur</font> {_ou(r.get('fournisseur'))}"
                 for r in ph["reactifs"]) or "aucun"
@@ -426,7 +447,8 @@ def blocs_phases(data: dict, corps) -> list:
             f"<br/><font color='#566360'>n° Scirius</font> {_ou(x.get('scirius'))} · <font color='#566360'>n° Aramis</font> {_ou(x.get('aramis'))}"
             + (f"<br/><i>Commentaire : {escape(x['commentaire'])}</i>" if x.get("commentaire") else "")
             for x in ph["echantillons"]) or "aucun"
-        lignes.append([Paragraph("Échantillons", petit), Paragraph(txt, petit)])
+        if not ph.get("depart_voie"):
+            lignes.append([Paragraph("Échantillons", petit), Paragraph(txt, petit)])
         t = Table(lignes, colWidths=[34 * mm, 140 * mm])
         t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
                                ("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))

@@ -1,9 +1,16 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.7.1"
+VERSION = "1.8.0"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.8.0", "05/11/2026", ["Réactifs : temps de contact et consigne propres à chaque réactif, repris dans le flux et dans les PDF / Word (un point par réactif)",
+                             "PDF et Word : quand le flux commence par des voies, un « Départ · voie X » par voie (plus de Départ avant les voies)",
+                             "Schéma du flux : une couleur par voie (A, B, C, D), schéma plus grand sur la page",
+                             "Étape de réunion : volumes pris dans chaque voie + réactifs liquides de l'étape = volume après réunion, affiché clairement",
+                             "Historique des statuts : toujours les initiales, jamais l'IGG",
+                             "Bugs et idées : l'export copie les pièces jointes dans un dossier voisin (images visibles dans le .md) ; fenêtre qui s'adapte",
+                             "Tags longs : retour à la ligne dans les tableaux ; fenêtre « Version » avec ascenseur"]),
     ("1.7.1", "05/11/2026", ["Vitesse d'agitation : choix tr/min ou RCF (g), comme pour la centrifugation (étapes et conditions communes)"]),
     ("1.7.0", "05/11/2026", ["Flux qui commence par des voies en parallèle : un « Départ » par voie (matières Scirius ou à la main, volume)",
                              "« Compléter les étapes » : matière reçue de chaque voie, et quantités reçues à la réunion des voies",
@@ -41,4 +48,4 @@ NOUVEAUTES = [
                              "Écran d'ouverture immédiat, version et date de mise à jour"]),
     ("1.0.0", "04/11/2026", ["Écran d'ouverture, historique des statuts"]),
 ]
-SCHEMA_DONNEES = 20  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer
+SCHEMA_DONNEES = 21  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer

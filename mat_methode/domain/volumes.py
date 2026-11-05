@@ -34,6 +34,12 @@ def volume_ajoute(v: Voie) -> float:
     return sum(n for x in v.autres if x.unite == "mL" and (n := _nombre(x.quantite)) is not None)
 
 
+def volume_reactifs(e) -> float:
+    """Réactifs liquides ajoutés à l'étape (mL, µL ou L), en mL : ils s'ajoutent au volume qui sort de l'étape."""
+    facteur = {"mL": 1.0, "ml": 1.0, "µL": 0.001, "ul": 0.001, "L": 1000.0, "l": 1000.0}
+    return sum(n * facteur[x.unite] for x in e.reactifs if x.unite in facteur and (n := _nombre(x.quantite)) is not None)
+
+
 def volume_depart_voie(v: Voie, volume_demande: float, nvoies: int) -> float:
     """Voie d'un bloc qui ouvre le flux : somme des mL de ses matières de départ ; sans volume saisi, part égale du volume de Ma demande."""
     propre = volume_ajoute(v)
@@ -64,7 +70,7 @@ def volumes_par_etape(m: Manip) -> list[LigneVolume]:
                 for rang, i in enumerate(voies[k]):
                     e = m.etapes[i]
                     entree = courant
-                    add = ajoute if rang == 0 else 0
+                    add = (ajoute if rang == 0 else 0) + volume_reactifs(e)
                     sort = entree + add - preleve[e.id]
                     alerte = "plus de volume prélevé que reçu" if sort < 0 else ""
                     if rang == 0 and not premier and sortie and recu > sortie + 1e-9 and v.part is not None:
@@ -82,8 +88,9 @@ def volumes_par_etape(m: Manip) -> list[LigneVolume]:
                 alerte_conv = ""
             else:
                 entree, alerte_conv = sortie, ""
-            sort = entree - preleve[e.id]
-            lignes[i] = LigneVolume(i, "", entree, 0.0, preleve[e.id], sort, alerte_conv or ("plus de volume prélevé que reçu" if sort < 0 else ""))
+            add = volume_reactifs(e)
+            sort = entree + add - preleve[e.id]
+            lignes[i] = LigneVolume(i, "", entree, add, preleve[e.id], sort, alerte_conv or ("plus de volume prélevé que reçu" if sort < 0 else ""))
             sortie = sort
         if voies:
             bloc_precedent = None

@@ -59,14 +59,14 @@ def trier_manips(manips: list, tri: Tri) -> list:
 class Pilule(QLabel):
     """Nom en couleur (donneur d'ordre, type), cliquable ; passe à la ligne au lieu d'être coupé."""
 
-    def __init__(self, texte: str, couleur: str, clic: Callable | None = None, tip: str = "", largeur: int = 0):
+    def __init__(self, texte: str, couleur: str, clic: Callable | None = None, tip: str = "", largeur: int = 0, rayon: int = 10):
         super().__init__(texte)
         p = theme.P
         c = QColor(couleur)
         fg = c.lighter(160).name() if p.sombre else c.name()
         self.setObjectName("pilule")
         self.setStyleSheet(f"QLabel#pilule{{background:rgba({c.red()},{c.green()},{c.blue()},{40 if p.sombre else 28});color:{fg};"
-                           f"border:1px solid {c.name()};border-radius:10px;padding:2px 9px;font-size:9pt;font-weight:600;}}")
+                           f"border:1px solid {c.name()};border-radius:{rayon}px;padding:2px 9px;font-size:9pt;font-weight:600;}}")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         if largeur and self.fontMetrics().horizontalAdvance(texte) + 26 > largeur:
             self.setWordWrap(True)  # trop long pour la colonne : sur plusieurs lignes, sur toute la largeur
@@ -121,7 +121,9 @@ def bouton_tag(t: str, r, clic: Callable | None = None):
 def cellule_tags(m, r, clic: Callable[[str], None] | None = None) -> QWidget:
     if not m.tags:
         return boite(etiquette("—", secondaire=True), LARG_TAGS)
-    return fixe(flux_widgets([bouton_tag(t, r, (lambda t=t: clic(t)) if clic else None) for t in m.tags], centre=True), LARG_TAGS)
+    pilules = [Pilule(f"#{t}", O.couleur_tag(r, t), (lambda t=t: clic(t)) if clic else None, f"Filtrer sur le tag {t}" if clic else t,
+                      LARG_TAGS - 6, rayon=4) for t in m.tags]  # un tag trop long passe à la ligne au lieu d'être coupé
+    return fixe(flux_widgets(pilules, centre=True), LARG_TAGS)
 
 
 def cellule_attribue(m, r, trier: Callable[[str], None] | None = None) -> QWidget:

@@ -13,6 +13,7 @@ from mat_methode.domain.models import Etape, Manip, Prelevement, Reglages
 from mat_methode.domain.reglages_ops import auteur
 from mat_methode.domain.regles import (
     bilan,
+    bloc_au_depart,
     blocs,
     echantillons_tries,
     est_entree,
@@ -63,6 +64,8 @@ class LigneReactif:
     fournisseur: str = ""
     lot: str = ""
     etapes: list[int] = field(default_factory=list)
+    contact: str = ""
+    consigne: str = ""
 
 
 @dataclass
@@ -93,6 +96,8 @@ class Phase:
     debut_groupe: bool = False  # première phase de sa grande étape
     parallele: str = ""  # « EN PARALLÈLE · VOIE A » pour une étape d'une voie
     reunion: str = ""  # « Réunit les voies A et B » pour l'étape qui suit un bloc en parallèle
+    depart_voie: bool = False  # « Départ · voie A » : matière et volume propres à une voie d'un bloc qui ouvre le flux
+    entree_voies: bool = False  # échantillons d'entrée d'un flux qui commence par des voies (pas de matière ni de volume communs)
 
 
 @dataclass
@@ -299,19 +304,27 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
                                 labo=p.labo, analyses=list(p.analyses), commentaire=p.commentaire.strip())
 
     tab_ech = [ligne_ech(p) for p in ech]
-    phases = [Phase(0, "Départ", "", [], [], [x for x in tab_ech if x.n_etape == 0])]
+    depart_voies = bloc_au_depart(m) if m.etapes else None
+    entree = [x for x in tab_ech if x.n_etape == 0]
+    # flux qui commence par des voies : pas de « Départ » commun (sauf s'il porte des échantillons d'entrée), un Départ par voie
+    if depart_voies is None:
+        phases = [Phase(0, "Départ", "", [], [], entree)]
+    else:
+        phases = [Phase(0, "Entrée · échantillons avant les voies", "", [], [], entree, entree_voies=True)] if entree else []
     for i, e in enumerate(m.etapes):
         rs = []
         for r in e.reactifs:
             if r.nom:
                 f = _inv(reglages, r.nom)
                 rs.append(LigneReactif(nom=r.nom, quantite=r.quantite_complete, scirius=f.get("scirius", "") or r.reference, emplacement=f.get("emplacement", ""),
-                                       fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
+                                       fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1],
+                                       contact=r.contact.strip(), consigne=r.consigne.strip()))
         g = m.groupe(e.groupe_id)
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
         par = m.parallele(e.parallele_id)
         voie = next((v for v in par.voies if v.id == e.voie_id), None) if par else None
-        if voie is not None and not any(x.voie_id == voie.id and x.parallele_id == par.id for x in m.etapes[:i]):  # 1re étape de la voie : ses matières
+        if (voie is not None and par is not depart_voies  # (au départ du flux, les matières sont dans le « Départ · voie X »)
+                and not any(x.voie_id == voie.id and x.parallele_id == par.id for x in m.etapes[:i])):  # 1re étape de la voie : ses matières
             for mat in voie.autres:
                 if mat.nom:
                     f = _inv(reglages, mat.nom)
@@ -319,6 +332,14 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
                                            emplacement=f.get("emplacement", ""), fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
         voie_nom = next((v.nom.strip() for v in par.voies if v.id == e.voie_id), "") if par else ""
         en_parallele = f"EN PARALLÈLE · VOIE {lettre_voie(m, par.id, e.voie_id)}" + (f" ({voie_nom})" if voie_nom else "") if par else ""
+        if depart_voies is not None and par is depart_voies and voie is not None and not any(x.voie_id == voie.id and x.parallele_id == par.id for x in m.etapes[:i]):
+            from mat_methode.domain.volumes import volume_ajoute
+            vol = volume_ajoute(voie)
+            phases.append(Phase(0, f"Départ · voie {lettre_voie(m, par.id, voie.id)}", f"{fmt_vol(vol)} mL" if vol else "matière et volume à saisir", [],
+                                [LigneReactif(nom=x.nom, quantite=x.quantite_complete, scirius=(_inv(reglages, x.nom).get("scirius", "") or x.reference),
+                                              emplacement=_inv(reglages, x.nom).get("emplacement", ""), fournisseur=_inv(reglages, x.nom).get("fournisseur", ""),
+                                              lot=_inv(reglages, x.nom).get("lot", ""), etapes=[i + 1], contact=x.contact.strip(), consigne=x.consigne.strip())
+                                 for x in voie.autres if x.nom], [], parallele=en_parallele, depart_voie=True))
         reunion = ""
         if par is None and i > 0 and m.etapes[i - 1].parallele_id:
             lettres = sorted({lettre_voie(m, m.etapes[i - 1].parallele_id, x.voie_id) for x in m.etapes if x.parallele_id == m.etapes[i - 1].parallele_id})

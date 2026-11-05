@@ -49,7 +49,10 @@ class Demande(BaseModel):
         return True
 
 
-def vers_markdown(demandes: list[Demande], nom_de, version: str = "") -> str:
+IMAGES = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+
+
+def vers_markdown(demandes: list[Demande], nom_de, version: str = "", chemin_piece=None) -> str:
     """Toutes les demandes en un fichier .md (lisible tel quel et collable dans une conversation)."""
     out = [f"# Bugs et idées — Mat & Méthode{' ' + version if version else ''}", "",
            "Consigne : si besoin, tu me poses des questions sur mes demandes.", "", f"_{len(demandes)} demande(s)_", ""]
@@ -60,6 +63,10 @@ def vers_markdown(demandes: list[Demande], nom_de, version: str = "") -> str:
             out.append("- Menus concernés : " + ", ".join(d.tags))
         if d.pieces:
             out.append("- Pièces jointes : " + ", ".join(d.pieces))
+            for nom in d.pieces:  # fichiers copiés à côté de l'export : l'image s'affiche, le lien ouvre le fichier
+                rel = chemin_piece(d, nom) if chemin_piece else None
+                if rel:
+                    out.append(f"  - {'!' if nom.lower().endswith(IMAGES) else ''}[{nom}]({rel})")
         for c in d.historique:
             out.append(f"- {fmt_dt(c.t)} : {c.de} → {c.vers} par {nom_de(c.par)}")
         out += ["", d.texte.strip() or "_(pas de description)_", ""]

@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_vol
 from mat_methode.exports.disposition import disposer
-from mat_methode.exports.pdf import avec_departs, code_badge, conditions, moment_texte, phrase_volumes
+from mat_methode.exports.pdf import _depart_commun, avec_departs, code_badge, conditions, moment_texte, phrase_volumes
 from mat_methode.exports.polices import trouver
 
 TEAL, AMBER, MUTED = "0F6B5C", "8A4B00", "566360"
@@ -96,7 +96,11 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
         ls = []
         for r in (e.get("reactifs_detail") or [{"nom": n, "quantite": ""} for n in e.get("reactifs", [])]):
             if r.get("nom"):
-                ls += [(t, f_b, "#14201D") for t in _lignes(tmp, r["nom"] + (" " + r["quantite"] if r.get("quantite") else ""), f_b, cw - 28)]
+                ls += [(t, f_b, "#14201D") for t in _lignes(tmp, "• " + r["nom"] + (" " + r["quantite"] if r.get("quantite") else ""), f_b, cw - 28)]
+                if r.get("contact"):
+                    ls += [(t, f_n, "#566360") for t in _lignes(tmp, f"   contact {r['contact']}", f_n, cw - 28)]
+                if r.get("consigne"):
+                    ls += [(t, f_n, "#8A4B00") for t in _lignes(tmp, f"   Consigne : {r['consigne']}", f_n, cw - 28)]
         cond = " · ".join(x for x in [conditions(e["parametres"])] + [f"{a['nom']} {a.get('valeur', '')}".strip() for a in e.get("autres", [])] if x)
         if cond:
             ls += [(t, f_n, "#0F6B5C") for t in _lignes(tmp, cond, f_n, cw - 28)]
@@ -358,24 +362,26 @@ def ecrire_docx(data: dict, chemin) -> None:
 
     doc.add_heading("Détail par phase du flux", level=1)
     for i, ph in enumerate(data.get("phases", [])):
-        if i == 0:
+        if _depart_commun(ph, i):
             entete = (f"{ctx.get('matiere') or ''}" + (f" · n° Scirius {ctx['scirius']}" if ctx.get("scirius") else "")
                       + (f" · fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "")
                       + (f" · emplacement {ctx['emplacement']}" if ctx.get("emplacement") else "")) + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
         else:
-            entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
+            entete = (ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
                 f"\nConsigne / remarque : {ph['remarque']}" if ph.get("remarque") else "")
         lignes = [((ph["parallele"] + "\n" if ph.get("parallele") else "") + (ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"]
                    + ("\n" + ph["reunion"] if ph.get("reunion") else ""), entete)]
-        if i:
+        if not _depart_commun(ph, i) and not ph.get("entree_voies"):
             lignes.append(("Réactifs", "\n".join(
-                f"{r['nom']}{' · ' + r['quantite'] if r.get('quantite') else ''} — n° Scirius {manque(r.get('scirius'))}, "
+                f"• {r['nom']}{' · ' + r['quantite'] if r.get('quantite') else ''}{' · contact ' + r['contact'] if r.get('contact') else ''}"
+                f"{' · Consigne : ' + r['consigne'] if r.get('consigne') else ''} — n° Scirius {manque(r.get('scirius'))}, "
                 f"emplacement {manque(r.get('emplacement'))}, fournisseur {manque(r.get('fournisseur'))}"
                 for r in ph["reactifs"]) or "aucun"))
-        lignes.append(("Échantillons", "\n".join(
-            f"{x['id']} · {fmt_vol(x['volume'] or 0)} mL · {x['moment']} · {x.get('labo', '')} · {', '.join(x.get('analyses', [])) or 'aucune analyse'} — "
-            f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}"
-            + (f"\nCommentaire : {x['commentaire']}" if x.get("commentaire") else "") for x in ph["echantillons"]) or "aucun"))
+        if not ph.get("depart_voie"):
+            lignes.append(("Échantillons", "\n".join(
+                f"{x['id']} · {fmt_vol(x['volume'] or 0)} mL · {x['moment']} · {x.get('labo', '')} · {', '.join(x.get('analyses', [])) or 'aucune analyse'} — "
+                f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}"
+                + (f"\nCommentaire : {x['commentaire']}" if x.get("commentaire") else "") for x in ph["echantillons"]) or "aucun"))
         tab = doc.add_table(rows=len(lignes), cols=2)
         tab.style = "Table Grid"
         tab.autofit = False

@@ -12,9 +12,11 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QPlainTextEdit,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -85,7 +87,17 @@ def confirmer(parent, titre: str, message: str, libelle: str = "Confirmer", dang
 
 def informer(parent, titre: str, message: str) -> None:
     d = Dialogue(parent, titre)
-    d.lay.addWidget(etiquette(message, wrap=True))
+    corps = etiquette(message, wrap=True)
+    haut = max(200, int(parent.window().height() * 0.6))  # long texte (Nouveautés) : défilement, le bouton OK reste visible
+    zone = QScrollArea()
+    zone.setWidgetResizable(True)
+    zone.setFrameShape(QFrame.Shape.NoFrame)
+    zone.setStyleSheet("QScrollArea{background:transparent;}")
+    zone.setWidget(corps)
+    corps.setStyleSheet("background:transparent;")
+    zone.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    d.lay.addWidget(zone)
+    zone.setFixedHeight(min(haut, corps.heightForWidth(470) + 8 if corps.hasHeightForWidth() else corps.sizeHint().height() + 8))
     ok = bouton("OK", d.accept, accent=True)
     ok.setDefault(True)
     d.boutons.addWidget(ok)
