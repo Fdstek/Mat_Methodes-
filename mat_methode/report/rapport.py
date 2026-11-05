@@ -344,6 +344,10 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         if par is None and i > 0 and m.etapes[i - 1].parallele_id:
             lettres = sorted({lettre_voie(m, m.etapes[i - 1].parallele_id, x.voie_id) for x in m.etapes if x.parallele_id == m.etapes[i - 1].parallele_id})
             reunion = "Réunit les voies " + " et ".join(lettres)
+            from mat_methode.domain.volumes import volumes_par_etape
+            lg = next((x for x in volumes_par_etape(m) if x.indice == i), None)
+            if lg is not None and lg.entree:
+                reunion += f" · volume réuni {fmt_vol(lg.entree)} mL"
         phases.append(Phase(i + 1, f"{i + 1} · {cap(e.operation)}", conditions_phase(e), list(e.equipements), rs,
                             [ligne_ech(p) for p in ech if p.etape_id == e.id], groupe=g.nom if g else "",
                             groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1,

@@ -114,6 +114,12 @@ def avec_departs(etapes: list[dict]) -> list[dict]:
     out = []
     for e in etapes:
         par = e.get("parallele") or {}
+        reu = e.get("reunion")
+        if reu and reu.get("voies"):  # étape qui réunit des voies : carte « Réunion » avec le volume de chaque voie et le total
+            out.append({"virtuel": True, "n": None, "operation": "Réunion · voies " + " + ".join(v["lettre"] for v in reu["voies"]),
+                        "depart": {"volume_ml": reu.get("volume_ml"), "reunion": True,
+                                   "matieres": [{"nom": f"Voie {v['lettre']}", "quantite": f"{fmt_vol(v['volume_ml'])} mL"} for v in reu["voies"]]},
+                        "parametres": {}, "reactifs_detail": [], "autres": [], "equipement": []})
         if par.get("depart") is not None:
             out.append({"virtuel": True, "n": None, "operation": f"Départ · voie {par.get('lettre', '')}", "parallele": par, "depart": par["depart"],
                         "parametres": {}, "reactifs_detail": [], "autres": [], "equipement": []})
@@ -161,7 +167,7 @@ class Flux(Flowable):
                 if x.get("reference"):
                     lignes += [(ln, self.font, 7, MUTED) for ln in simpleSplit(str(x["reference"]), self.font, 7, w - 6 * mm)]
             if len(dep.get("matieres", [])) != 1 or not dep.get("volume_ml"):  # une seule matière : son volume est déjà écrit
-                lignes.append((f"{fmt_vol(dep['volume_ml'])} mL" if dep.get("volume_ml") else "matière à saisir", self.font, 7.5, TEAL))
+                lignes.append((("Total " if dep.get("reunion") else "") + f"{fmt_vol(dep['volume_ml'])} mL" if dep.get("volume_ml") else "matière à saisir", self.font, 7.5, TEAL))
             return {"titre": [e["operation"].upper()], "taille_t": 7.5, "lignes": lignes, "h": 12 * mm + sum(t + 1.6 for _, _, t, _ in lignes) + 3 * mm}
         titre, taille_t = titre_lignes(e["operation"][:1].upper() + e["operation"][1:], w - 11 * mm, self.fontb)
         detail = e.get("reactifs_detail") or [{"nom": n, "quantite": ""} for n in e.get("reactifs", [])]

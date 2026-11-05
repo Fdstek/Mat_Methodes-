@@ -41,6 +41,7 @@ from mat_methode.domain.reglages_ops import auteur, texte_statut
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_num, fmt_vol, norm
 from mat_methode.domain.volumes import part_voie, volume_ajoute, volumes_par_etape
+from mat_methode.exports.echange import reunion_volumes
 from mat_methode.report.rapport import autres_conditions, resume_conditions
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
@@ -1347,6 +1348,8 @@ class PageFlux(QWidget):
                 cv.addWidget(t)
                 lay.addWidget(cadre)
                 cible = cv
+            if self._reunit_les_voies(i):  # carte « Réunion » : volume de chaque voie et total, comme le Départ d'une voie
+                cible.addWidget(self._carte_reunion(i, e, volumes))
             c = self._carte_flux(e.id, i + 1, cap(e.operation))
             if not self.consultation:
                 rendre_cible(c, {"echantillon": "dedans"}, lambda genre, ident, avant, e=e: self._deposer_ech(ident, e.id))
@@ -1420,6 +1423,18 @@ class PageFlux(QWidget):
         total = volume_ajoute(vo)
         if len([x for x in vo.autres if x.nom]) != 1 or not total:  # une seule matière : son volume est déjà écrit
             c.layout().addWidget(etiquette(f"{fmt_vol(total)} mL" if total else "matière et volume à saisir", secondaire=True))
+        return c
+
+    def _carte_reunion(self, i: int, e, volumes: dict) -> QFrame:
+        """Réunion des voies avant l'étape i : volume pris dans chaque voie et volume réuni (un clic ouvre l'étape qui réunit)."""
+        reu = reunion_volumes(self.m, i, {k: lg for k, lg in volumes.items()})
+        lettres = " + ".join(v["lettre"] for v in reu["voies"])
+        c = self._carte_flux(e.id, None, f"Réunion · voies {lettres}")
+        c.setProperty("sel", False)
+        for v in reu["voies"]:
+            c.layout().addWidget(etiquette(f"<b>Voie {v['lettre']}</b> {fmt_vol(v['volume_ml'])} mL", wrap=True))
+        if reu["volume_ml"] is not None:
+            c.layout().addWidget(etiquette(f"<b>Total {fmt_vol(reu['volume_ml'])} mL</b>", secondaire=True))
         return c
 
     def _carte_flux(self, ident, n, titre) -> QFrame:

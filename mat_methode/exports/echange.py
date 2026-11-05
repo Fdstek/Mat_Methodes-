@@ -26,6 +26,7 @@ from mat_methode.domain.prototype import contexte_depuis
 from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat
 from mat_methode.domain.regles import bloc_au_depart, blocs, echantillons_tries, etiquettes, lettre_voie, numero_etape, reperes_etapes
 from mat_methode.domain.texte import cap, minuscule_initiale
+from mat_methode.domain.volumes import volumes_par_etape
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
 
 
@@ -59,8 +60,22 @@ def _nombre(v):
     return int(v) if isinstance(v, float) and v.is_integer() else v
 
 
+def reunion_volumes(m: Manip, i: int, lignes: dict) -> dict:
+    """Réunion des voies avant l'étape i : volume pris dans chaque voie (lettre, mL) et volume total (None si aucun volume connu)."""
+    e, par = m.etapes[i], m.parallele(m.etapes[i - 1].parallele_id)
+    voies = []
+    for vo in par.voies:
+        idx = [k for k, x in enumerate(m.etapes) if x.parallele_id == par.id and x.voie_id == vo.id]
+        if idx and idx[-1] in lignes:
+            sortie = lignes[idx[-1]].sortie
+            voies.append({"lettre": lettre_voie(m, par.id, vo.id), "volume_ml": max(0.0, min(e.apports.get(vo.id, sortie), sortie))})
+    total = sum(v["volume_ml"] for v in voies)
+    return {"voies": voies, "volume_ml": total if total else None}
+
+
 def exporter(m: Manip, reglages: Reglages) -> dict:
     r, lab = construire(m, reglages), etiquettes(m)
+    lignes_vol = {lg.indice: lg for lg in volumes_par_etape(m)}
     etapes = []
     for i, e in enumerate(m.etapes):
         par = _sans_none({"temperature_c": _nombre(e.temperature_c), "duree_min": _nombre(e.duree_min),
@@ -91,6 +106,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                 etapes[-1]["parallele"]["depart"] = {"volume_ml": _nombre(volume_ajoute(voie)), "matieres": [
                     {"nom": a.nom, "quantite": a.quantite_complete, "reference": (reglages.reactif(a.nom).scirius if reglages.reactif(a.nom) else "") or a.reference}
                     for a in voie.autres if a.nom]}
+        if i > 0 and par is None and m.parallele(m.etapes[i - 1].parallele_id):  # étape qui réunit des voies : volume de chaque voie et total
+            etapes[-1]["reunion"] = reunion_volumes(m, i, lignes_vol)
         if e.apports and i > 0 and m.parallele(m.etapes[i - 1].parallele_id):  # étape qui réunit des voies : quantité prise de chacune
             pp = m.parallele(m.etapes[i - 1].parallele_id)
             etapes[-1]["apports"] = {str(k): v for k, vo in enumerate(pp.voies) if (v := e.apports.get(vo.id)) is not None}
