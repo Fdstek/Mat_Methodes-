@@ -24,6 +24,11 @@ def operateur(m: Manip) -> str:
     return (m.contexte.operateur or "").strip() or "Opérateur"
 
 
+def _q(r: dict) -> str:
+    """Quantité d'un réactif avec son unité (« 250 mL »)."""
+    return f"{r.get('quantite') or ''} {r.get('unite') or ''}".strip() if (r.get('quantite') or '').strip() else ""
+
+
 def photo(m: Manip) -> dict:
     """Contenu suivi : demande, tags, étapes, échantillons."""
     d = m.model_dump(include={"contexte", "tags", "etapes", "prelevements", "groupes"})
@@ -93,9 +98,9 @@ def differences(a: dict, b: dict, m: Manip) -> list[str]:
         rb = {norm(r["nom"]): r for r in e["reactifs"]}
         for k, r in rb.items():
             if k not in ra:
-                out.append(f"{lb} : réactif ajouté ({r['nom']}{', ' + r['quantite'] if r['quantite'] else ''})")
-            elif not _eq(ra[k]["quantite"], r["quantite"]):
-                out.append(f"{lb} : réactif {r['nom']}, quantité {_v(ra[k]['quantite'])} → {_v(r['quantite'])}")
+                out.append(f"{lb} : réactif ajouté ({r['nom']}{', ' + _q(r) if _q(r) else ''})")
+            elif not _eq(_q(ra[k]), _q(r)):
+                out.append(f"{lb} : réactif {r['nom']}, quantité {_v(_q(ra[k]))} → {_v(_q(r))}")
         out += [f"{lb} : réactif retiré ({r['nom']})" for k, r in ra.items() if k not in rb]
         aa = {norm(x["nom"]): x for x in oe.get("autres", []) if x["nom"]}
         ab = {norm(x["nom"]): x for x in e.get("autres", []) if x["nom"]}

@@ -779,3 +779,71 @@ def test_demandes_modifiables_a_faire_dans_les_pdf_et_listes_identiques(fen, tmp
     # listes Mat & Méthode et Protocole : même colonne « Manip »
     ref = C.resume_manip(fen.ctrl, m)
     assert ref.findChildren(type(fen.titre))[0].text() == m.nom
+
+
+def test_etapes_en_parallele_dans_l_editeur_les_documents_et_unites(fen, tmp_path):
+    import pdfplumber
+    from PySide6.QtWidgets import QFrame
+
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import ReactifEtape
+    from mat_methode.exports.echange import exporter, importer
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.word import image_flux
+    from mat_methode.report.rapport import construire
+    from mat_methode.ui.widgets import ChoixVitesse
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    ids = [e.id for e in m.etapes]
+    # création d'un bloc en parallèle par la liste « Où ajouter l'étape ? » puis ajout de sous-étapes dans les voies
+    page._choisir_cible("p:new")
+    assert len(m.paralleles) == 1 and page.voie_cible
+    pid, va = page.voie_cible
+    page._ajouter_etape("lavage")
+    page._viser_voie(pid, m.paralleles[0].voies[1].id)
+    page._ajouter_etape("centrifugation")
+    page._finir_voie()
+    seg = R.segments(m)
+    assert [s[0] for s in seg] == ["seq", "par"] and [len(v) for v in seg[1][2]] == [1, 1]
+    page.rafraichir()
+    QTest.qWait(50)
+    assert any(f.objectName() == "voie" for f in page.findChildren(QFrame))
+    # glisser une étape dans une voie
+    page._deposer_dans_voie(ids[0], pid, va)
+    assert m.etape(ids[0]).voie_id == va
+    # l'étape suivante réunit les voies : texte du rapport, PDF et image du Word
+    page._finir_voie()
+    page._ajouter_etape("séchage")
+    d = exporter(m, fen.ctrl.reglages)
+    assert [e["parallele"]["lettre"] for e in d["etapes"] if e.get("parallele")] == ["A", "A", "B"]
+    texte = construire(m, fen.ctrl.reglages).sections[2].texte
+    assert "voie A, en parallèle" in texte and "réunion des voies A et B" in texte
+    ecrire_pdf(d, tmp_path / "p.pdf")
+    with pdfplumber.open(tmp_path / "p.pdf") as pdf:
+        assert "EN PARALLÈLE" in " ".join(pg.extract_text() for pg in pdf.pages)
+    assert image_flux(d["etapes"], d["prelevements"]).size[1] > 600
+    # aller-retour par l'export JSON
+    m2, _ = importer(d, fen.ctrl.reglages)
+    assert len(m2.paralleles) == 1 and [e.parallele_id is not None for e in m2.etapes].count(True) == 3
+    # unités des réactifs et vitesses d'agitation (listes des Réglages)
+    r = fen.ctrl.reglages
+    assert r.unites_reactifs[0] == "mL" and 300 in r.vitesses_agitation
+    e = m.etapes[0]
+    e.reactifs = [ReactifEtape(nom="Éthanol", quantite="250", unite="mL")]
+    assert e.reactifs[0].quantite_complete == "250 mL"
+    assert exporter(m, r)["etapes"][0]["reactifs_detail"][0]["quantite"] == "250 mL"
+    from mat_methode.domain import reglages_ops as O
+    assert O.ajouter_vitesse(r, 650) and not O.ajouter_vitesse(r, 650) and 650 in r.vitesses_agitation
+    assert O.renommer_unite(r, [m], "mL", "ml") == [m] and e.reactifs[0].unite == "ml"
+    lv = ChoixVitesse(r.vitesses_agitation, 325.0)  # valeur hors liste : reste affichée
+    assert "(hors liste)" in lv.currentText() and lv.findText("Autre valeur…") >= 0
+    page.ouvrir("comp")
+    page.etape_id = m.etapes[0].id
+    page.rafraichir()
+    fen.aller("reglages")
+    for section in ("unites", "vitesses"):
+        fen.p_reglages.ouvrir(section)
+        QTest.qWait(30)

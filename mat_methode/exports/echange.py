@@ -13,14 +13,16 @@ from mat_methode.domain.models import (
     Lancement,
     LigneJournal,
     Manip,
+    Parallele,
     Prelevement,
     ReactifEtape,
     Reglages,
     Vide,
+    Voie,
 )
 from mat_methode.domain.prototype import contexte_depuis
 from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat
-from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, numero_etape, reperes_etapes
+from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, lettre_voie, numero_etape, reperes_etapes
 from mat_methode.domain.texte import cap, minuscule_initiale
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
 
@@ -65,10 +67,15 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
             par.update({"vide": True, "vide_mbar": _nombre(e.vide.mbar)})
         etapes.append({"n": i + 1, "operation": e.operation, "parametres": par, "equipement": list(e.equipements),
                        "reactifs": [minuscule_initiale(x.nom) for x in e.reactifs if x.nom],
-                       "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite} for x in e.reactifs],
+                       "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite_complete} for x in e.reactifs],
                        "autres": [a.model_dump() for a in e.autres if a.nom], "remarque": e.remarque})
         if m.groupe(e.groupe_id):
             etapes[-1]["groupe"] = m.groupe(e.groupe_id).nom
+        par = m.parallele(e.parallele_id)
+        if par is not None:  # étape en parallèle : bloc, voie (A, B…) et nombre de voies
+            voie = next((v for v in par.voies if v.id == e.voie_id), par.voies[0])
+            etapes[-1]["parallele"] = {"id": par.id, "voie": par.voies.index(voie), "lettre": lettre_voie(m, par.id, voie.id),
+                                       "nvoies": len(par.voies), "nom_voie": voie.nom}
     materiel: list[str] = []
     for e in m.etapes:
         materiel += [x for x in e.equipements if x not in materiel]
@@ -165,6 +172,15 @@ def importer(d, reglages: Reglages) -> tuple[Manip, list[int]]:
             e.groupe_id = prec.id
             if nom_groupe not in reglages.grandes_etapes:
                 reglages.grandes_etapes.append(nom_groupe)
+        pj = x.get("parallele")
+        if isinstance(pj, dict) and pj.get("id"):  # étape en parallèle : on recrée le bloc et ses voies
+            bloc = next((q for q in m.paralleles if q.id == f"import-{pj['id']}"), None)
+            if bloc is None:
+                bloc = Parallele(id=f"import-{pj['id']}", voies=[Voie() for _ in range(max(2, int(pj.get("nvoies") or 2)))])
+                m.paralleles.append(bloc)
+            k = min(max(int(pj.get("voie") or 0), 0), len(bloc.voies) - 1)
+            bloc.voies[k].nom = pj.get("nom_voie") or bloc.voies[k].nom
+            e.parallele_id, e.voie_id, e.groupe_id = bloc.id, bloc.voies[k].id, None
         m.etapes.append(e)
         if x.get("a_verifier"):
             a_verifier.append(i + 1)

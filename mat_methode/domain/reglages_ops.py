@@ -220,6 +220,35 @@ def supprimer_volume(r: Reglages, v: float) -> None:
     r.volumes_ml = [x for x in r.volumes_ml if x != v]
 
 
+def ajouter_vitesse(r: Reglages, v: float | None) -> bool:
+    """Vitesse d'agitation proposée (tr/min), liste triée."""
+    if v is None or v <= 0 or v in r.vitesses_agitation:
+        return False
+    r.vitesses_agitation = sorted(r.vitesses_agitation + [float(v)])
+    return True
+
+
+def supprimer_vitesse(r: Reglages, v: float) -> None:
+    """Les étapes qui utilisent cette vitesse la gardent."""
+    r.vitesses_agitation = [x for x in r.vitesses_agitation if x != v]
+
+
+def renommer_unite(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
+    """Renomme une unité de réactif dans la liste et dans les étapes de toutes les manips."""
+    if not _renommer_liste(r.unites_reactifs, ancien, nouveau):
+        return []
+    ch = []
+    for m in manips:
+        touche = False
+        for e in m.etapes:
+            for x in e.reactifs:
+                if x.unite == ancien:
+                    x.unite, touche = nouveau.strip(), True
+        if touche:
+            ch.append(m)
+    return ch
+
+
 # ------------------------------------------------------------------ opérations (sous-étapes)
 def ajouter_operation(r: Reglages, nom: str, participe: str = "") -> bool:
     nom = minuscule_initiale(nom.strip())

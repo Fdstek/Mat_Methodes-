@@ -8,7 +8,7 @@ from mat_methode import NOM_APPLICATION, VERSION
 from mat_methode.domain import reglages_ops as O
 from mat_methode.domain.models import Personne, initiales_de
 from mat_methode.domain.regles import basculer_analyse, deplacer_tag, tous_les_tags
-from mat_methode.domain.texte import libelle_volume, norm
+from mat_methode.domain.texte import fmt_num, libelle_volume, norm
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.dialogues import confirmer
 from mat_methode.ui.widgets import (
@@ -68,6 +68,8 @@ class PageReglages(QWidget):
             ("materiel", "Matériel", "Matériel proposé dans les étapes (plaque chauffante, étuve…)", f"{len(r.materiels)}", self._materiel),
             ("reactifs", "Réactifs", "Noms des réactifs proposés dans les étapes", f"{len(r.reactifs)}", self._reactifs),
             ("volumes", "Volumes d’échantillon", "30 mL … 1 L", f"{len(r.volumes_ml)}", self._volumes),
+            ("unites", "Unités des réactifs", "mL, g, µL, % … proposées à côté des quantités", f"{len(r.unites_reactifs)}", self._unites),
+            ("vitesses", "Vitesses d’agitation", "100, 200, 300 tr/min … proposées dans les étapes", f"{len(r.vitesses_agitation)}", self._vitesses),
             ("analyses", "Analyses", "Analyses disponibles pour les laboratoires", f"{len(r.analyses)}", self._analyses),
             ("types", "Types de demande", "Support, R&D, Test d’idée…", f"{len(r.types_demande)}", self._types),
             ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
@@ -385,6 +387,31 @@ class PageReglages(QWidget):
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ("Nouveau volume", nouveau), bouton("Ajouter", ajout), "stretch"))
+
+    def _unites(self):
+        self._liste_simple("Unités des réactifs", self.r.unites_reactifs, lambda v: self.r.unites_reactifs.remove(v),
+                           lambda v: O.ajouter_simple(self.r.unites_reactifs, v), "Nouvelle unité",
+                           "Proposées à côté de la quantité de chaque réactif d’une étape. La 1re est proposée en premier. "
+                           "✎ renomme aussi dans les étapes de toutes les manips ; ✕ ne touche pas les étapes existantes.",
+                           renommer=self._ren(O.renommer_unite, lambda: self.r.unites_reactifs))
+
+    def _vitesses(self):
+        vs = self.r.vitesses_agitation
+        x = self._section("Vitesses d’agitation", f"{len(vs)}")
+        x.ajouter(etiquette("Vitesses proposées pour l’agitation et la centrifugation (tr/min). Retirer une vitesse ne change pas les étapes existantes.",
+                            secondaire=True, wrap=True))
+        x.ajouter(flux_widgets([ChipSupprimable(f"{fmt_num(v)} tr/min", lambda v=v: (O.supprimer_vitesse(self.r, v), self._changer(), self._actualiser()),
+                                                f"Retirer {fmt_num(v)} tr/min") for v in vs]) if vs else etiquette("Aucune", secondaire=True))
+        nouveau = NumberBox(None, "tr/min", "ex. 650")
+        nouveau.setMaximumWidth(200)
+
+        def ajout():
+            if O.ajouter_vitesse(self.r, nouveau.lire()):
+                self._changer()
+                self._actualiser()
+
+        nouveau.returnPressed.connect(ajout)
+        x.ajouter(ligne(champ("Nouvelle vitesse", nouveau), bouton("Ajouter", ajout), "stretch"))
 
     def _renommer_operation(self, o, nouveau):
         nouveau = nouveau.strip()

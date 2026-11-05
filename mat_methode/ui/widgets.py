@@ -255,6 +255,42 @@ class ChoixVolume(SansMolette, QComboBox):
         self.setMinimumContentsLength(7)
 
 
+class ChoixVitesse(SansMolette, QComboBox):
+    """Vitesse (tr/min) choisie dans la liste des Réglages, ou « Autre valeur… ». Une valeur hors liste reste affichée."""
+    choisi = Signal(object)
+
+    def __init__(self, vitesses: list[float], valeur: float | None):
+        super().__init__()
+        from mat_methode.domain.texte import fmt_num
+        opts = sorted(set(vitesses) | ({valeur} if valeur is not None else set()))
+        for v in opts:
+            self.addItem(f"{fmt_num(v)} tr/min" + ("" if v in vitesses else "  (hors liste)"), float(v))
+        self.addItem("Autre valeur…", "autre")
+        if valeur is None:
+            self.insertItem(0, "Choisir…", None)
+            self.setCurrentIndex(0)
+        else:
+            self.setCurrentIndex(self.findData(float(valeur)))
+        self._courant = self.currentIndex()
+        self.activated.connect(self._active)
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.setMinimumContentsLength(11)
+        self.setAccessibleName("Vitesse en tours par minute")
+
+    def _active(self, i: int):
+        d = self.itemData(i)
+        if d == "autre":
+            from PySide6.QtWidgets import QInputDialog
+            val, ok = QInputDialog.getDouble(self, "Autre vitesse", "Vitesse (tr/min)", 0, 0, 100000, 0)
+            if ok and val > 0:
+                self.choisi.emit(float(val))
+            else:
+                self.setCurrentIndex(self._courant)
+            return
+        self._courant = i
+        self.choisi.emit(d)
+
+
 class ListeSaisie(SansMolette, QComboBox):
     """Liste déroulante où l'on peut aussi taper une valeur absente de la liste (matériel…)."""
     valide = Signal(str)

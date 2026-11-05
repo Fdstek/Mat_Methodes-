@@ -1,9 +1,11 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.2.0"
-DATE_VERSION = "04/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
+VERSION = "1.3.0"
+DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.3.0", "05/11/2026", ["Étapes en parallèle : cadre avec des voies côte à côte, l'étape suivante réunit les voies (flux, rapport, PDF, Word)",
+                             "Unités des réactifs et vitesses d'agitation : listes gérées dans Réglages"]),
     ("1.2.0", "04/11/2026", ["Glisser-déposer : étapes, grandes étapes (poignée ⠿) et échantillons (vers une autre étape)",
                              "Listes Mat & Méthode et Protocole : même présentation",
                              "Points « À faire » non cochés repris dans les PDF et le Word",
@@ -21,4 +23,4 @@ NOUVEAUTES = [
                              "Écran d'ouverture immédiat, version et date de mise à jour"]),
     ("1.0.0", "04/11/2026", ["Écran d'ouverture, historique des statuts"]),
 ]
-SCHEMA_DONNEES = 14  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer
+SCHEMA_DONNEES = 15  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer
