@@ -90,7 +90,7 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
                 if x.get("reference"):
                     ls += [(t, f_s, "#566360") for t in _lignes(tmp, str(x["reference"]), f_s, cw - 28)]
             if len(dep.get("matieres", [])) != 1 or not dep.get("volume_ml"):
-                ls.append((f"{fmt_vol(dep['volume_ml'])} mL" if dep.get("volume_ml") else "matière à saisir", f_n, "#0F6B5C"))
+                ls.append((("Total " if dep.get("reunion") else "") + f"{fmt_vol(dep['volume_ml'])} mL" if dep.get("volume_ml") else "matière à saisir", f_n, "#0F6B5C"))
             cartes.append({"e": e, "ls": ls, "ps": [], "tl": [e["operation"].upper()], "tfont": f_bs, "pas": 24, "extra": 0, "bande": 0, "h": 80 + 30 * len(ls)})
             continue
         ls = []

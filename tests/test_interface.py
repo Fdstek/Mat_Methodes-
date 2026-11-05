@@ -970,7 +970,7 @@ def test_consigne_en_parallele_dans_les_pdf_conditions_par_materiel_et_fenetre_d
     m.etapes[0].remarque = "Chauffer sans dépasser 60 °C"
     d = exporter(m, r)
     assert [ph.get("parallele") for ph in d["phases"][1:4]] == [None, "EN PARALLÈLE · VOIE A", "EN PARALLÈLE · VOIE B"]
-    assert d["phases"][4]["reunion"] == "Réunit les voies A et B"
+    assert d["phases"][4]["reunion"] .startswith("Réunit les voies A et B")
     for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
         ecrire(d, tmp_path / f"{i}.pdf")
         with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
@@ -1151,3 +1151,36 @@ def test_filtre_par_statut_comme_les_tags(fen, qtbot):
     assert {m.etat for m in f.appliquer(manips)} <= {"encours", "realisee"}
     barre = f.barre(manips, fen.ctrl.reglages, lambda: None, [])
     assert len(barre.findChildren(C.ListeMulti)) == 3  # types, statuts, tags
+
+
+def test_reunion_des_voies_volume_reuni_dans_le_flux_et_les_pdf(fen, tmp_path):
+    import pdfplumber
+    import pytest
+
+    from mat_methode.domain.texte import fmt_vol
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    page._choisir_cible("p:new")
+    pid, va = page.voie_cible
+    page._ajouter_etape("lavage")
+    page._viser_voie(pid, m.paralleles[0].voies[1].id)
+    page._ajouter_etape("centrifugation")
+    page._finir_voie()
+    page._ajouter_etape("séchage")
+    m.prelevements = []
+    m.contexte.volume_depart_ml = 100
+    page.rafraichir()
+    QTest.qWait(50)
+    d = exporter(m, fen.ctrl.reglages)
+    reu = next(e["reunion"] for e in d["etapes"] if e.get("reunion"))
+    assert [v["lettre"] for v in reu["voies"]] == ["A", "B"] and reu["volume_ml"] == pytest.approx(sum(v["volume_ml"] for v in reu["voies"])) and reu["volume_ml"] > 0
+    assert any("volume réuni" in ph.get("reunion", "") for ph in d["phases"])
+    ecrire_pdf(d, tmp_path / "r.pdf")
+    with pdfplumber.open(tmp_path / "r.pdf") as pdf:
+        texte = " ".join(pg.extract_text() for pg in pdf.pages)
+    assert "RÉUNION · VOIES A + B" in texte.upper() and f"Total {fmt_vol(reu['volume_ml'])} mL" in texte
