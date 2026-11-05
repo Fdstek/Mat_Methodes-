@@ -1102,3 +1102,23 @@ def test_unite_de_vitesse_tr_min_ou_g_pour_l_agitation_et_les_conditions_commune
     page.aller(e.id)
     QTest.qWait(50)
     assert any(c.findText("RCF (g)") >= 0 for c in page.findChildren(QComboBox))  # sélecteur tr/min ou RCF (g) sur une étape d’agitation
+
+
+def test_ton_flux_reste_en_place_pendant_le_defilement(fen, qtbot):
+    from PySide6.QtWidgets import QScrollArea
+    fen.resize(1400, 650)
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux._mode("comp")
+    fen.p_flux.aller(m.etapes[3].id)
+    qtbot.wait(150)
+    defil = fen.defilements["flux"]
+    assert isinstance(fen.p_flux._zone_flux, QScrollArea)
+    barre = defil.verticalScrollBar()
+    barre.setValue(barre.maximum())
+    qtbot.wait(150)
+    hote, zone = fen.p_flux._hote_flux, fen.p_flux._zone_flux
+    # la colonne suit le défilement : elle a quitté le haut de son hôte et reste visible dans la page
+    haut_visible = zone.mapTo(defil.viewport(), zone.rect().topLeft()).y()
+    assert zone.y() > 0 and haut_visible + zone.height() > 0 and haut_visible < defil.viewport().height()
+    assert zone.y() + zone.height() <= hote.height()

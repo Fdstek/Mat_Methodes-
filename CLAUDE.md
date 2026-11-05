@@ -110,6 +110,8 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   `depart_voie` (« Départ · voie X » par voie quand un bloc ouvre le flux), `entree_voies` (échantillons d'entrée seuls) ; `pdf.COULEURS_VOIES` (une couleur par
   voie dans le schéma) ; `volumes.volume_reactifs` (réactifs liquides de l'étape ajoutés au volume, résumé dans `_panneau_convergence`) ; `reglages_ops.auteur`
   (initiales, « ? » si IGG inconnu) ; export « Bugs et idées » avec dossier `<nom>_pieces` ; `colonnes.Pilule(rayon)` pour les tags : poussé sur la branche.
+- Lot du 05/11 (version 1.8.1) : `PageFlux._epingler` (colonne « Ton flux » épinglée, suit le défilement de la page) ; `pdf.couleur_phase` (couleur de voie
+  dans le détail par phase) ; `ReactifEtape.contact_unite / contact_complet` : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

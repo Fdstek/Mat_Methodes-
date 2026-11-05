@@ -1,9 +1,12 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.8.0"
+VERSION = "1.8.1"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.8.1", "05/11/2026", ["Compléter les étapes : la colonne « Ton flux » reste en place (l'étape choisie est visible), seul le détail défile",
+                             "PDF Protocole et Rapport : le détail du flux par phase reprend la couleur de chaque voie",
+                             "Réactifs : temps de contact avec une liste déroulante d'unités (s, min, h, jour, semaine)"]),
     ("1.8.0", "05/11/2026", ["Réactifs : temps de contact et consigne propres à chaque réactif, repris dans le flux et dans les PDF / Word (un point par réactif)",
                              "PDF et Word : quand le flux commence par des voies, un « Départ · voie X » par voie (plus de Départ avant les voies)",
                              "Schéma du flux : une couleur par voie (A, B, C, D), schéma plus grand sur la page",

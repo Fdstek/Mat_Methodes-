@@ -1,6 +1,7 @@
 """Modèle de données (cahier des charges §7)."""
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import datetime, timezone
 from typing import Literal, Optional
@@ -247,8 +248,15 @@ class ReactifEtape(_Modele):
     quantite: str = ""
     unite: str = ""  # unité choisie dans la liste des Réglages (vide = quantité écrite en texte libre)
     reference: str = ""  # référence saisie à la main (lot, n° interne…) quand la matière ne vient pas de Scirius
-    contact: str = ""  # temps de contact de ce réactif (« 30 min », « une nuit »)
+    contact: str = ""  # temps de contact de ce réactif : un nombre (avec contact_unite) ou un texte libre (« une nuit »)
+    contact_unite: str = "min"  # unité choisie dans la liste des durées (Réglages › Unités de durée)
     consigne: str = ""  # consigne propre à ce réactif (visible dans le flux et les PDF)
+
+    @property
+    def contact_complet(self) -> str:
+        """« 30 min » : un nombre est suivi de son unité ; un texte libre reste tel quel."""
+        c = self.contact.strip()
+        return f"{c} {self.contact_unite}".strip() if c and re.fullmatch(r"[\d.,\s]+", c) else c
 
     @property
     def quantite_complete(self) -> str:
