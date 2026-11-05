@@ -1137,3 +1137,17 @@ def test_carte_du_flux_ne_s_ecrase_pas_quand_on_ajoute_un_echantillon(fen, qtbot
     qtbot.wait(200)
     contenu = fen.p_flux._zone_flux.widget()
     assert contenu.height() >= contenu.layout().minimumHeightForWidth(contenu.width())  # jamais en dessous de la taille nécessaire
+
+
+def test_filtre_par_statut_comme_les_tags(fen, qtbot):
+    from mat_methode.ui import colonnes as C
+    manips = list(fen.ctrl.manips)
+    assert len({m.etat for m in manips}) >= 2
+    f = C.Filtres()
+    assert f.appliquer(manips) == manips and not f.actif()
+    f.statut = {"En cours"}
+    assert f.actif() and all(m.etat == "encours" for m in f.appliquer(manips)) and f.appliquer(manips)
+    f.statut = {"En cours", "Réalisée"}
+    assert {m.etat for m in f.appliquer(manips)} <= {"encours", "realisee"}
+    barre = f.barre(manips, fen.ctrl.reglages, lambda: None, [])
+    assert len(barre.findChildren(C.ListeMulti)) == 3  # types, statuts, tags
