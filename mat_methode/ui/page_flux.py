@@ -675,6 +675,8 @@ class PageFlux(QWidget):
             choix.update({f"g:{g.id}": f"Dans {g.nom} ({R.plage(R.numeros_groupe(m, g.id))})" for g in m.groupes})
             choix.update({f"n:{n}": f"Nouvelle grande étape : {n}" for n in self.ctrl.reglages.grandes_etapes})
             choix["n:*"] = "Nouvelle grande étape (autre nom)…"
+            choix.update({f"mo:{x.nom}": f"Modèle de grande étape : {x.nom} ({len(x.etapes)} étape{'s' if len(x.etapes) > 1 else ''})"
+                          for x in self.ctrl.reglages.modeles_grandes_etapes})
             choix["p:new"] = "Nouveau bloc en parallèle (2 voies)…"
             for kp, par in enumerate(m.paralleles):
                 for vo in par.voies:
@@ -953,6 +955,7 @@ class PageFlux(QWidget):
             v.addWidget(ligne(Poignee("groupe", g.id, f"la grande étape {g.nom}", f), titre, nom, "stretch", haut, bas,
                               bouton("+ Ajouter une sous-étape", lambda: self._viser_groupe(g.id)),
                               icone("⧉", f"Dupliquer la grande étape {g.nom} (choix du nombre de copies)", lambda: self._dupliquer_groupe(g)),
+                              icone("★", f"Enregistrer la grande étape {g.nom} comme modèle (sans les quantités)", lambda: self._enregistrer_modele(g)),
                               bouton("Défaire", lambda: self._defaire_groupe(g), tip=f"Défaire la grande étape {g.nom} (ses étapes restent dans le flux)")))
             rendre_cible(f, {"etape": "dedans", "groupe": "avant"},
                          lambda genre, ident, avant, g=g, idx=idx: self._deposer_sur_groupe(genre, ident, g, idx, avant))
@@ -1003,6 +1006,8 @@ class PageFlux(QWidget):
         elif v.startswith("g:"):
             self.voie_cible = None
             self._viser_groupe(v[2:])
+        elif v.startswith("mo:"):
+            self._poser_modele(v[3:])
         elif v == "n:*":
             from mat_methode.ui.dialogues import demander_texte
             nom = demander_texte(self, "Nouvelle grande étape", "Nom", "", "Le nom est aussi ajouté à la liste des Réglages.",
@@ -1013,6 +1018,32 @@ class PageFlux(QWidget):
                 self._actualiser()
         else:
             self._commencer_groupe(v[2:])
+
+    def _poser_modele(self, nom: str):
+        """Ajoute à la fin du flux une grande étape copiée d'un modèle (les quantités de réactifs sont à compléter)."""
+        modele = next((x for x in self.ctrl.reglages.modeles_grandes_etapes if x.nom == nom), None)
+        if modele is None:
+            self._actualiser()
+            return
+        self.ctrl.memoriser_manip()
+        g = R.appliquer_modele(self.m, modele)
+        self.groupe_cible, self.inserer_apres, self.voie_cible = None, None, None
+        self._toucher(True)
+        self.ctrl.toast.emit(f"Grande étape « {g.nom} » ajoutée d’après le modèle : complète les quantités (Ctrl+Z pour annuler)")
+
+    def _enregistrer_modele(self, g):
+        """Enregistre la grande étape comme modèle (étapes, conditions, réactifs sans quantités), partagé avec tous les postes."""
+        from mat_methode.domain import reglages_ops as O
+        from mat_methode.ui.dialogues import demander_texte
+        nom = demander_texte(self, "Enregistrer comme modèle", "Nom du modèle", g.nom,
+                             "Les étapes, leurs conditions et leurs réactifs sont gardés, sans les quantités. Le modèle est partagé avec tous les postes ; "
+                             "un modèle du même nom est remplacé.", bouton_ok="Enregistrer")
+        if not nom:
+            return
+        remplace = O.enregistrer_modele(self.ctrl.reglages, R.modele_depuis_groupe(self.m, g.id, nom))
+        self.ctrl.toucher_reglages()
+        self.ctrl.toast.emit(f"Modèle « {nom.strip()} » {'remplacé' if remplace else 'enregistré'}")
+        self._actualiser()
 
     def _commencer_groupe(self, nom: str):
         if not nom:

@@ -1,9 +1,11 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.8.4"
+VERSION = "1.9.0"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.9.0", "05/11/2026", ["Modèles de grandes étapes : bouton ★ pour enregistrer une grande étape (sans les quantités), à poser dans « Où ajouter l’étape ? » ; gestion dans Réglages",
+                             "Nouvelle version des données (22) : installer cette version sur tous les postes en même temps"]),
     ("1.8.4", "05/11/2026", ["Réunion de deux voies : carte « Réunion · voies A + B » avec le volume de chaque voie et le volume réuni, dans le flux, les schémas PDF / Word et le détail par phase"]),
     ("1.8.3", "05/11/2026", ["Nouveau filtre « Tous les statuts » (choix multiples, comme les tags) dans Mat & Méthode, Protocole et Rapport"]),
     ("1.8.2", "05/11/2026", ["Colonne « Ton flux » : les cartes ne s'écrasent plus quand on ajoute un échantillon (badges coupés, pastilles qui se chevauchent)",
@@ -55,4 +57,4 @@ NOUVEAUTES = [
                              "Écran d'ouverture immédiat, version et date de mise à jour"]),
     ("1.0.0", "04/11/2026", ["Écran d'ouverture, historique des statuts"]),
 ]
-SCHEMA_DONNEES = 21  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer
+SCHEMA_DONNEES = 22  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer

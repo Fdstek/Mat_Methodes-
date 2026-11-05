@@ -448,6 +448,32 @@ def placer_dans_groupe(m: Manip, etape_id: str, groupe_id: str | None) -> None:
     m.etapes.insert(dernier + 1, e)
 
 
+def modele_depuis_groupe(m: Manip, groupe_id: str, nom: str = ""):
+    """Modèle de grande étape : copie des étapes de la grande étape, sans les quantités de réactifs (ni voies, ni apports)."""
+    from mat_methode.domain.models import ModeleGrandeEtape
+    g = m.groupe(groupe_id)
+    etapes = []
+    for e in m.etapes:
+        if e.groupe_id == groupe_id:
+            c = e.model_copy(deep=True)
+            c.id, c.groupe_id, c.parallele_id, c.voie_id, c.apports = nouvel_id(), None, None, None, {}
+            for r in c.reactifs:
+                r.quantite = ""
+            etapes.append(c)
+    return ModeleGrandeEtape(nom=(nom or (g.nom if g else "")).strip() or "Grande étape", etapes=etapes)
+
+
+def appliquer_modele(m: Manip, modele) -> Groupe:
+    """Ajoute à la fin du flux une grande étape portant le nom du modèle, avec une copie de ses étapes (quantités à compléter)."""
+    g = creer_groupe(m, modele.nom)
+    for e in modele.etapes:
+        c = e.model_copy(deep=True)
+        c.id, c.groupe_id, c.parallele_id, c.voie_id, c.apports = nouvel_id(), g.id, None, None, {}
+        m.etapes.append(c)
+    normaliser(m)
+    return g
+
+
 def defaire_groupe(m: Manip, groupe_id: str) -> None:
     """Supprime la grande étape ; ses étapes restent dans le flux."""
     for e in m.etapes:

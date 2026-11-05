@@ -1187,3 +1187,19 @@ def test_reunion_des_voies_volume_reuni_dans_le_flux_et_les_pdf(fen, tmp_path):
     with pdfplumber.open(tmp_path / "r.pdf") as pdf:
         texte = " ".join(pg.extract_text() for pg in pdf.pages)
     assert "RÉUNION · VOIES A + B" in texte.upper() and f"Total {fmt_vol(reu['volume_ml'])} mL" in texte
+
+
+def test_modele_de_grande_etape_enregistre_puis_pose_dans_un_autre_flux(fen, qtbot):
+    from mat_methode.domain import regles as R
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    g = R.creer_groupe(m, "Bleaching")
+    R.placer_dans_groupe(m, m.etapes[0].id, g.id)
+    from mat_methode.domain import reglages_ops as O
+    O.enregistrer_modele(fen.ctrl.reglages, R.modele_depuis_groupe(m, g.id))
+    page.rafraichir()
+    n = len(m.etapes)
+    page._choisir_cible("mo:Bleaching")
+    assert len(m.etapes) == n + 1 and len(m.groupes) == 2 and m.etapes[-1].groupe_id == m.groupes[-1].id
