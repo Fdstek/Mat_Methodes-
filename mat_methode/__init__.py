@@ -1,9 +1,12 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.7.0", "05/11/2026", ["Flux qui commence par des voies en parallèle : un « Départ » par voie (matières Scirius ou à la main, volume)",
+                             "« Compléter les étapes » : matière reçue de chaque voie, et quantités reçues à la réunion des voies",
+                             "PDF et Word : flèches sur tout le schéma (entrée, départs, étapes, réunion, sortie) et cadre « EN PARALLÈLE »"]),
     ("1.6.0", "05/11/2026", ["« Consignes / remarques » d'une étape : dans la carte du flux et dans les PDF",
                              "PDF : les étapes en parallèle (voie, réunion des voies) sont indiquées dans le détail du flux",
                              "Boutons « Nouvelle manip » et « Importer un ancien Mat & Méthode » à côté du titre ; « Importer un ancien rapport » dans Rapport",

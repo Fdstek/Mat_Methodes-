@@ -100,6 +100,10 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   des PDF) ; boutons à côté du titre (`Fenetre._boutons_titre`) ; « Bugs et idées » dans une fenêtre flottante (`Fenetre._fenetre_demandes /
   ouvrir_demandes`, `Qt.Tool`) ; `MENUS_DEMANDE` avec les sous-menus ; `Reglages.conditions_materiel` (`reglages_ops.appliquer_conditions_materiel`,
   carte Réglages › Conditions par matériel) ; tableau de matières `PageFlux._table_matieres` (réactifs d'étape et `Voie.autres` = `ReactifEtape` avec `reference`) : poussé sur la branche.
+- Lot du 05/11 (version 1.7.0) : départ par voie quand un bloc en parallèle ouvre le flux (`regles.bloc_au_depart / synchroniser_depart`,
+  `volumes.volume_depart_voie`, ids `depart:<voie>` dans `PageFlux.ordre`, `_carte_depart_voie`, `_lignes_matiere_recue`, matière reçue dans
+  l'éditeur de la 1re étape de chaque voie) ; schéma des PDF / Word : cartes virtuelles « Départ · voie X » (`pdf.avec_departs`), cadre
+  « EN PARALLÈLE », flèches ENTRÉE → cartes → SORTIE : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

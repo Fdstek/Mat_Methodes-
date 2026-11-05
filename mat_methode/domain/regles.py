@@ -325,6 +325,32 @@ def numero_prochaine_etape_voie(m: Manip, parallele_id: str, voie_id: str) -> in
     return (max(avant) + 2) if avant else (min(membres) + 1)
 
 
+def bloc_au_depart(m: Manip) -> Parallele | None:
+    """Le bloc en parallèle qui ouvre le flux (aucune étape avant lui), s'il y en a un."""
+    if m.etapes:
+        return m.parallele(m.etapes[0].parallele_id)
+    return m.paralleles[0] if m.paralleles else None
+
+
+def synchroniser_depart(m: Manip) -> None:
+    """Flux qui commence par des voies : la matière et le volume de départ sont ceux des voies (somme des mL de leurs matières de départ)."""
+    from mat_methode.domain.volumes import volume_ajoute
+    par = bloc_au_depart(m)
+    if par is None:
+        return
+    total = sum(volume_ajoute(v) for v in par.voies)
+    if total > 0:
+        m.contexte.volume_depart_ml = total
+    noms = []
+    for v in par.voies:
+        for x in v.autres:
+            if x.nom.strip() and x.nom.strip() not in noms:
+                noms.append(x.nom.strip())
+                break
+    if noms:
+        m.contexte.matiere = " + ".join(noms)
+
+
 def creer_parallele(m: Manip, nvoies: int = 2) -> Parallele:
     p = Parallele(voies=[Voie() for _ in range(max(2, min(nvoies, len(LETTRES_VOIES))))])
     m.paralleles.append(p)

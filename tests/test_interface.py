@@ -1030,3 +1030,47 @@ def test_tableau_de_matieres_scirius_ou_a_la_main(fen):
     QTest.qWait(50)
     textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
     assert "Autres matières de la voie" in textes
+
+
+def test_depart_par_voie_matiere_recue_dans_completer_et_schema_du_pdf(fen, tmp_path):
+    import pdfplumber
+    from PySide6.QtWidgets import QFrame
+
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import Manip, ReactifEtape
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.word import image_flux
+    r = fen.ctrl.reglages
+    m = Manip(nom="Départ en parallèle", etat="brouillon")
+    m.contexte.volume_depart_ml = 1
+    fen.ctrl.manips.append(m)
+    p = R.creer_parallele(m)
+    for op, v in (("filtration", 0), ("décantation", 0), ("lavage", 1)):
+        e = R.ajouter_etape(m, op, None, reglages=r)
+        R.placer_dans_voie(m, e.id, p.id, p.voies[v].id)
+    R.ajouter_etape(m, "mélange", None, reglages=r)
+    p.voies[0].autres = [ReactifEtape(nom="Graisse animale", quantite="12", unite="mL")]
+    p.voies[1].autres = [ReactifEtape(nom="Huile de colza", quantite="8", unite="mL", reference="lot EA-42")]
+    fen.ctrl.toucher(m)  # volume et matière de départ = ceux des voies
+    assert m.contexte.volume_depart_ml == 20 and m.contexte.matiere == "Graisse animale + Huile de colza"
+    fen.ouvrir(m.id, "comp")
+    page = fen.p_flux
+    assert page.ordre()[:2] == [f"depart:{p.voies[0].id}", f"depart:{p.voies[1].id}"] and page.etape_id == page.ordre()[0]
+    page.rafraichir()
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    assert "Départ · voie A" in textes and "Départ · voie B" in textes and "Reçoit : voie A" in textes  # un Départ par voie, réunion visible
+    assert "Matière de départ de la voie A" in textes  # éditeur du départ de la voie
+    page.aller(m.etapes[2].id)  # 1re étape de la voie B : sa matière reçue reste modifiable dans l'éditeur
+    QTest.qWait(50)
+    assert "Matière de départ de la voie B" in " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    # PDF et Word : cartes « Départ · voie X », cadre, flèches
+    d = exporter(m, r)
+    assert d["etapes"][0]["parallele"]["depart"]["volume_ml"] == 12 and d["etapes"][2]["parallele"]["depart"]["matieres"][0]["reference"] == "lot EA-42"
+    ecrire_pdf(d, tmp_path / "d.pdf")
+    with pdfplumber.open(tmp_path / "d.pdf") as pdf:
+        t = " ".join(pg.extract_text() for pg in pdf.pages)
+    assert "DÉPART · VOIE A" in t and "DÉPART · VOIE B" in t and "EN PARALLÈLE" in t and "SORTIE" in t and "ENTRÉE" in t
+    assert image_flux(d["etapes"], d["prelevements"]).size[1] > 500
+    assert not any(f.objectName() == "menuAjout" for f in page.findChildren(QFrame))

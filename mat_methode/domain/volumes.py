@@ -34,6 +34,12 @@ def volume_ajoute(v: Voie) -> float:
     return sum(n for x in v.autres if x.unite == "mL" and (n := _nombre(x.quantite)) is not None)
 
 
+def volume_depart_voie(v: Voie, volume_demande: float, nvoies: int) -> float:
+    """Voie d'un bloc qui ouvre le flux : somme des mL de ses matières de départ ; sans volume saisi, part égale du volume de Ma demande."""
+    propre = volume_ajoute(v)
+    return propre if propre > 0 else volume_demande / max(nvoies, 1)
+
+
 def part_voie(v: Voie, sortie_precedente: float, nvoies: int) -> float:
     """Volume reçu par la voie : % ou mL de la sortie précédente ; sans valeur, part égale."""
     if v.part is None:
@@ -47,20 +53,21 @@ def volumes_par_etape(m: Manip) -> list[LigneVolume]:
     sortie = m.contexte.volume_depart_ml or 0
     sorties_voies: dict[str, float] = {}  # voie -> sortie de sa dernière étape (pour l'étape qui réunit)
     bloc_precedent = None
-    for genre, par, voies in segments(m):
+    for rang_segment, (genre, par, voies) in enumerate(segments(m)):
         if genre == "par":
-            recu = sum(part_voie(v, sortie, len(par.voies)) for v in par.voies)
+            premier = rang_segment == 0  # bloc qui ouvre le flux : chaque voie part de sa propre matière
+            recu = sum(volume_depart_voie(v, sortie, len(par.voies)) if premier else part_voie(v, sortie, len(par.voies)) for v in par.voies)
             sorties_voies = {}
             for k, v in enumerate(par.voies):
-                courant = part_voie(v, sortie, len(par.voies))
-                ajoute = volume_ajoute(v)
+                courant = volume_depart_voie(v, sortie, len(par.voies)) if premier else part_voie(v, sortie, len(par.voies))
+                ajoute = 0.0 if premier else volume_ajoute(v)
                 for rang, i in enumerate(voies[k]):
                     e = m.etapes[i]
                     entree = courant
                     add = ajoute if rang == 0 else 0
                     sort = entree + add - preleve[e.id]
                     alerte = "plus de volume prélevé que reçu" if sort < 0 else ""
-                    if rang == 0 and sortie and recu > sortie + 1e-9 and v.part is not None:
+                    if rang == 0 and not premier and sortie and recu > sortie + 1e-9 and v.part is not None:
                         alerte = "les voies reçoivent plus que la sortie précédente"
                     lignes[i] = LigneVolume(i, lettre_voie(m, par.id, v.id), entree, add, preleve[e.id], sort, alerte)
                     courant = sort
