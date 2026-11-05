@@ -159,7 +159,7 @@ def appliquer_communes(m: Manip, remplacer: bool = False) -> int:
         if c.temperature_c is not None and (remplacer or e.temperature_c is None):
             e.temperature_c, ch = c.temperature_c, True
         if c.agitation_trmin is not None and not est_centrifugation(e.operation) and (remplacer or e.agitation_trmin is None):
-            e.agitation_trmin, ch = c.agitation_trmin, True
+            e.agitation_trmin, e.vitesse_unite, ch = c.agitation_trmin, c.vitesse_unite, True
         if c.vide is not None and (remplacer or e.vide is None):
             e.vide, ch = c.vide.model_copy(), True
         n += ch
@@ -198,7 +198,7 @@ def heriter_communes(m: Manip, e: Etape) -> None:
     if c.temperature_c is not None and e.temperature_c is None:
         e.temperature_c = c.temperature_c
     if c.agitation_trmin is not None and e.agitation_trmin is None and not est_centrifugation(e.operation):
-        e.agitation_trmin = c.agitation_trmin
+        e.agitation_trmin, e.vitesse_unite = c.agitation_trmin, c.vitesse_unite
     if c.vide is not None and e.vide is None:
         e.vide = c.vide.model_copy()
 

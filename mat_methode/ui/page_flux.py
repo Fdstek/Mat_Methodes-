@@ -1045,11 +1045,12 @@ class PageFlux(QWidget):
         defs = [("temperature_c", "Chauffage", "Température", "°C"), ("agitation_trmin", "Agitation", "Vitesse", "tr/min"),
                 ("vide", "Sous vide", "Pression (facultatif)", "mbar")]
         for k, (cle, lib, lib_v, unite) in enumerate(defs):
+            if cle == "agitation_trmin":
+                unite = c.vitesse_unite if c.vitesse_unite in UNITES_VITESSE else "tr/min"
             on = (c.vide is not None) if cle == "vide" else getattr(c, cle) is not None
             g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_commune(m, cle), self._toucher(True)),
                                         (c.vide.mbar if c.vide else None) if cle == "vide" else getattr(c, cle), lib_v, unite,
-                                        lambda v, cle=cle: self._set_commune(cle, v),
-                                        self.ctrl.reglages.vitesses_agitation if cle == "agitation_trmin" else None), 0, k)
+                                        lambda v, cle=cle: self._set_commune(cle, v), *self._vitesse_commune(cle)), 0, k)
         cl.addLayout(g)
         rem = ToggleSwitch("Remplacer aussi les valeurs déjà saisies", self.remplacer)
         rem.toggled.connect(lambda v: setattr(self, "remplacer", v))
@@ -1059,6 +1060,26 @@ class PageFlux(QWidget):
         cl.addWidget(ligne(ap, "stretch"))
         cl.addWidget(etiquette("Les étapes que tu ajouteras ensuite reprennent ces conditions automatiquement.", secondaire=True))
         return f
+
+    def _vitesse_commune(self, cle: str) -> tuple:
+        """(liste des vitesses, sélecteur d'unité tr/min ou RCF) pour l'agitation commune ; (None, None) pour les autres conditions."""
+        if cle != "agitation_trmin":
+            return None, None
+        c, r = self.m.communes, self.ctrl.reglages
+        u = c.vitesse_unite if c.vitesse_unite in UNITES_VITESSE else "tr/min"
+        unite = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})
+        unite.setMinimumWidth(110)
+        unite.setAccessibleName("Unité de la vitesse commune : tr/min ou RCF (g)")
+        unite.choisi.connect(self._changer_unite_vitesse_commune)
+        return (r.vitesses_rcf if u == "g" else r.vitesses_agitation), unite
+
+    def _changer_unite_vitesse_commune(self, unite: str):
+        r, c = self.ctrl.reglages, self.m.communes
+        liste = r.vitesses_rcf if unite == "g" else r.vitesses_agitation
+        c.vitesse_unite = unite
+        if c.agitation_trmin is not None and liste:
+            c.agitation_trmin = liste[0]
+        self._toucher(True)
 
     def _set_commune(self, cle, v):
         c = self.m.communes
@@ -1461,11 +1482,10 @@ class PageFlux(QWidget):
             if cle == "agitation_trmin":  # vitesse choisie dans la liste des Réglages ; centrifugation : tr/min ou RCF (g)
                 u = e.vitesse_unite if e.vitesse_unite in UNITES_VITESSE else "tr/min"
                 choix = self.ctrl.reglages.vitesses_rcf if u == "g" else self.ctrl.reglages.vitesses_agitation
-                if est_centrifugation(e.operation):
-                    extra = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})
-                    extra.setMinimumWidth(110)
-                    extra.setAccessibleName("Unité de la vitesse de centrifugation")
-                    extra.choisi.connect(lambda nouv, e=e: self._changer_unite_vitesse(e, nouv))
+                extra = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})  # tr/min ou RCF (g), agitation comme centrifugation
+                extra.setMinimumWidth(110)
+                extra.setAccessibleName("Unité de la vitesse : tr/min ou RCF (g)")
+                extra.choisi.connect(lambda nouv, e=e: self._changer_unite_vitesse(e, nouv))
             g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_condition(e, cle), self._toucher(True)), val, lib_v, u,
                                         lambda v, cle=cle: self._set_cond(e, cle, v), choix, extra), k // 2, k % 2)
         wg = QWidget()

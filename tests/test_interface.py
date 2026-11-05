@@ -1074,3 +1074,31 @@ def test_depart_par_voie_matiere_recue_dans_completer_et_schema_du_pdf(fen, tmp_
     assert "DÉPART · VOIE A" in t and "DÉPART · VOIE B" in t and "EN PARALLÈLE" in t and "SORTIE" in t and "ENTRÉE" in t
     assert image_flux(d["etapes"], d["prelevements"]).size[1] > 500
     assert not any(f.objectName() == "menuAjout" for f in page.findChildren(QFrame))
+
+
+def test_unite_de_vitesse_tr_min_ou_g_pour_l_agitation_et_les_conditions_communes(fen):
+    from mat_methode.domain import regles as R
+    from mat_methode.report.rapport import construire
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    # conditions communes : agitation en g (RCF), appliquée aux étapes
+    m.communes.agitation_trmin = 3000.0
+    page._changer_unite_vitesse_commune("g")
+    assert m.communes.vitesse_unite == "g" and m.communes.agitation_trmin == r.vitesses_rcf[0]
+    n = R.appliquer_communes(m, remplacer=True)
+    assert n > 0 and all(e.vitesse_unite == "g" for e in m.etapes if e.agitation_trmin is not None and e.operation != "centrifugation")
+    # une étape d'agitation (pas seulement la centrifugation) peut passer de tr/min à g, et revenir
+    e = next(x for x in m.etapes if x.operation != "centrifugation" and x.agitation_trmin is not None)
+    page._changer_unite_vitesse(e, "tr/min")
+    assert e.vitesse_unite == "tr/min" and e.agitation_trmin == r.vitesses_agitation[0]
+    page._changer_unite_vitesse(e, "g")
+    assert "g" in construire(m, r).sections[2].texte
+    from PySide6.QtWidgets import QComboBox
+    page.ouvrir("comp")
+    page.aller(e.id)
+    QTest.qWait(50)
+    assert any(c.findText("RCF (g)") >= 0 for c in page.findChildren(QComboBox))  # sélecteur tr/min ou RCF (g) sur une étape d’agitation
