@@ -64,7 +64,7 @@ class Controleur(QObject):
         st = self.st
         st.initialiser()
         st.configurer_logs()
-        premier = not st.f_reglages.exists() and not any(st.d_manips.glob("*.json")) if not st.lecture_seule else False
+        premier = not st.f_reglages.exists() and not st.a_des_manips() if not st.lecture_seule else False
         st.sauvegarde_du_jour()
         try:
             self.reglages = st.charger_reglages()
@@ -93,6 +93,11 @@ class Controleur(QObject):
         self.liste.manips += [precedentes[i] for i in self.liste.occupes if i in precedentes]  # fichier tenu un instant : version déjà connue
         en_memoire = {m.id: m for m in self.manips if m.id in self.sales or m.id == self.courante_id}
         self.manips = [en_memoire.get(m.id, m) for m in self.liste.manips]
+        for m in self.liste.manips:  # les manips relues remplacent celles de la mémoire : leur version de départ suit
+            if m.id not in en_memoire and m.id in self.liste.bases:
+                self.st.adopter(m.id, self.liste.bases[m.id])
+        if self.liste.converties:  # nouveau format : les réglages sont réécrits (un ancien exécutable les refusera)
+            self.reglages_sales = True
         self.manips += [m for i, m in en_memoire.items() if i not in {x.id for x in self.manips}]
         if self.manips and not self.dernier_enregistrement:
             self.dernier_enregistrement = max(m.maj for m in self.manips)
@@ -345,6 +350,21 @@ class Controleur(QObject):
                 self.actualiser()
 
     # ------------------------------------------------------------ conflit
+    def versions_en_conflit(self, ident: str) -> list:
+        return self.st.versions_en_conflit(ident)
+
+    def resoudre_conflit(self, ident: str, fichier: str, copier: bool) -> str:
+        """Garde la version choisie ; retourne un message si c'est impossible (manip ouverte ici ou chez quelqu'un d'autre)."""
+        if self.courante_id == ident:
+            return "Ferme d’abord cette manip (flèche ← en haut) pour choisir sa version"
+        if self.st.verrou_autre(ident):
+            return "Impossible : la manip est ouverte en ce moment par quelqu’un d’autre"
+        self.st.resoudre_conflit(ident, fichier, copier)
+        self.sales.discard(ident)
+        self._charger_liste()
+        self.liste_changee.emit()
+        return ""
+
     def recharger_disque(self, disque: Manip) -> None:
         i = next(k for k, m in enumerate(self.manips) if m.id == disque.id)
         self.manips[i] = disque

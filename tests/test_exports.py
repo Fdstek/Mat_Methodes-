@@ -137,11 +137,11 @@ def test_commentaire_echantillon(ethanol, reglages, tmp_path):
     ecrire_protocole(d, tmp_path / "p.pdf")
     with pdfplumber.open(tmp_path / "p.pdf") as pdf:
         t = " ".join(p.extract_text() for p in pdf.pages)
-    assert "Commentaire S0 : flacon ambré" in t and "Remarque : à l’abri de la lumière" in t
+    assert "Commentaire S0 : flacon ambré" in t and "Consigne / remarque : à l’abri de la lumière" in t
     ecrire_pdf(d, tmp_path / "r.pdf")  # rapport : remarque et commentaire dans le détail par phase
     with pdfplumber.open(tmp_path / "r.pdf") as pdf:
         t = " ".join(" ".join(p.extract_text() for p in pdf.pages).split())
-    assert "Commentaire : flacon ambré" in t and "Remarque : à l’abri de la lumière" in t
+    assert "Commentaire : flacon ambré" in t and "Consigne / remarque : à l’abri de la lumière" in t
 
 
 def test_import_ancien_mat_et_methode(tmp_path, reglages):

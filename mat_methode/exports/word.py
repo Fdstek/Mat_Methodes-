@@ -90,6 +90,8 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
             ls += [(t, f_n, "#0F6B5C") for t in _lignes(tmp, cond, f_n, cw - 28)]
         if e.get("equipement"):
             ls += [(t, f_s, "#566360") for t in _lignes(tmp, ", ".join(e["equipement"]), f_s, cw - 28)]
+        if e.get("remarque"):
+            ls += [(t, f_s, "#8A4B00") for t in _lignes(tmp, f"Consigne : {e['remarque']}", f_s, cw - 28)]
         tl, tfont, pas = _titre(tmp, e["operation"][:1].upper() + e["operation"][1:], cw - 72)
         extra = pas * (len(tl) - 1)
         ps = par_apres.get(e["n"], [])
@@ -311,8 +313,9 @@ def ecrire_docx(data: dict, chemin) -> None:
                       + (f" · emplacement {ctx['emplacement']}" if ctx.get("emplacement") else "")) + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
         else:
             entete = (ph.get("conditions") or "conditions à compléter") + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
-                f"\nRemarque : {ph['remarque']}" if ph.get("remarque") else "")
-        lignes = [((ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"], entete)]
+                f"\nConsigne / remarque : {ph['remarque']}" if ph.get("remarque") else "")
+        lignes = [((ph["parallele"] + "\n" if ph.get("parallele") else "") + (ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"]
+                   + ("\n" + ph["reunion"] if ph.get("reunion") else ""), entete)]
         if i:
             lignes.append(("Réactifs", "\n".join(
                 f"{r['nom']}{' · ' + r['quantite'] if r.get('quantite') else ''} — n° Scirius {manque(r.get('scirius'))}, "

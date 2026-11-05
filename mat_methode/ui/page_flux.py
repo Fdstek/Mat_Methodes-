@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import journal as J
+from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
 from mat_methode.domain.models import (
@@ -31,7 +32,6 @@ from mat_methode.domain.models import (
     UNITES_VITESSE,
     VALIDEE,
     Condition,
-    Matiere,
     ReactifEtape,
     Tache,
     maintenant_iso,
@@ -854,7 +854,6 @@ class PageFlux(QWidget):
 
     def _carte_matiere_voie(self, par, vo, voies) -> QWidget:
         """Matière reçue par la voie (part de la sortie précédente, en % ou mL) et autres matières ajoutées."""
-        r = self.ctrl.reglages
         sortie, d_ou = self._sortie_avant_bloc(par)
         f = QFrame()
         f.setObjectName("sousCarte")
@@ -873,28 +872,8 @@ class PageFlux(QWidget):
         unite.choisi.connect(lambda u: (setattr(vo, "part_unite", u), self._toucher(True)))
         v.addWidget(etiquette(f"<b>Matière reçue</b> {d_ou}" + (f" = <b>{fmt_vol(recu)} mL</b>" if sortie else ""), wrap=True))
         v.addWidget(ligne(champ("Part reçue", part), champ("Unité", unite), "stretch", espacement=8))
-        for k, mat in enumerate(vo.autres):
-            v.addWidget(ligne(ChipSupprimable(f"{mat.nom} · {mat.quantite} {mat.unite}".strip(" ·"),
-                                              lambda k=k: (vo.autres.pop(k), self._toucher(True)), f"Retirer {mat.nom}"), "stretch"))
-        nom = Liste([x.nom for x in r.reactifs], "", vide="Autre matière…")
-        nom.setMinimumWidth(120)
-        qte = ChampTexte("", "quantité", mono=True)
-        qte.setMaximumWidth(80)
-        u = Liste(r.unites_reactifs, (r.unites_reactifs or [""])[0], vide=None)
-        u.setMinimumWidth(70)
-        u.setMaximumWidth(90)
-        choisi = {"nom": "", "unite": u.currentData() or ""}
-        nom.choisi.connect(lambda val: choisi.update(nom=val))
-        u.choisi.connect(lambda val: choisi.update(unite=val))
-
-        def ajout():
-            if choisi["nom"].strip():
-                vo.autres.append(Matiere(nom=choisi["nom"].strip(), quantite=qte.text().strip(), unite=choisi["unite"]))
-                self._toucher(True)
-            else:
-                self.ctrl.toast.emit("Choisis la matière à ajouter")
-
-        v.addWidget(ligne(champ("Autres matières", nom), champ("Quantité", qte), champ("Unité", u), bouton("+ matière", ajout), "stretch", espacement=6))
+        v.addWidget(etiquette("Autres matières de la voie", "etiquetteChamp"))
+        v.addWidget(self._table_matieres(vo.autres, "matière"))
         return f
 
     def _panneau_convergence(self, i: int) -> QWidget:
@@ -1279,6 +1258,8 @@ class PageFlux(QWidget):
             cl.addWidget(etiquette(cond, "conditions", wrap=True) if cond else etiquette("conditions à compléter", "aCompleter"))
             if e.equipements:
                 cl.addWidget(etiquette(" · ".join(e.equipements), secondaire=True, wrap=True))
+            if e.remarque.strip():
+                cl.addWidget(etiquette(f"<i>Consigne : {e.remarque.strip()}</i>", wrap=True))
             ps = [p for p in ech if p.etape_id == e.id]
             if e.duree_min or ps:
                 cl.addWidget(Frise(e.duree_min, [(position(p, e), code_badge(lab[p.id])) for p in ps]))
@@ -1436,9 +1417,9 @@ class PageFlux(QWidget):
             x.ajouter(ligne(champ("Autre condition", n), champ("Valeur", v),
                             icone("✕", "Retirer cette condition", lambda k=k: self._retirer_autre(e, k), danger=True)))
         x.ajouter(ligne(bouton("+ Autre condition", lambda: (e.autres.append(Condition()), self._toucher(True)), ajout=True), "stretch"))
-        rem = ChampTexte(e.remarque, "Apparaît entre parenthèses à la fin de la phrase de l’étape")
+        rem = ChampTexte(e.remarque, "Consigne ou remarque : carte du flux, PDF, et entre parenthèses à la fin de la phrase de l’étape")
         rem.modifie.connect(lambda v: (setattr(e, "remarque", v), self._toucher()))
-        x.ajouter(champ("Remarque (facultatif)", rem))
+        x.ajouter(champ("Consignes / remarques (facultatif)", rem))
         return x
 
     def _changer_unite_vitesse(self, e, unite: str):
@@ -1470,6 +1451,9 @@ class PageFlux(QWidget):
         if v and v not in e.equipements:
             e.equipements.append(v)
             r = self.ctrl.reglages
+            ajoutees = O.appliquer_conditions_materiel(r, e)  # conditions particulières de ce matériel (Réglages › Conditions par matériel)
+            if ajoutees:
+                self.ctrl.toast.emit("Conditions ajoutées : " + ", ".join(ajoutees))
             if not any(norm(v) == norm(x) for x in r.materiels):  # tapé à la main : ajouté aux Réglages
                 r.materiels.append(v)
                 self.ctrl.toucher_reglages()
@@ -1486,48 +1470,98 @@ class PageFlux(QWidget):
         self._toucher(True)
 
     def _reactifs(self, e) -> QWidget:
-        r = self.ctrl.reglages
         n = len(e.reactifs)
         x = Expander("2 · Réactifs", f"{n} dans cette étape" if n else "aucun pour l’instant")
-        g = QGridLayout()
+        x.ajouter(self._table_matieres(e.reactifs, "réactif"))
+        x.ajouter(flux_widgets([bouton("Gérer la liste des réactifs (Réglages)", lambda: self.voir_reglages.emit("reactifs"), lien=True)]))
+        return x
+
+    def _table_matieres(self, liste: list, mot: str = "matière") -> QWidget:
+        """Tableau des matières d'une étape (« réactifs ») ou d'une voie : une ligne par matière, choisie dans Scirius ou saisie à la main,
+        avec référence, quantité et unité. Autant de lignes que nécessaire."""
+        r = self.ctrl.reglages
         noms = [y.nom for y in r.reactifs]
-        for k, re_ in enumerate(e.reactifs):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
+        for k, re_ in enumerate(liste):
+            inv = r.reactif(re_.nom) if re_.nom else None
             sf = QFrame()
             sf.setObjectName("sousCarte")
-            v = QVBoxLayout(sf)
-            v.setContentsMargins(12, 10, 12, 10)
-            v.addWidget(ligne(etiquette(f"Réactif {k + 1}", "titreCarte"), "stretch",
-                              icone("✕", f"Retirer le réactif {k + 1}", lambda k=k: self._retirer_reactif(e, k), danger=True)))
-            nom = Liste(noms, re_.nom)
-            nom.choisi.connect(lambda val, re_=re_: (setattr(re_, "nom", val), self._toucher(True)))
-            nouveau = bouton("+ Nouveau réactif…", lambda re_=re_: self._nouveau_reactif(re_), lien=True,
-                             tip="Ajouter un réactif à la liste des Réglages et le choisir ici")
-            v.addWidget(champ("Réactif", nom))
-            v.addWidget(flux_widgets([nouveau, bouton("Chercher dans Scirius…", lambda re_=re_: self._scirius_reactif(re_), lien=True,
-                                                      tip="Remplit le n° Scirius, l’emplacement et le fournisseur depuis le fichier Scirius")]))
-            q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
+            lv = QVBoxLayout(sf)
+            lv.setContentsMargins(10, 6, 10, 6)
+            lv.setSpacing(4)
+            origine = etiquette("Scirius" if inv and inv.scirius else "À la main", "etiquetteChamp")
+            origine.setFixedWidth(62)
+            origine.setToolTip("Scirius : produit avec un n° Scirius. À la main : référence saisie ici.")
+            nom = ChampTexte(re_.nom, f"Nom du {mot}", suggestions=noms)
+            nom.modifie.connect(lambda val, re_=re_: (setattr(re_, "nom", val), self._toucher()))
+            ref = ChampTexte(re_.reference, "référence à la main", mono=True)
+            ref.modifie.connect(lambda val, re_=re_: (setattr(re_, "reference", val), self._toucher()))
+            q = ChampTexte(re_.quantite, "quantité ou ratio", mono=True)
+            q.setMaximumWidth(140)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
             u = Liste(r.unites_reactifs, re_.unite, vide="—")
-            u.setMinimumWidth(110)
+            u.setMinimumWidth(80)
+            u.setMaximumWidth(100)
             u.setAccessibleName("Unité de la quantité (liste dans Réglages › Unités des réactifs)")
             u.choisi.connect(lambda val, re_=re_: (setattr(re_, "unite", val), self._toucher()))
-            v.addWidget(ligne(champ("Quantité ou ratio", q), champ("Unité", u), espacement=10))
-            inv = r.reactif(re_.nom) if re_.nom else None
-            if inv is not None:  # mémorisé par nom de réactif, repris partout
-                sc = ChampTexte(inv.scirius, "à saisir", mono=True)
-                sc.modifie.connect(lambda val, inv=inv: self._inv(inv, "scirius", val))
-                em = ChampTexte(inv.emplacement, "ex. armoire 1, étagère 2")
-                em.modifie.connect(lambda val, inv=inv: self._inv(inv, "emplacement", val))
-                fo = ChampTexte(inv.fournisseur)
-                fo.modifie.connect(lambda val, inv=inv: self._inv(inv, "fournisseur", val))
-                v.addWidget(ligne(champ("N° Scirius", sc), champ("Emplacement", em), champ("Fournisseur", fo)))
-            g.addWidget(sf, k // 2, k % 2, Qt.AlignmentFlag.AlignTop)
-        wg = QWidget()
-        wg.setLayout(g)
-        x.ajouter(wg)
-        x.ajouter(flux_widgets([bouton("+ Ajouter un réactif à cette étape", lambda: (e.reactifs.append(ReactifEtape(unite=(r.unites_reactifs or [""])[0])), self._toucher(True)), ajout=True),
-                                bouton("Gérer la liste des réactifs (Réglages)", lambda: self.voir_reglages.emit("reactifs"), lien=True)]))
-        return x
+            lv.addWidget(ligne(origine, nom, icone("🔎", f"Chercher dans Scirius (ligne {k + 1})", lambda re_=re_: self._scirius_reactif(re_)),
+                               icone("✕", f"Retirer le {mot} {k + 1}", lambda k=k: (liste.pop(k), self._toucher(True)), danger=True), espacement=6))
+            lv.addWidget(ligne(ref, q, u, espacement=6))
+            sc = ChampTexte(inv.scirius if inv else "", "n° Scirius à saisir", mono=True)
+            em = ChampTexte(inv.emplacement if inv else "", "emplacement (armoire, étagère…)")
+            fo = ChampTexte(inv.fournisseur if inv else "", "fournisseur")
+            for cle, champ_ in (("scirius", sc), ("emplacement", em), ("fournisseur", fo)):  # mémorisés par nom de produit, repris partout
+                champ_.setEnabled(bool(re_.nom.strip()))
+                champ_.setToolTip("Écris d’abord le nom du produit" if not re_.nom.strip() else "")
+                champ_.modifie.connect(lambda val, cle=cle, re_=re_: self._inv_par_nom(re_, cle, val))
+            lv.addWidget(ligne(sc, em, fo, espacement=6))
+
+            def nom_saisi(re_=re_, nom=nom, origine=origine, sc=sc, em=em, fo=fo):
+                """Nom validé : il rejoint les produits connus (Réglages) et les champs se remplissent avec ce qui est déjà mémorisé."""
+                texte = nom.text().strip()
+                re_.nom = texte
+                if texte and r.reactif(texte) is None:
+                    r.assurer_reactif(texte)
+                    self.ctrl.toucher_reglages()
+                i = r.reactif(texte) if texte else None
+                origine.setText("Scirius" if i and i.scirius else "À la main")
+                for champ_, val in ((sc, i.scirius if i else ""), (em, i.emplacement if i else ""), (fo, i.fournisseur if i else "")):
+                    champ_.setText(val)
+                    champ_.setEnabled(bool(texte))
+                self._toucher()
+
+            nom.editingFinished.connect(nom_saisi)
+            v.addWidget(sf)
+        if not liste:
+            v.addWidget(etiquette(f"Aucun {mot} pour l’instant.", secondaire=True))
+        v.addWidget(flux_widgets([bouton(f"+ {cap(mot)} depuis Scirius…", lambda: self._ajouter_depuis_scirius(liste), ajout=True,
+                                         tip="Chercher le produit dans le fichier Scirius : nom, n° Scirius, emplacement et fournisseur sont remplis"),
+                                  bouton("+ Référence à la main", lambda: self._ajouter_a_la_main(liste),
+                                         tip="Saisir le nom et une référence sans passer par Scirius")]))
+        return w
+
+    def _ajouter_a_la_main(self, liste: list):
+        liste.append(ReactifEtape(unite=(self.ctrl.reglages.unites_reactifs or [""])[0]))
+        self._toucher(True)
+
+    def _ajouter_depuis_scirius(self, liste: list):
+        re_ = ReactifEtape(unite=(self.ctrl.reglages.unites_reactifs or [""])[0])
+        liste.append(re_)
+        self._scirius_reactif(re_)
+        if not re_.nom:  # recherche annulée : pas de ligne vide
+            liste.remove(re_)
+            self._toucher(True)
+
+    def _inv_par_nom(self, re_, cle: str, val: str):
+        """N° Scirius, emplacement ou fournisseur saisi sur une ligne : mémorisé pour ce produit (créé si besoin) dans les Réglages."""
+        if not re_.nom.strip():
+            return
+        inv = self.ctrl.reglages.assurer_reactif(re_.nom)
+        if inv is not None:
+            self._inv(inv, cle, val)
 
     def _choisir_donneur(self, v):
         m = self.m

@@ -115,7 +115,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                     "echantillons": [{"id": x.id, "volume": _nombre(x.volume), "moment": x.moment, "labo": x.labo, "analyses": x.analyses,
                                       "scirius": x.scirius, "aramis": x.aramis,
                                       **({"commentaire": x.commentaire} if x.commentaire else {})} for x in ph.echantillons],
-                    **({"remarque": ph.remarque} if ph.remarque else {})} for ph in r.phases],
+                    **({"remarque": ph.remarque} if ph.remarque else {}),
+                    **({"parallele": ph.parallele} if ph.parallele else {}), **({"reunion": ph.reunion} if ph.reunion else {})} for ph in r.phases],
         "inventaire_reactifs": [{"nom": minuscule_initiale(n), **{k: (getattr(reglages.reactif(n), k, "") or None)
                                                                  for k in ("scirius", "emplacement", "fournisseur", "lot")}}
                                 for n, _ in used],

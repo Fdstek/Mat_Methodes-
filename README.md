@@ -25,7 +25,7 @@ MatMethode_1.0\
   MatMethode.exe, _internal\       l'application (à remplacer lors d'une mise à jour)
   donnees\                         à CONSERVER lors d'une mise à jour
     reglages.json                  laboratoires, réactifs, analyses, donneurs d'ordre, types, états
-    manips\<id>.json               une manip = un fichier
+    manips\<id>\vNNNNNN_<poste>_<alea>.json   une version = un fichier, jamais réécrit (pas de copie de conflit OneDrive)
     verrous\                       qui modifie quelle manip en ce moment
     preferences\<utilisateur>.json dernière manip, taille de fenêtre, dernier dossier d'export
     sauvegardes\AAAA-MM-JJ\        copie à la 1re ouverture du jour (10 jours gardés)

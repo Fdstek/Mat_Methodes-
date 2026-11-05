@@ -37,7 +37,7 @@ def ethanol(f):
 
 
 def fichier(f, m) -> dict:
-    return json.loads((f.ctrl.st.d_manips / f"{m.id}.json").read_text(encoding="utf-8"))
+    return json.loads(f.ctrl.st.chemin_manip(m.id).read_text(encoding="utf-8"))
 
 
 def test_premier_lancement_cree_donnees_et_exemples(fen, tmp_path):
@@ -103,7 +103,7 @@ def test_parcours_nouvelle_manip(fen, qtbot, monkeypatch):
     assert fen.p_flux.consultation  # validée : en lecture, sauf « Modifier »
     fen.p_flux.suivante()
     assert fen.page == "protocole"
-    qtbot.waitUntil(lambda: (fen.ctrl.st.d_manips / f"{m.id}.json").exists(), timeout=2000)
+    qtbot.waitUntil(lambda: fen.ctrl.st.chemin_manip(m.id).exists(), timeout=2000)
 
 
 def test_crit23_type_test_affiche_idee(fen):
@@ -220,7 +220,7 @@ def test_annulee_puis_suppression(fen, monkeypatch):
     fen.p_manips._statut(m, ANNULEE)
     assert m.etat == ANNULEE and fichier(fen, m)["etat"] == ANNULEE
     fen.p_manips._supprimer(m)
-    assert m not in fen.ctrl.manips and not (fen.ctrl.st.d_manips / f"{m.id}.json").exists()
+    assert m not in fen.ctrl.manips and not fen.ctrl.st.chemin_manip(m.id).exists()
     fen._annuler()  # Ctrl+Z
     assert any(x.id == m.id for x in fen.ctrl.manips)
 
@@ -648,7 +648,7 @@ def test_experience_attribution_etapes_filtres_et_demandes(fen, tmp_path):
         QTest.qWait(50)
         assert fen.pages[page].minimumSizeHint().width() <= fen.width() - 272
     # demandes
-    fen.aller("demandes")
+    fen.ouvrir_demandes()
     p = fen.p_demandes
     p.titre_saisi, p.texte_saisi = "Bouton trop petit", "Dans Réglages"
     pj = tmp_path / "capture.png"
@@ -677,7 +677,7 @@ def test_export_des_nouvelles_demandes_et_fait_des_manips(fen, tmp_path, monkeyp
     assert S.relire(st, ancien.id).statut == "À vérifier"
     cible = tmp_path / "export.md"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(cible), "")))
-    fen.aller("demandes")
+    fen.ouvrir_demandes()
     fen.p_demandes.ouvrir_fichier.disconnect()
     fen.p_demandes._exporter()
     texte = cible.read_text(encoding="utf-8")
@@ -750,7 +750,7 @@ def test_demandes_modifiables_a_faire_dans_les_pdf_et_listes_identiques(fen, tmp
     from mat_methode.ui import colonnes as C
     st, r = fen.ctrl.st, fen.ctrl.reglages
     # demandes : menus concernés (plusieurs) puis modification
-    fen.aller("demandes")
+    fen.ouvrir_demandes()
     p = fen.p_demandes
     p.titre_saisi, p.texte_saisi = "Colonne trop étroite", "Dans la liste"
     p.tags_saisis = {"Mat & Méthode", "Protocole"}
@@ -921,3 +921,112 @@ def test_matiere_par_voie_unites_de_duree_vitesses_en_g_et_conditions_par_defaut
     assert lav.temperature_c == 25 and lav.vide is not None and lav.vide.mbar is None
     ch = R.ajouter_etape(m, "chauffage", None, reglages=r)
     assert ch.temperature_c == 60 and ch.agitation_trmin == 300
+
+
+def test_conflit_entre_deux_postes_choix_de_la_version(fen, monkeypatch):
+    from mat_methode.storage.stockage import Stockage
+    st = fen.ctrl.st
+    m = ethanol(fen)
+    fen.ctrl.enregistrer_tout()
+    marie = Stockage(st.racine, "marie", "PC2")
+    marie.initialiser()
+    b = marie.lire_manip(m.id)
+    b.nom = "Version Marie"
+    import mat_methode.storage.stockage as S
+    sauve = S.V.tetes
+    S.V.tetes = lambda dossier: [v for v in sauve(dossier) if v.poste.startswith("PC2")] or sauve(dossier)  # la synchronisation n'a rien apporté
+    try:
+        fen.ctrl.st.enregistrer_manip(m, forcer=False)  # (aucun changement : sans effet sur le test)
+        S.V.tetes = lambda dossier: []  # Marie enregistre sans voir la version de Pierre
+        assert marie.enregistrer_manip(b).ok
+    finally:
+        S.V.tetes = sauve
+    fen.ctrl.actualiser()
+    assert fen.ctrl.liste.conflits == [m.id]
+    fen.aller("manips")
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in fen.p_manips.findChildren(type(fen.titre)))
+    assert "deux versions à choisir" in textes
+    versions = fen.ctrl.versions_en_conflit(m.id)
+    assert len(versions) == 2
+    msg = fen.ctrl.resoudre_conflit(m.id, versions[0][0].fichier, False)
+    assert msg == "" and fen.ctrl.liste.conflits == []
+
+
+def test_consigne_en_parallele_dans_les_pdf_conditions_par_materiel_et_fenetre_des_demandes(fen, tmp_path):
+    import pdfplumber
+
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.domain import regles as R
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.protocole import ecrire_protocole
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    ids = [e.id for e in m.etapes]
+    p = R.creer_parallele(m)
+    R.placer_dans_voie(m, ids[1], p.id, p.voies[0].id)
+    R.placer_dans_voie(m, ids[2], p.id, p.voies[1].id)
+    m.etapes[0].remarque = "Chauffer sans dépasser 60 °C"
+    d = exporter(m, r)
+    assert [ph.get("parallele") for ph in d["phases"][1:4]] == [None, "EN PARALLÈLE · VOIE A", "EN PARALLÈLE · VOIE B"]
+    assert d["phases"][4]["reunion"] == "Réunit les voies A et B"
+    for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
+        ecrire(d, tmp_path / f"{i}.pdf")
+        with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
+            t = " ".join(" ".join(pg.extract_text() for pg in pdf.pages).split())
+        assert "EN PARALLÈLE · VOIE A" in t and "Réunit les voies A et B" in t and "Chauffer sans dépasser 60 °C" in t
+    # conditions particulières d'un matériel : ajoutées à l'étape avec leur valeur par défaut
+    assert O.ajouter_condition_materiel(r, "Étuve", "Humidité", "%", "40") and not O.ajouter_condition_materiel(r, "Étuve", "humidité")
+    e = m.etapes[4]
+    e.equipements = ["Étuve"]
+    assert O.appliquer_conditions_materiel(r, e) == ["Humidité"] and e.autres[-1].valeur == "40 %"
+    assert O.appliquer_conditions_materiel(r, e) == []  # pas de doublon
+    assert O.renommer_materiel(r, [m], "Étuve", "Étuve ventilée") is not None and "Étuve ventilée" in r.conditions_materiel
+    fen.aller("reglages")
+    fen.p_reglages.ouvrir("cond_materiel")
+    QTest.qWait(30)
+    # fenêtre « Bugs et idées » : flottante, qui ne bloque pas l'application
+    assert not fen.fen_demandes.isVisible()
+    fen.nav["demandes"].click()
+    assert fen.fen_demandes.isVisible() and fen.page == "reglages" and not fen.fen_demandes.isModal()
+    fen.fen_demandes.hide()
+    # boutons à côté du titre
+    fen.aller("manips")
+    assert [b.text().replace("&&", "&") for b in fen.actions_titre.findChildren(type(fen.nav["manips"]))] == ["+  Nouvelle manip", "Importer un ancien Mat & Méthode"]
+    fen.aller("rapports")
+    assert [b.text() for b in fen.actions_titre.findChildren(type(fen.nav["manips"]))] == ["Importer un ancien rapport"]
+
+
+def test_tableau_de_matieres_scirius_ou_a_la_main(fen):
+    from mat_methode.domain.models import ReactifEtape
+    from mat_methode.report.rapport import construire
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    e = m.etapes[1]
+    avant = len(e.reactifs)
+    page._ajouter_a_la_main(e.reactifs)  # ligne vide : unité par défaut
+    assert len(e.reactifs) == avant + 1 and e.reactifs[-1].unite == r.unites_reactifs[0]
+    re_ = e.reactifs[-1]
+    re_.nom, re_.reference, re_.quantite = "Acide citrique", "lot AC-42", "5"
+    page._inv_par_nom(re_, "scirius", "1234567")  # n° mémorisé pour ce produit, créé dans les Réglages
+    inv = r.reactif("Acide citrique")
+    assert inv is not None and inv.scirius == "1234567"
+    # plusieurs matières dans une même voie, avec la référence à la main dans le détail des phases
+    from mat_methode.domain import regles as R
+    p = R.creer_parallele(m)
+    R.placer_dans_voie(m, m.etapes[2].id, p.id, p.voies[0].id)
+    p.voies[0].autres = [ReactifEtape(nom="Eau déminéralisée", reference="lot EA-42", quantite="50", unite="mL"),
+                         ReactifEtape(nom="Acide citrique", quantite="5", unite="g")]
+    phases = construire(m, r).phases
+    ph = next(x for x in phases if x.n == m.etapes.index(m.etapes[2]) + 1)
+    noms = {x.nom: x.scirius for x in ph.reactifs}
+    assert noms.get("Eau déminéralisée") == "lot EA-42" and noms.get("Acide citrique") == "1234567"
+    page.rafraichir()
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    assert "Autres matières de la voie" in textes

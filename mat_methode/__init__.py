@@ -1,9 +1,18 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.4.0"
+VERSION = "1.6.0"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.6.0", "05/11/2026", ["« Consignes / remarques » d'une étape : dans la carte du flux et dans les PDF",
+                             "PDF : les étapes en parallèle (voie, réunion des voies) sont indiquées dans le détail du flux",
+                             "Boutons « Nouvelle manip » et « Importer un ancien Mat & Méthode » à côté du titre ; « Importer un ancien rapport » dans Rapport",
+                             "Bugs et idées s'ouvre dans une fenêtre à part, pour tester en même temps ; menus concernés avec les sous-menus",
+                             "Conditions opératoires particulières à chaque matériel (Réglages › Conditions par matériel)",
+                             "Réactifs d'une étape et matières d'une voie : tableau avec recherche Scirius ou référence à la main, plusieurs lignes"]),
+    ("1.5.0", "05/11/2026", ["Fin des copies de conflit OneDrive : un fichier par version de chaque manip, jamais réécrit",
+                             "Si deux postes enregistrent en même temps, les deux versions sont gardées et on choisit laquelle conserver",
+                             "Les anciens fichiers sont convertis au premier lancement (originaux gardés dans manips\\_ancien)"]),
     ("1.4.0", "05/11/2026", ["Le choix de l'étape à ajouter s'ouvre juste sous l'étape, la grande étape ou la voie concernée",
                              "Voies en parallèle : matière reçue (% ou mL), autres matières, quantité prise à la réunion, tableau « Volumes par étape »",
                              "Voies en parallèle dans la colonne « Étapes » des listes",
@@ -28,4 +37,4 @@ NOUVEAUTES = [
                              "Écran d'ouverture immédiat, version et date de mise à jour"]),
     ("1.0.0", "04/11/2026", ["Écran d'ouverture, historique des statuts"]),
 ]
-SCHEMA_DONNEES = 17  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer
+SCHEMA_DONNEES = 19  # version du format des fichiers de données (2 : grandes étapes ; 3 : personnes, Scirius de la charge ; 4 : à faire) ; voir storage.stockage.migrer

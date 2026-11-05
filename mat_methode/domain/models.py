@@ -79,6 +79,13 @@ def initiales_de(nom: str) -> str:
     return out
 
 
+class ConditionMateriel(_Modele):
+    """Condition opératoire particulière d'un matériel (ex. étuve : « Humidité », %, 40)."""
+    nom: str
+    unite: str = ""
+    defaut: str = ""
+
+
 class Personne(_Modele):
     """Donneur d'ordre (ou opérateur) : nom affiché, initiales (référence des manips), IGG Windows."""
     nom: str
@@ -144,6 +151,7 @@ class Reglages(_Modele):
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v, defauts=dict(DEFAUTS_OPERATIONS.get(k, {}))) for k, v in OPERATIONS.items()])
     unites_reactifs: list[str] = Field(default_factory=lambda: list(UNITES_REACTIFS_DEFAUT))  # unités proposées pour les quantités de réactifs
     vitesses_agitation: list[float] = Field(default_factory=lambda: list(VITESSES_DEFAUT))  # vitesses d'agitation proposées (tr/min)
+    conditions_materiel: dict[str, list[ConditionMateriel]] = Field(default_factory=dict)  # matériel -> conditions particulières proposées dans l'étape
     vitesses_rcf: list[float] = Field(default_factory=lambda: list(VITESSES_RCF_DEFAUT))  # vitesses de centrifugation proposées en g (RCF)
     unites_duree: list[str] = Field(default_factory=lambda: list(UNITES_DUREE_DEFAUT))  # unités de durée proposées (s, min, h, jour, semaine)
     ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)
@@ -238,6 +246,7 @@ class ReactifEtape(_Modele):
     nom: str = ""
     quantite: str = ""
     unite: str = ""  # unité choisie dans la liste des Réglages (vide = quantité écrite en texte libre)
+    reference: str = ""  # référence saisie à la main (lot, n° interne…) quand la matière ne vient pas de Scirius
 
     @property
     def quantite_complete(self) -> str:
@@ -265,11 +274,7 @@ class Etape(_Modele):
     voie_id: Optional[str] = None  # voie du bloc en parallèle (A, B…)
 
 
-class Matiere(_Modele):
-    """Autre matière apportée à une voie en parallèle (réactif, quantité et unité)."""
-    nom: str = ""
-    quantite: str = ""
-    unite: str = ""
+Matiere = ReactifEtape  # une matière d'une voie se décrit comme un réactif d'étape
 
 
 class Voie(_Modele):
@@ -277,7 +282,7 @@ class Voie(_Modele):
     nom: str = ""  # facultatif (ex. « phase huile ») : la lettre A, B… vient de la place de la voie
     part: Optional[float] = None  # part de la sortie de l'étape précédente (ou du volume de départ) reçue par la voie ; vide = part égale
     part_unite: str = "%"  # « % » ou « mL »
-    autres: list[Matiere] = Field(default_factory=list)  # autres matières ajoutées au début de la voie
+    autres: list[ReactifEtape] = Field(default_factory=list)  # autres matières ajoutées au début de la voie (Scirius ou référence à la main)
 
 
 class Parallele(_Modele):

@@ -66,6 +66,8 @@ class PageReglages(QWidget):
             ("laboratoires", "Laboratoires", "Volume par défaut et analyses de chaque labo", f"{len(r.laboratoires)}", self._laboratoires),
             ("operations", "Opérations", "Sous-étapes du flux (chauffage, filtration…) et texte", f"{len(r.operations)}", self._operations),
             ("materiel", "Matériel", "Matériel proposé dans les étapes (plaque chauffante, étuve…)", f"{len(r.materiels)}", self._materiel),
+            ("cond_materiel", "Conditions par matériel", "Conditions particulières proposées avec chaque matériel (humidité, pression…)",
+             f"{sum(len(v) for v in r.conditions_materiel.values())}", self._conditions_materiel),
             ("reactifs", "Réactifs", "Noms des réactifs proposés dans les étapes", f"{len(r.reactifs)}", self._reactifs),
             ("volumes", "Volumes d’échantillon", "30 mL … 1 L", f"{len(r.volumes_ml)}", self._volumes),
             ("unites", "Unités des réactifs", "mL, g, µL, % … proposées à côté des quantités", f"{len(r.unites_reactifs)}", self._unites),
@@ -391,6 +393,33 @@ class PageReglages(QWidget):
 
         nouveau.returnPressed.connect(ajout)
         x.ajouter(ligne(champ("Nouveau volume", nouveau), bouton("Ajouter", ajout), "stretch"))
+
+    def _conditions_materiel(self):
+        x = self._section("Conditions particulières par matériel", f"{sum(len(v) for v in self.r.conditions_materiel.values())}")
+        x.ajouter(etiquette("Pour chaque matériel, des conditions opératoires propres à cet équipement (ex. étuve : humidité en %). Quand on ajoute ce matériel "
+                            "à une étape, ces conditions sont ajoutées avec leur valeur par défaut, dans « Autres conditions ».", secondaire=True, wrap=True))
+        if not self.r.materiels:
+            x.ajouter(etiquette("Aucun matériel : ajoute-en dans Réglages › Matériel.", secondaire=True))
+        for mat in self.r.materiels:
+            conds = self.r.conditions_materiel.get(mat, [])
+            x.ajouter(etiquette(mat, "titreCarte"))
+            if conds:
+                x.ajouter(flux_widgets([ChipSupprimable(f"{c.nom}" + (f" · {c.defaut} {c.unite}".rstrip() if (c.defaut or c.unite) else ""),
+                                                        lambda c=c, mat=mat: (O.retirer_condition_materiel(self.r, mat, c.nom), self._changer(), self._actualiser()),
+                                                        f"Retirer {c.nom}") for c in conds]))
+            nom, unite, defaut = ChampTexte("", "ex. Humidité"), ChampTexte("", "ex. %"), ChampTexte("", "ex. 40")
+            unite.setMaximumWidth(110)
+            defaut.setMaximumWidth(110)
+
+            def ajout(mat=mat, nom=nom, unite=unite, defaut=defaut):
+                if O.ajouter_condition_materiel(self.r, mat, nom.text(), unite.text(), defaut.text()):
+                    self._changer()
+                    self._actualiser()
+                elif nom.text().strip():
+                    self.ctrl.toast.emit("Cette condition existe déjà pour ce matériel")
+
+            nom.returnPressed.connect(ajout)
+            x.ajouter(ligne(champ("Nouvelle condition", nom), champ("Unité", unite), champ("Valeur par défaut", defaut), bouton("Ajouter", ajout), "stretch"))
 
     def _unites(self):
         self._liste_simple("Unités des réactifs", self.r.unites_reactifs, lambda v: self.r.unites_reactifs.remove(v),

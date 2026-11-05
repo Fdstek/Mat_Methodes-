@@ -1,7 +1,7 @@
 """Données partagées dans le dossier de l'application (§9.1).
 
     donnees\\reglages.json             réglages partagés (contrôle de révision + fusion)
-    donnees\\manips\\<id>.json         UNE manip = UN fichier
+    donnees\\manips\\<id>\\v000012_<poste>_<alea>.json   UNE version = UN fichier, jamais réécrit (voir storage/versions.py)
     donnees\\verrous\\<id>.lock        qui édite quelle manip (battement toutes les 30 s, expire après 3 min)
     donnees\\preferences\\<user>.json  préférences propres à chacun
     donnees\\sauvegardes\\AAAA-MM-JJ\\  copie à la 1re ouverture du jour, 10 jours conservés
@@ -23,8 +23,9 @@ from pathlib import Path
 from typing import Optional
 
 from mat_methode import SCHEMA_DONNEES
-from mat_methode.domain.models import Manip, Reglages, maintenant_iso
+from mat_methode.domain.models import Manip, Reglages, maintenant_iso, nouvel_id
 from mat_methode.domain.texte import norm
+from mat_methode.storage import versions as V
 from mat_methode.storage.fusion import LISTES, fusionner
 
 log = logging.getLogger("mat_methode")
@@ -161,7 +162,9 @@ class ResultatEnregistrement:
 class Liste:
     manips: list[Manip] = field(default_factory=list)
     illisibles: list[str] = field(default_factory=list)
-    conflits: list[str] = field(default_factory=list)  # fichiers de conflit SharePoint / OneDrive
+    conflits: list[str] = field(default_factory=list)  # identifiants des manips à deux versions courantes (deux postes ont enregistré en même temps)
+    bases: dict[str, str] = field(default_factory=dict)  # manip -> version lue (le contrôleur l'adopte pour les manips qu'il remplace)
+    converties: int = 0  # manips converties de l'ancien format à cette lecture
     occupes: list[str] = field(default_factory=list)  # identifiants des fichiers tenus un instant par un autre processus (relus plus tard)
 
 
@@ -173,6 +176,7 @@ class Stockage:
         self.lecture_seule = False
         self.message = ""
         self._reglages_lus: Optional[Reglages] = None
+        self._bases: dict[str, str] = {}  # manip -> version lue ou écrite en dernier (sert à détecter un enregistrement fait entre-temps)
 
     # ------------------------------------------------------------ dossiers
     @property
@@ -245,8 +249,13 @@ class Stockage:
                 tmp.mkdir(parents=True)
                 if self.f_reglages.exists():
                     shutil.copy2(self.f_reglages, tmp / "reglages.json")
-                if self.d_manips.exists():
-                    shutil.copytree(self.d_manips, tmp / "manips")
+                if self.d_manips.exists():  # la version courante de chaque manip
+                    (tmp / "manips").mkdir()
+                    for d in self.d_manips.iterdir():
+                        if d.is_dir() and d.name != V.DOSSIER_ANCIEN:
+                            t = self._plus_recente(V.tetes(d))
+                            if t:
+                                shutil.copy2(t[0].chemin, tmp / "manips" / f"{d.name}.json")
                 os.replace(tmp, cible)
             limite = aujourdhui - timedelta(days=JOURS_SAUVEGARDE)
             for d in racine.iterdir():
@@ -297,74 +306,193 @@ class Stockage:
             return False
 
     # ------------------------------------------------------------ manips
+    # ------------------------------------------------------------ manips (un fichier par version, voir storage/versions.py)
+    def dossier_manip(self, ident: str) -> Path:
+        return self.d_manips / ident
+
+    def tetes(self, ident: str) -> list[V.Version]:
+        """Versions courantes de la manip (une seule, sauf conflit entre deux postes)."""
+        return V.tetes(self.dossier_manip(ident))
+
+    def _plus_recente(self, tetes: list[V.Version]) -> list[V.Version]:
+        """Versions courantes classées de la plus récente (date d'enregistrement) à la plus ancienne."""
+        def date(v: V.Version) -> tuple:
+            try:
+                return (json.loads(v.chemin.read_text(encoding="utf-8")).get("maj", ""), v.rev, v.fichier)
+            except (OSError, ValueError):
+                return ("", v.rev, v.fichier)
+        return sorted(tetes, key=date, reverse=True) if len(tetes) > 1 else list(tetes)
+
     def chemin_manip(self, ident: str) -> Path:
-        return self.d_manips / f"{ident}.json"
+        """Fichier de la version la plus récente (n'existe pas si la manip n'a pas encore été enregistrée)."""
+        t = self._plus_recente(self.tetes(ident))
+        return t[0].chemin if t else self.dossier_manip(ident) / "(aucune version)"
+
+    def a_des_manips(self) -> bool:
+        try:
+            return any(p.name != V.DOSSIER_ANCIEN for p in self.d_manips.iterdir()) if self.d_manips.exists() else False
+        except OSError:
+            return False
+
+    def _lire_version(self, v: V.Version) -> Manip:
+        return Manip.model_validate(migrer(lire_json(v.chemin, essais=3, attente=0.15), v.chemin))
+
+    def migrer_ancien_format(self) -> int:
+        """Ancien format (donnees\\manips\\<id>.json) : chaque fichier devient la 1re version de sa manip ; le fichier est mis de côté dans
+        manips\\_ancien. Une copie de conflit OneDrive devient une 2e version courante (à trancher dans l'application)."""
+        n = 0
+        if not self.d_manips.exists() or self.lecture_seule:
+            return 0
+        for f in sorted(self.d_manips.glob("*.json")):
+            try:
+                d = lire_json(f, essais=3, attente=0.15)
+                m = Manip.model_validate(migrer(d, f))
+                dossier = self.dossier_manip(m.id)
+                copie = f.stem != m.id or not NOM_VALIDE.match(f.name)
+                suffixe = "conflit-" + re.sub(r"[^A-Za-z0-9]", "", f.stem[len(m.id):])[:20] if copie else "migration"
+                nom = f"v{m.rev:06d}_{suffixe}.json"
+                if not (dossier / nom).exists():
+                    dossier.mkdir(parents=True, exist_ok=True)
+                    ecrire_atomique(dossier / nom, json.dumps({"parents": [], **m.to_json()}, ensure_ascii=False, indent=2))
+                ancien = self.d_manips / V.DOSSIER_ANCIEN
+                ancien.mkdir(exist_ok=True)
+                try:
+                    shutil.move(str(f), str(ancien / f.name))
+                except (OSError, shutil.Error):
+                    pass  # déjà déplacé par un autre poste
+                n += 1
+            except Exception as ex:  # fichier illisible : il reste en place et sera signalé par lister()
+                log.warning("conversion impossible de %s : %s", f.name, ex)
+        if n:
+            log.info("%d manip(s) converties au format « un fichier par version »", n)
+        return n
 
     def lister(self) -> Liste:
         res = Liste()
         if not self.d_manips.exists():
             return res
-        for f in sorted(self.d_manips.glob("*.json")):
+        res.converties = self.migrer_ancien_format()
+        for f in sorted(self.d_manips.glob("*.json")):  # fichier de l'ancien format qui n'a pas pu être converti : on dit pourquoi
             try:
-                d = lire_json(f, essais=3, attente=0.15)
-                m = Manip.model_validate(migrer(d, f))
-            except OSError as ex:
-                if fichier_occupe(ex):  # pas un fichier abîmé : on garde la version en mémoire et on relit au prochain passage
-                    log.info("fichier occupé %s : relu plus tard", f.name)
-                    res.occupes.append(f.stem)
-                    continue
-                log.warning("fichier illisible %s : %s", f.name, ex)
-                res.illisibles.append(f"{f.name} ({raison_illisible(ex)})")
-                continue
+                Manip.model_validate(migrer(lire_json(f, essais=3, attente=0.15), f))
             except DonneesTropRecentes as ex:
                 res.illisibles.append(str(ex))
-                continue
-            except Exception as ex:  # un fichier illisible n'empêche jamais l'ouverture des autres
+            except OSError as ex:
+                if fichier_occupe(ex):  # tenu un instant par la synchronisation : converti au prochain passage
+                    res.occupes.append(f.stem)
+                else:
+                    res.illisibles.append(f"{f.name} ({raison_illisible(ex)})")
+            except Exception as ex:
                 log.warning("fichier illisible %s : %s", f.name, ex)
                 res.illisibles.append(f"{f.name} ({raison_illisible(ex)})")
+        for dossier in sorted(p for p in self.d_manips.iterdir() if p.is_dir() and p.name != V.DOSSIER_ANCIEN):
+            ident = dossier.name
+            tetes = self._plus_recente(V.tetes(dossier))
+            if not tetes:
                 continue
-            if f.stem != m.id or not NOM_VALIDE.match(f.name):
-                res.conflits.append(f.name)  # ex. « k97omty-PC-MARIE.json », « k97omty (1).json »
+            m = None
+            for t in tetes:  # la plus récente d'abord ; une version illisible n'empêche pas de lire l'autre
+                try:
+                    m = self._lire_version(t)
+                    res.bases[ident] = t.fichier
+                    break
+                except OSError as ex:
+                    if fichier_occupe(ex):  # pas un fichier abîmé : on garde la version en mémoire et on relit au prochain passage
+                        log.info("fichier occupé %s : relu plus tard", t.fichier)
+                        res.occupes.append(ident)
+                        break
+                    log.warning("fichier illisible %s : %s", t.fichier, ex)
+                    res.illisibles.append(f"{ident}\\{t.fichier} ({raison_illisible(ex)})")
+                except DonneesTropRecentes as ex:
+                    res.illisibles.append(str(ex))
+                    break
+                except Exception as ex:  # un fichier illisible n'empêche jamais l'ouverture des autres
+                    log.warning("fichier illisible %s : %s", t.fichier, ex)
+                    res.illisibles.append(f"{ident}\\{t.fichier} ({raison_illisible(ex)})")
+            if m is None:
                 continue
             res.manips.append(m)
+            if len(tetes) > 1:
+                res.conflits.append(ident)  # deux postes ont enregistré en même temps : une version à choisir
         return res
 
+    def adopter(self, ident: str, fichier: str) -> None:
+        """La version `fichier` est maintenant celle que l'application affiche pour cette manip."""
+        self._bases[ident] = fichier
+
     def lire_manip(self, ident: str) -> Optional[Manip]:
-        f = self.chemin_manip(ident)
-        if not f.exists():
+        t = self._plus_recente(self.tetes(ident))
+        if not t:
             return None
-        return Manip.model_validate(migrer(lire_json(f), f))
+        m = self._lire_version(t[0])
+        self._bases[ident] = t[0].fichier
+        return m
 
     def enregistrer_manip(self, m: Manip, forcer: bool = False) -> ResultatEnregistrement:
-        """Contrôle de révision : si le fichier a changé depuis la lecture, on n'écrase pas."""
+        """Écrit une nouvelle version. Si quelqu'un a enregistré depuis que cette manip a été lue, on n'écrase rien :
+        la version trouvée sur le disque est rendue (conflit), sauf avec « forcer » (la nouvelle version remplace alors les courantes)."""
         if self.lecture_seule:
             return ResultatEnregistrement(False, erreur="Non enregistré : dossier inaccessible")
-        f = self.chemin_manip(m.id)
         try:
-            if f.exists() and not forcer:
-                try:
-                    disque = Manip.model_validate(lire_json(f))
-                except Exception:
-                    disque = None
-                if disque is not None and disque.rev != m.rev:
-                    return ResultatEnregistrement(False, conflit=disque)
-                m.rev += 1
+            tetes = self._plus_recente(self.tetes(m.id))
+            base = self._bases.get(m.id)
+            if tetes and not forcer and not (len(tetes) == 1 and tetes[0].fichier == base):
+                disque = self._lire_version(tetes[0])
+                self._bases[m.id] = tetes[0].fichier
+                return ResultatEnregistrement(False, conflit=disque)
+            if tetes:
+                m.rev = max(m.rev, *(t.rev for t in tetes)) + 1
             m.maj, m.modifie_par = maintenant_iso(), self.utilisateur
-            ecrire_atomique(f, _dumps(m.to_json()))
+            self._ecrire_version(m, [t.fichier for t in tetes] if forcer else ([base] if base and tetes else []))
             return ResultatEnregistrement(True)
         except OSError as ex:
             log.warning("enregistrement impossible %s : %s", m.id, ex)
             return ResultatEnregistrement(False, erreur="Non enregistré : dossier inaccessible")
 
+    def _ecrire_version(self, m: Manip, parents: list[str]) -> V.Version:
+        v = V.ecrire_version(self.dossier_manip(m.id), m.rev, self.pc, parents, m.to_json(), ecrire_atomique)
+        self._bases[m.id] = v.fichier
+        V.elaguer(self.dossier_manip(m.id))
+        return v
+
     def ecrire_tel_quel(self, m: Manip) -> None:
-        """Écrit la manip sans toucher à sa version ni à sa date (restauration des exemples)."""
-        ecrire_atomique(self.chemin_manip(m.id), _dumps(m.to_json()))
+        """Écrit la manip sans toucher à sa version ni à sa date (restauration des exemples) : elle remplace les versions courantes."""
+        self._ecrire_version(m, [t.fichier for t in self.tetes(m.id)])
 
     def supprimer_manip(self, ident: str) -> None:
-        f = self.chemin_manip(ident)
-        if f.exists():
-            f.unlink()
+        shutil.rmtree(self.dossier_manip(ident), ignore_errors=True)
+        self._bases.pop(ident, None)
         self.liberer_verrou(ident)
+
+    # ------------------------------------------------------------ conflit entre deux postes
+    def versions_en_conflit(self, ident: str) -> list[tuple[V.Version, Manip]]:
+        """Les versions courantes (plus récente d'abord) avec leur contenu, si deux postes ont enregistré en même temps."""
+        t = self._plus_recente(self.tetes(ident))
+        return [(v, self._lire_version(v)) for v in t] if len(t) > 1 else []
+
+    def resoudre_conflit(self, ident: str, garder: str, copier_les_autres: bool = False) -> list[Manip]:
+        """Garde la version `garder` (nom de fichier) : une nouvelle version la reprend et remplace les versions courantes (elles restent
+        dans l'historique). Avec `copier_les_autres`, chaque autre version devient une nouvelle manip « (version de <poste>) ».
+        Retourne les manips créées."""
+        tetes = self._plus_recente(self.tetes(ident))
+        choisie = next((t for t in tetes if t.fichier == garder), None)
+        if choisie is None:
+            return []
+        autres = [(t, self._lire_version(t)) for t in tetes if t is not choisie]
+        m = self._lire_version(choisie)
+        m.rev = max(t.rev for t in tetes) + 1
+        m.maj, m.modifie_par = maintenant_iso(), self.utilisateur
+        self._ecrire_version(m, [t.fichier for t in tetes])
+        creees = []
+        if copier_les_autres:
+            for t, autre in autres:
+                c = autre.model_copy(deep=True)
+                c.id = nouvel_id()
+                c.nom = f"{autre.nom} (version de {t.poste.split('_')[0]})"
+                c.rev, c.maj, c.modifie_par = 1, maintenant_iso(), self.utilisateur
+                V.ecrire_version(self.dossier_manip(c.id), c.rev, self.pc, [], c.to_json(), ecrire_atomique)
+                creees.append(c)
+        return creees
 
     # ------------------------------------------------------------ verrous
     def lire_verrou(self, ident: str) -> Optional[Verrou]:

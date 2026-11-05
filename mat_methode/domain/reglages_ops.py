@@ -2,7 +2,7 @@
 (à enregistrer) et, si utile, un message court."""
 from __future__ import annotations
 
-from mat_methode.domain.models import ANNULEE, ARCHIVEE, STATUTS, Laboratoire, Manip, Operation, Reglages
+from mat_methode.domain.models import ANNULEE, ARCHIVEE, STATUTS, Condition, ConditionMateriel, Laboratoire, Manip, Operation, Reglages
 from mat_methode.domain.texte import minuscule_initiale, norm
 
 
@@ -175,6 +175,8 @@ def renommer_materiel(r: Reglages, manips: list[Manip], ancien: str, nouveau: st
     """Renomme un matériel dans la liste et dans les étapes de toutes les manips."""
     if not _renommer_liste(r.materiels, ancien, nouveau):
         return []
+    if ancien in r.conditions_materiel:  # ses conditions particulières suivent
+        r.conditions_materiel = {(nouveau.strip() if k == ancien else k): v for k, v in r.conditions_materiel.items()}
     ch = []
     for m in manips:
         touche = False
@@ -185,6 +187,32 @@ def renommer_materiel(r: Reglages, manips: list[Manip], ancien: str, nouveau: st
         if touche:
             ch.append(m)
     return ch
+
+
+def ajouter_condition_materiel(r: Reglages, materiel: str, nom: str, unite: str = "", defaut: str = "") -> bool:
+    nom = nom.strip()
+    liste = r.conditions_materiel.get(materiel, [])
+    if not nom or any(norm(c.nom) == norm(nom) for c in liste):
+        return False
+    r.conditions_materiel = {**r.conditions_materiel, materiel: liste + [ConditionMateriel(nom=nom, unite=unite.strip(), defaut=defaut.strip())]}
+    return True
+
+
+def retirer_condition_materiel(r: Reglages, materiel: str, nom: str) -> None:
+    """Les étapes qui ont déjà cette condition la gardent."""
+    liste = [c for c in r.conditions_materiel.get(materiel, []) if c.nom != nom]
+    r.conditions_materiel = {**{k: v for k, v in r.conditions_materiel.items() if k != materiel}, **({materiel: liste} if liste else {})}
+
+
+def appliquer_conditions_materiel(r: Reglages, e) -> list[str]:
+    """Ajoute à l'étape les conditions particulières de son matériel (valeur par défaut), sans doublon. Retourne les noms ajoutés."""
+    ajoutees = []
+    for mat in e.equipements:
+        for c in r.conditions_materiel.get(mat, []):
+            if not any(norm(a.nom) == norm(c.nom) for a in e.autres):
+                e.autres.append(Condition(nom=c.nom, valeur=f"{c.defaut} {c.unite}".strip()))
+                ajoutees.append(c.nom)
+    return ajoutees
 
 
 def renommer_tag(manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:

@@ -43,18 +43,12 @@ class PageManips(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(14)
 
-        barre = QHBoxLayout()
-        barre.addWidget(bouton("+  Nouvelle manip", self.nouvelle.emit, accent=True, tip="Nouvelle manip (Ctrl+N)"))
-        barre.addWidget(bouton("Importer un ancien rapport", self.importer.emit, tip="Rapport PDF ou fichier JSON exporté"))
-        barre.addWidget(bouton("Importer un ancien Mat & Méthode", self.importer_mm.emit, tip="Fichier Word, PDF ou texte, ou texte collé"))
-        barre.addStretch(1)
         self.recherche = QLineEdit()  # placée à droite des onglets Manips / Archivées
         self.recherche.setPlaceholderText("Rechercher une manip, un tag, un objectif…")
         self.recherche.setAccessibleName("Rechercher une manip (Ctrl+F)")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.setMinimumWidth(180)
         self.recherche.textChanged.connect(lambda *_: self._actualiser())
-        lay.addLayout(barre)
 
         self.pivot = QHBoxLayout()
         self.b_actives = bouton("", lambda: self._onglet(False))
@@ -88,6 +82,23 @@ class PageManips(QWidget):
     def _onglet(self, archives: bool):
         self.archives = archives
         self.rafraichir()
+
+    def _choisir_version(self):
+        """Comparaison des deux versions d'une manip enregistrée en même temps par deux postes ; l'une est gardée, l'autre peut devenir une manip."""
+        from mat_methode.ui.dialogues import choisir_version
+        for ident in list(self.ctrl.liste.conflits):
+            m = self.ctrl.manip(ident)
+            versions = self.ctrl.versions_en_conflit(ident)
+            if m is None or not versions:
+                continue
+            choix = choisir_version(self, m.nom, versions, self.ctrl.nom_de, lambda e: O.nom_etat(self.ctrl.reglages, e)[0])
+            if choix is None:
+                return
+            msg = self.ctrl.resoudre_conflit(ident, choix[0], choix[1])
+            self.ctrl.toast.emit(msg or "Version gardée" + (" ; l’autre est devenue une nouvelle manip" if choix[1] else ""))
+            self._actualiser()
+            if msg:
+                return
 
     def _recharger(self):
         self.ctrl.actualiser()
@@ -137,9 +148,11 @@ class PageManips(QWidget):
         vider(self.bandeaux)
         if ctrl.liste.conflits:
             n = len(ctrl.liste.conflits)
-            self.bandeaux.addWidget(InfoBar(f"{', '.join(ctrl.liste.conflits)} : copie créée par la synchronisation SharePoint / OneDrive. "
-                                            "Compare-la à la manip d’origine ; l’application ne la supprime jamais.",
-                                            titre=f"{n} conflit{'s' if n > 1 else ''} de synchronisation à vérifier"))
+            noms = " ; ".join(f"« {ctrl.manip(i).nom} »" for i in ctrl.liste.conflits if ctrl.manip(i))
+            self.bandeaux.addWidget(InfoBar(f"{noms} : deux postes ont enregistré en même temps. Rien n’est perdu : les deux versions sont gardées, "
+                                            "choisis celle à conserver.",
+                                            titre=f"{n} manip{'s' if n > 1 else ''} avec deux versions à choisir",
+                                            actions=[bouton("Choisir la version…", self._choisir_version, accent=True)]))
         if ctrl.liste.illisibles:
             self.bandeaux.addWidget(InfoBar("Ignoré(s) : " + " ; ".join(ctrl.liste.illisibles), titre="Fichier illisible"))
 
