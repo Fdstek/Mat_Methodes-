@@ -185,7 +185,7 @@ def test_migration_etats_a_faire_et_lancee(tmp_path):
     f = tmp_path / "reglages.json"
     f.write_text("{}", encoding="utf-8")
     d = migrer({"schema": 4, "etats": [{"id": "brouillon", "nom": "Brouillon"}, {"id": "x", "nom": "lancée"}]}, f)
-    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée", "Réalisée"] and d["schema"] == 18
+    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée", "Réalisée"] and d["schema"] == 19
     d = migrer({"schema": 5, "etats": [{"id": "encours", "nom": "En cours"}, {"id": "terminee", "nom": "Terminée"}]}, f)
     assert [e["nom"] for e in d["etats"]] == ["En cours", "Réalisée", "Terminée"]
 

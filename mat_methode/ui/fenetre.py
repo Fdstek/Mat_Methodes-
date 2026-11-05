@@ -142,7 +142,16 @@ class Fenetre(QMainWindow):
         tete.addWidget(self.retour, 0, Qt.AlignmentFlag.AlignTop)
         self.sous_titre = QWidget()
         QHBoxLayout(self.sous_titre).setContentsMargins(0, 0, 0, 0)
-        titres.addWidget(self.titre)
+        ligne_titre = QHBoxLayout()  # le titre de la page, puis les boutons de la page (nouvelle manip, importer…) à côté
+        ligne_titre.setSpacing(14)
+        ligne_titre.addWidget(self.titre)
+        self.actions_titre = QWidget()
+        self.actions_titre.setLayout(QHBoxLayout())
+        self.actions_titre.layout().setContentsMargins(0, 0, 0, 0)
+        self.actions_titre.layout().setSpacing(8)
+        ligne_titre.addWidget(self.actions_titre, 0, Qt.AlignmentFlag.AlignVCenter)
+        ligne_titre.addStretch(1)
+        titres.addLayout(ligne_titre)
         titres.addWidget(self.sous_titre)
         tete.addLayout(titres, 1)
         self.enregistrement = etiquette("", "enregistrement")
@@ -172,7 +181,8 @@ class Fenetre(QMainWindow):
         self.p_rapports = PageRapports(ctrl)
         self.p_demandes = PageDemandes(ctrl)
         self.pages = {"manips": self.p_manips, "flux": self.p_flux, "protocoles": self.p_protocoles, "protocole": self.p_protocole,
-                      "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages, "demandes": self.p_demandes}
+                      "rapports": self.p_rapports, "rapport": self.p_rapport, "reglages": self.p_reglages}
+        self._fenetre_demandes()  # « Bugs et idées » : fenêtre à part, pour tester l'application pendant qu'on saisit
         self._bandeau()  # les bandeaux de statut entrent tout de suite dans la fenêtre (jamais de fenêtre à part)
         for k, page in self.pages.items():  # actions dans une page : reconstruction sans remonter en haut
             page.sur_place = lambda k=k: self._sur_place(k)
@@ -244,9 +254,42 @@ class Fenetre(QMainWindow):
         b.setText(b._textes[0])
         b.setIconSize(QSize(20, 20))
         b.setIcon(icone_menu(*b._glyphe, theme.P.texte))
-        b.clicked.connect(lambda *_: self.aller(k))
+        b.clicked.connect(lambda *_: self.ouvrir_demandes() if k == "demandes" else self.aller(k))
         self.nav[k] = b
         return b
+
+    def _fenetre_demandes(self):
+        """Fenêtre « Bugs et idées » : flottante au-dessus de l'application (non bloquante), pour saisir une demande ou vérifier un point
+        sans faire d'allers-retours dans le menu."""
+        w = QWidget(self, Qt.WindowType.Tool)
+        w.setWindowTitle("Bugs et idées")
+        w.setObjectName("fenetreDemandes")
+        w.resize(600, 820)
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+        s = QScrollArea()
+        s.setWidgetResizable(True)
+        s.setFrameShape(QFrame.Shape.NoFrame)
+        boite = QWidget()
+        boite.setObjectName("page")
+        bl = QVBoxLayout(boite)
+        bl.setContentsMargins(18, 14, 18, 18)
+        bl.addWidget(self.p_demandes)
+        s.setWidget(boite)
+        v.addWidget(s)
+        self.fen_demandes = w
+        self.p_demandes.sur_place = self.p_demandes.rafraichir
+
+    def ouvrir_demandes(self):
+        """Ouvre (ou ramène devant) la fenêtre « Bugs et idées », à droite de la fenêtre principale la première fois."""
+        w = self.fen_demandes
+        if not w.isVisible():
+            g = self.geometry()
+            w.move(max(0, g.right() - w.width() - 20), g.top() + 70)
+        self.p_demandes.rafraichir()
+        w.show()
+        w.raise_()
+        w.activateWindow()
 
     def _nouveautes(self):
         texte = "\n\n".join(f"Version {v} — {d}\n" + "\n".join(f"  • {x}" for x in lignes) for v, d, lignes in NOUVEAUTES)
@@ -336,6 +379,17 @@ class Fenetre(QMainWindow):
         p["derniere_manip"] = ident
         self.ctrl.st.ecrire_preferences(p)
 
+    def _boutons_titre(self):
+        """Boutons à côté du titre : Mat & Méthode › Nouvelle manip et Importer un ancien Mat & Méthode ; Rapport › Importer un ancien rapport."""
+        lay = self.actions_titre.layout()
+        vider(lay)
+        if self.page == "manips":
+            lay.addWidget(bouton("+  Nouvelle manip", self.nouvelle, accent=True, tip="Nouvelle manip (Ctrl+N)"))
+            lay.addWidget(bouton("Importer un ancien Mat & Méthode", lambda: self.importer(mm=True), tip="Fichier Word, PDF ou texte, ou texte collé"))
+        elif self.page == "rapports":
+            lay.addWidget(bouton("Importer un ancien rapport", self.importer, tip="Rapport PDF ou fichier JSON exporté"))
+        self.actions_titre.setVisible(lay.count() > 0)
+
     def rafraichir(self):
         m, ctrl = self.ctrl.courante, self.ctrl
         listes = {"flux": "manips", "protocole": "protocoles", "rapport": "rapports"}
@@ -359,6 +413,7 @@ class Fenetre(QMainWindow):
         self.retour.setVisible(self.page in PAGES_MANIP)
         sous = self.sous_titre.layout()
         vider(sous)
+        self._boutons_titre()
         if self.page in TITRES:
             self.titre.setText(TITRES[self.page])
             self.pages[self.page].rafraichir()

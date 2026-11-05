@@ -91,6 +91,8 @@ class Phase:
     remarque: str = ""  # remarque de l'étape (Flux)
     groupe_plage: str = ""  # « étapes 2 à 4 »
     debut_groupe: bool = False  # première phase de sa grande étape
+    parallele: str = ""  # « EN PARALLÈLE · VOIE A » pour une étape d'une voie
+    reunion: str = ""  # « Réunit les voies A et B » pour l'étape qui suit un bloc en parallèle
 
 
 @dataclass
@@ -307,10 +309,17 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
                                        fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
         g = m.groupe(e.groupe_id)
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
+        par = m.parallele(e.parallele_id)
+        voie_nom = next((v.nom.strip() for v in par.voies if v.id == e.voie_id), "") if par else ""
+        en_parallele = f"EN PARALLÈLE · VOIE {lettre_voie(m, par.id, e.voie_id)}" + (f" ({voie_nom})" if voie_nom else "") if par else ""
+        reunion = ""
+        if par is None and i > 0 and m.etapes[i - 1].parallele_id:
+            lettres = sorted({lettre_voie(m, m.etapes[i - 1].parallele_id, x.voie_id) for x in m.etapes if x.parallele_id == m.etapes[i - 1].parallele_id})
+            reunion = "Réunit les voies " + " et ".join(lettres)
         phases.append(Phase(i + 1, f"{i + 1} · {cap(e.operation)}", conditions_phase(e), list(e.equipements), rs,
                             [ligne_ech(p) for p in ech if p.etape_id == e.id], groupe=g.nom if g else "",
                             groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1,
-                            remarque=e.remarque.strip()))
+                            remarque=e.remarque.strip(), parallele=en_parallele, reunion=reunion))
     return Rapport(sections, tab_reac, tab_ech, phases)
 
 

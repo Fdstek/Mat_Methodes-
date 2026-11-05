@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from mat_methode.domain import journal as J
+from mat_methode.domain import reglages_ops as O
 from mat_methode.domain import regles as R
 from mat_methode.domain.catalogue import est_centrifugation
 from mat_methode.domain.models import (
@@ -1279,6 +1280,8 @@ class PageFlux(QWidget):
             cl.addWidget(etiquette(cond, "conditions", wrap=True) if cond else etiquette("conditions à compléter", "aCompleter"))
             if e.equipements:
                 cl.addWidget(etiquette(" · ".join(e.equipements), secondaire=True, wrap=True))
+            if e.remarque.strip():
+                cl.addWidget(etiquette(f"<i>Consigne : {e.remarque.strip()}</i>", wrap=True))
             ps = [p for p in ech if p.etape_id == e.id]
             if e.duree_min or ps:
                 cl.addWidget(Frise(e.duree_min, [(position(p, e), code_badge(lab[p.id])) for p in ps]))
@@ -1436,9 +1439,9 @@ class PageFlux(QWidget):
             x.ajouter(ligne(champ("Autre condition", n), champ("Valeur", v),
                             icone("✕", "Retirer cette condition", lambda k=k: self._retirer_autre(e, k), danger=True)))
         x.ajouter(ligne(bouton("+ Autre condition", lambda: (e.autres.append(Condition()), self._toucher(True)), ajout=True), "stretch"))
-        rem = ChampTexte(e.remarque, "Apparaît entre parenthèses à la fin de la phrase de l’étape")
+        rem = ChampTexte(e.remarque, "Consigne ou remarque : carte du flux, PDF, et entre parenthèses à la fin de la phrase de l’étape")
         rem.modifie.connect(lambda v: (setattr(e, "remarque", v), self._toucher()))
-        x.ajouter(champ("Remarque (facultatif)", rem))
+        x.ajouter(champ("Consignes / remarques (facultatif)", rem))
         return x
 
     def _changer_unite_vitesse(self, e, unite: str):
@@ -1470,6 +1473,9 @@ class PageFlux(QWidget):
         if v and v not in e.equipements:
             e.equipements.append(v)
             r = self.ctrl.reglages
+            ajoutees = O.appliquer_conditions_materiel(r, e)  # conditions particulières de ce matériel (Réglages › Conditions par matériel)
+            if ajoutees:
+                self.ctrl.toast.emit("Conditions ajoutées : " + ", ".join(ajoutees))
             if not any(norm(v) == norm(x) for x in r.materiels):  # tapé à la main : ajouté aux Réglages
                 r.materiels.append(v)
                 self.ctrl.toucher_reglages()

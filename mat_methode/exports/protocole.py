@@ -47,8 +47,9 @@ def phases_a_remplir(data: dict, s: dict) -> list:
     ctx = data.get("contexte", {})
     for i, ph in enumerate(data.get("phases", [])):
         n = 0 if i == 0 else data["etapes"][i - 1]["n"]
-        titre = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + \
-            f"<b>{escape(ph['titre'])}</b>"
+        titre = (f"<font size='7' color='#8A4B00'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "") + \
+            (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + \
+            f"<b>{escape(ph['titre'])}</b>" + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else "")
         if i == 0:
             info = escape(ctx.get("matiere") or "") + "" + (
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
@@ -57,7 +58,7 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         else:
             info = escape(ph.get("conditions") or "conditions à compléter") + (
                 f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
-                f"<br/><b>Remarque :</b> {escape(ph['remarque'])}" if ph.get("remarque") else "")
+                f"<br/><b>Consigne / remarque :</b> {escape(ph['remarque'])}" if ph.get("remarque") else "")
             if ph.get("reactifs"):
                 info += "<br/>" + "<br/>".join(
                     f"<b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"

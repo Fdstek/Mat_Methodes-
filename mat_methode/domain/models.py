@@ -79,6 +79,13 @@ def initiales_de(nom: str) -> str:
     return out
 
 
+class ConditionMateriel(_Modele):
+    """Condition opératoire particulière d'un matériel (ex. étuve : « Humidité », %, 40)."""
+    nom: str
+    unite: str = ""
+    defaut: str = ""
+
+
 class Personne(_Modele):
     """Donneur d'ordre (ou opérateur) : nom affiché, initiales (référence des manips), IGG Windows."""
     nom: str
@@ -144,6 +151,7 @@ class Reglages(_Modele):
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v, defauts=dict(DEFAUTS_OPERATIONS.get(k, {}))) for k, v in OPERATIONS.items()])
     unites_reactifs: list[str] = Field(default_factory=lambda: list(UNITES_REACTIFS_DEFAUT))  # unités proposées pour les quantités de réactifs
     vitesses_agitation: list[float] = Field(default_factory=lambda: list(VITESSES_DEFAUT))  # vitesses d'agitation proposées (tr/min)
+    conditions_materiel: dict[str, list[ConditionMateriel]] = Field(default_factory=dict)  # matériel -> conditions particulières proposées dans l'étape
     vitesses_rcf: list[float] = Field(default_factory=lambda: list(VITESSES_RCF_DEFAUT))  # vitesses de centrifugation proposées en g (RCF)
     unites_duree: list[str] = Field(default_factory=lambda: list(UNITES_DUREE_DEFAUT))  # unités de durée proposées (s, min, h, jour, semaine)
     ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)

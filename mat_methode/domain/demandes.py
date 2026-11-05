@@ -7,7 +7,10 @@ from mat_methode.domain.models import maintenant_iso, nouvel_id
 from mat_methode.domain.texte import fmt_dt
 
 TYPES_DEMANDE = ("Bug", "Bonne idée")
-MENUS_DEMANDE = ("Mat & Méthode", "Protocole", "Rapport", "Réglages", "Bugs et idées", "Général")  # tags : le menu de gauche concerné
+MENUS_DEMANDE = ("Mat & Méthode", "Mat & Méthode › Édition", "Protocole", "Protocole › Édition", "Rapport", "Rapport › Édition",
+                 "Réglages", "Réglages › Personnes", "Réglages › Laboratoires", "Réglages › Opérations", "Réglages › Matériel", "Réglages › Réactifs",
+                 "Réglages › Volumes", "Réglages › Unités et vitesses", "Réglages › Tags", "Réglages › Fichier Scirius",
+                 "Bugs et idées", "Général")  # tags : le menu de gauche concerné (et ses sous-menus)
 STATUTS_DEMANDE = ("Nouvelle", "À vérifier", "Traitée", "Refusée")  # « À vérifier » : exportée, en attente de contrôle
 
 

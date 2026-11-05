@@ -648,7 +648,7 @@ def test_experience_attribution_etapes_filtres_et_demandes(fen, tmp_path):
         QTest.qWait(50)
         assert fen.pages[page].minimumSizeHint().width() <= fen.width() - 272
     # demandes
-    fen.aller("demandes")
+    fen.ouvrir_demandes()
     p = fen.p_demandes
     p.titre_saisi, p.texte_saisi = "Bouton trop petit", "Dans Réglages"
     pj = tmp_path / "capture.png"
@@ -677,7 +677,7 @@ def test_export_des_nouvelles_demandes_et_fait_des_manips(fen, tmp_path, monkeyp
     assert S.relire(st, ancien.id).statut == "À vérifier"
     cible = tmp_path / "export.md"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(lambda *a, **k: (str(cible), "")))
-    fen.aller("demandes")
+    fen.ouvrir_demandes()
     fen.p_demandes.ouvrir_fichier.disconnect()
     fen.p_demandes._exporter()
     texte = cible.read_text(encoding="utf-8")
@@ -750,7 +750,7 @@ def test_demandes_modifiables_a_faire_dans_les_pdf_et_listes_identiques(fen, tmp
     from mat_methode.ui import colonnes as C
     st, r = fen.ctrl.st, fen.ctrl.reglages
     # demandes : menus concernés (plusieurs) puis modification
-    fen.aller("demandes")
+    fen.ouvrir_demandes()
     p = fen.p_demandes
     p.titre_saisi, p.texte_saisi = "Colonne trop étroite", "Dans la liste"
     p.tags_saisis = {"Mat & Méthode", "Protocole"}
@@ -951,3 +951,48 @@ def test_conflit_entre_deux_postes_choix_de_la_version(fen, monkeypatch):
     assert len(versions) == 2
     msg = fen.ctrl.resoudre_conflit(m.id, versions[0][0].fichier, False)
     assert msg == "" and fen.ctrl.liste.conflits == []
+
+
+def test_consigne_en_parallele_dans_les_pdf_conditions_par_materiel_et_fenetre_des_demandes(fen, tmp_path):
+    import pdfplumber
+
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.domain import regles as R
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.protocole import ecrire_protocole
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    ids = [e.id for e in m.etapes]
+    p = R.creer_parallele(m)
+    R.placer_dans_voie(m, ids[1], p.id, p.voies[0].id)
+    R.placer_dans_voie(m, ids[2], p.id, p.voies[1].id)
+    m.etapes[0].remarque = "Chauffer sans dépasser 60 °C"
+    d = exporter(m, r)
+    assert [ph.get("parallele") for ph in d["phases"][1:4]] == [None, "EN PARALLÈLE · VOIE A", "EN PARALLÈLE · VOIE B"]
+    assert d["phases"][4]["reunion"] == "Réunit les voies A et B"
+    for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
+        ecrire(d, tmp_path / f"{i}.pdf")
+        with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
+            t = " ".join(" ".join(pg.extract_text() for pg in pdf.pages).split())
+        assert "EN PARALLÈLE · VOIE A" in t and "Réunit les voies A et B" in t and "Chauffer sans dépasser 60 °C" in t
+    # conditions particulières d'un matériel : ajoutées à l'étape avec leur valeur par défaut
+    assert O.ajouter_condition_materiel(r, "Étuve", "Humidité", "%", "40") and not O.ajouter_condition_materiel(r, "Étuve", "humidité")
+    e = m.etapes[4]
+    e.equipements = ["Étuve"]
+    assert O.appliquer_conditions_materiel(r, e) == ["Humidité"] and e.autres[-1].valeur == "40 %"
+    assert O.appliquer_conditions_materiel(r, e) == []  # pas de doublon
+    assert O.renommer_materiel(r, [m], "Étuve", "Étuve ventilée") is not None and "Étuve ventilée" in r.conditions_materiel
+    fen.aller("reglages")
+    fen.p_reglages.ouvrir("cond_materiel")
+    QTest.qWait(30)
+    # fenêtre « Bugs et idées » : flottante, qui ne bloque pas l'application
+    assert not fen.fen_demandes.isVisible()
+    fen.nav["demandes"].click()
+    assert fen.fen_demandes.isVisible() and fen.page == "reglages" and not fen.fen_demandes.isModal()
+    fen.fen_demandes.hide()
+    # boutons à côté du titre
+    fen.aller("manips")
+    assert [b.text().replace("&&", "&") for b in fen.actions_titre.findChildren(type(fen.nav["manips"]))] == ["+  Nouvelle manip", "Importer un ancien Mat & Méthode"]
+    fen.aller("rapports")
+    assert [b.text() for b in fen.actions_titre.findChildren(type(fen.nav["manips"]))] == ["Importer un ancien rapport"]

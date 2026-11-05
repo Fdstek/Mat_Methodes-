@@ -137,6 +137,8 @@ class Flux(Flowable):
             textes = [((r["nom"] + (" " + r["quantite"] if r.get("quantite") else "")), self.fontb, 7.5 * echelle, INK) for r in detail if r.get("nom")]
             textes.append((cond, self.font, 7.5 * echelle, TEAL))
             textes += [(eq, self.font, 7 * echelle, MUTED) for eq in e.get("equipement", [])]
+            if e.get("remarque"):
+                textes.append((f"Consigne : {e['remarque']}", self.font, 7 * echelle, AMBER))
             lignes = []
             for texte, police, taille, couleur in textes:
                 if texte:
@@ -323,8 +325,10 @@ def blocs_phases(data: dict, corps) -> list:
         else:
             sous = escape(ph.get("conditions") or "conditions à compléter") + (
                 f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
-                f"<br/><i>Remarque : {escape(ph['remarque'])}</i>" if ph.get("remarque") else "")
-        tete = (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
+                f"<br/><i>Consigne / remarque : {escape(ph['remarque'])}</i>" if ph.get("remarque") else "")
+        tete = ((f"<font size='7' color='#8A4B00'><b>{escape(ph['parallele'])}</b></font><br/>" if ph.get("parallele") else "")
+                + (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
+                + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else ""))
         lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
         if i:
             txt = "<br/>".join(

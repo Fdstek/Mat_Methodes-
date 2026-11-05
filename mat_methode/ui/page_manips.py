@@ -43,18 +43,12 @@ class PageManips(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(14)
 
-        barre = QHBoxLayout()
-        barre.addWidget(bouton("+  Nouvelle manip", self.nouvelle.emit, accent=True, tip="Nouvelle manip (Ctrl+N)"))
-        barre.addWidget(bouton("Importer un ancien rapport", self.importer.emit, tip="Rapport PDF ou fichier JSON exporté"))
-        barre.addWidget(bouton("Importer un ancien Mat & Méthode", self.importer_mm.emit, tip="Fichier Word, PDF ou texte, ou texte collé"))
-        barre.addStretch(1)
         self.recherche = QLineEdit()  # placée à droite des onglets Manips / Archivées
         self.recherche.setPlaceholderText("Rechercher une manip, un tag, un objectif…")
         self.recherche.setAccessibleName("Rechercher une manip (Ctrl+F)")
         self.recherche.setClearButtonEnabled(True)
         self.recherche.setMinimumWidth(180)
         self.recherche.textChanged.connect(lambda *_: self._actualiser())
-        lay.addLayout(barre)
 
         self.pivot = QHBoxLayout()
         self.b_actives = bouton("", lambda: self._onglet(False))
