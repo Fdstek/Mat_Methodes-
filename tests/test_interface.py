@@ -1114,7 +1114,10 @@ def test_ton_flux_reste_en_place_pendant_le_defilement(fen, qtbot):
     qtbot.wait(150)
     defil = fen.defilements["flux"]
     assert isinstance(fen.p_flux._zone_flux, QScrollArea)
+    defil.setMaximumHeight(380)  # la page doit défiler quelle que soit la hauteur de l'écran (sous Windows la fenêtre peut être plus haute)
+    qtbot.wait(150)
     barre = defil.verticalScrollBar()
+    assert barre.maximum() > 0
     barre.setValue(barre.maximum())
     hote, zone = fen.p_flux._hote_flux, fen.p_flux._zone_flux
     qtbot.waitUntil(lambda: zone.y() > 0, timeout=3000)
