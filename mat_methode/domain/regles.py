@@ -159,7 +159,7 @@ def appliquer_communes(m: Manip, remplacer: bool = False) -> int:
         if c.temperature_c is not None and (remplacer or e.temperature_c is None):
             e.temperature_c, ch = c.temperature_c, True
         if c.agitation_trmin is not None and not est_centrifugation(e.operation) and (remplacer or e.agitation_trmin is None):
-            e.agitation_trmin, ch = c.agitation_trmin, True
+            e.agitation_trmin, e.vitesse_unite, ch = c.agitation_trmin, c.vitesse_unite, True
         if c.vide is not None and (remplacer or e.vide is None):
             e.vide, ch = c.vide.model_copy(), True
         n += ch
@@ -198,7 +198,7 @@ def heriter_communes(m: Manip, e: Etape) -> None:
     if c.temperature_c is not None and e.temperature_c is None:
         e.temperature_c = c.temperature_c
     if c.agitation_trmin is not None and e.agitation_trmin is None and not est_centrifugation(e.operation):
-        e.agitation_trmin = c.agitation_trmin
+        e.agitation_trmin, e.vitesse_unite = c.agitation_trmin, c.vitesse_unite
     if c.vide is not None and e.vide is None:
         e.vide = c.vide.model_copy()
 
@@ -323,6 +323,32 @@ def numero_prochaine_etape_voie(m: Manip, parallele_id: str, voie_id: str) -> in
         return len(m.etapes) + 1
     avant = [i for i in membres if ordre.get(m.etapes[i].voie_id, 0) <= cible]
     return (max(avant) + 2) if avant else (min(membres) + 1)
+
+
+def bloc_au_depart(m: Manip) -> Parallele | None:
+    """Le bloc en parallèle qui ouvre le flux (aucune étape avant lui), s'il y en a un."""
+    if m.etapes:
+        return m.parallele(m.etapes[0].parallele_id)
+    return m.paralleles[0] if m.paralleles else None
+
+
+def synchroniser_depart(m: Manip) -> None:
+    """Flux qui commence par des voies : la matière et le volume de départ sont ceux des voies (somme des mL de leurs matières de départ)."""
+    from mat_methode.domain.volumes import volume_ajoute
+    par = bloc_au_depart(m)
+    if par is None:
+        return
+    total = sum(volume_ajoute(v) for v in par.voies)
+    if total > 0:
+        m.contexte.volume_depart_ml = total
+    noms = []
+    for v in par.voies:
+        for x in v.autres:
+            if x.nom.strip() and x.nom.strip() not in noms:
+                noms.append(x.nom.strip())
+                break
+    if noms:
+        m.contexte.matiere = " + ".join(noms)
 
 
 def creer_parallele(m: Manip, nvoies: int = 2) -> Parallele:

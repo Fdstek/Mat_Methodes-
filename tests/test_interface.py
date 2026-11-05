@@ -1030,3 +1030,75 @@ def test_tableau_de_matieres_scirius_ou_a_la_main(fen):
     QTest.qWait(50)
     textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
     assert "Autres matières de la voie" in textes
+
+
+def test_depart_par_voie_matiere_recue_dans_completer_et_schema_du_pdf(fen, tmp_path):
+    import pdfplumber
+    from PySide6.QtWidgets import QFrame
+
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import Manip, ReactifEtape
+    from mat_methode.exports.echange import exporter
+    from mat_methode.exports.pdf import ecrire_pdf
+    from mat_methode.exports.word import image_flux
+    r = fen.ctrl.reglages
+    m = Manip(nom="Départ en parallèle", etat="brouillon")
+    m.contexte.volume_depart_ml = 1
+    fen.ctrl.manips.append(m)
+    p = R.creer_parallele(m)
+    for op, v in (("filtration", 0), ("décantation", 0), ("lavage", 1)):
+        e = R.ajouter_etape(m, op, None, reglages=r)
+        R.placer_dans_voie(m, e.id, p.id, p.voies[v].id)
+    R.ajouter_etape(m, "mélange", None, reglages=r)
+    p.voies[0].autres = [ReactifEtape(nom="Graisse animale", quantite="12", unite="mL")]
+    p.voies[1].autres = [ReactifEtape(nom="Huile de colza", quantite="8", unite="mL", reference="lot EA-42")]
+    fen.ctrl.toucher(m)  # volume et matière de départ = ceux des voies
+    assert m.contexte.volume_depart_ml == 20 and m.contexte.matiere == "Graisse animale + Huile de colza"
+    fen.ouvrir(m.id, "comp")
+    page = fen.p_flux
+    assert page.ordre()[:2] == [f"depart:{p.voies[0].id}", f"depart:{p.voies[1].id}"] and page.etape_id == page.ordre()[0]
+    page.rafraichir()
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    assert "Départ · voie A" in textes and "Départ · voie B" in textes and "Reçoit : voie A" in textes  # un Départ par voie, réunion visible
+    assert "Matière de départ de la voie A" in textes  # éditeur du départ de la voie
+    page.aller(m.etapes[2].id)  # 1re étape de la voie B : sa matière reçue reste modifiable dans l'éditeur
+    QTest.qWait(50)
+    assert "Matière de départ de la voie B" in " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    # PDF et Word : cartes « Départ · voie X », cadre, flèches
+    d = exporter(m, r)
+    assert d["etapes"][0]["parallele"]["depart"]["volume_ml"] == 12 and d["etapes"][2]["parallele"]["depart"]["matieres"][0]["reference"] == "lot EA-42"
+    ecrire_pdf(d, tmp_path / "d.pdf")
+    with pdfplumber.open(tmp_path / "d.pdf") as pdf:
+        t = " ".join(pg.extract_text() for pg in pdf.pages)
+    assert "DÉPART · VOIE A" in t and "DÉPART · VOIE B" in t and "EN PARALLÈLE" in t and "SORTIE" in t and "ENTRÉE" in t
+    assert image_flux(d["etapes"], d["prelevements"]).size[1] > 500
+    assert not any(f.objectName() == "menuAjout" for f in page.findChildren(QFrame))
+
+
+def test_unite_de_vitesse_tr_min_ou_g_pour_l_agitation_et_les_conditions_communes(fen):
+    from mat_methode.domain import regles as R
+    from mat_methode.report.rapport import construire
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    # conditions communes : agitation en g (RCF), appliquée aux étapes
+    m.communes.agitation_trmin = 3000.0
+    page._changer_unite_vitesse_commune("g")
+    assert m.communes.vitesse_unite == "g" and m.communes.agitation_trmin == r.vitesses_rcf[0]
+    n = R.appliquer_communes(m, remplacer=True)
+    assert n > 0 and all(e.vitesse_unite == "g" for e in m.etapes if e.agitation_trmin is not None and e.operation != "centrifugation")
+    # une étape d'agitation (pas seulement la centrifugation) peut passer de tr/min à g, et revenir
+    e = next(x for x in m.etapes if x.operation != "centrifugation" and x.agitation_trmin is not None)
+    page._changer_unite_vitesse(e, "tr/min")
+    assert e.vitesse_unite == "tr/min" and e.agitation_trmin == r.vitesses_agitation[0]
+    page._changer_unite_vitesse(e, "g")
+    assert "g" in construire(m, r).sections[2].texte
+    from PySide6.QtWidgets import QComboBox
+    page.ouvrir("comp")
+    page.aller(e.id)
+    QTest.qWait(50)
+    assert any(c.findText("RCF (g)") >= 0 for c in page.findChildren(QComboBox))  # sélecteur tr/min ou RCF (g) sur une étape d’agitation

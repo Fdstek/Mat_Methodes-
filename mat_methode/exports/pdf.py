@@ -26,6 +26,7 @@ from mat_methode.exports.polices import trouver
 TEAL, TEAL_L = colors.HexColor("#0F6B5C"), colors.HexColor("#E1F0EC")
 INK, MUTED, LINE = colors.HexColor("#14201D"), colors.HexColor("#566360"), colors.HexColor("#BFCBC7")
 AMBER, AMBER_L = colors.HexColor("#8A4B00"), colors.HexColor("#FDF1DC")
+VERT, VERT_L, VERT_T = colors.HexColor("#4AA064"), colors.HexColor("#E8F6EE"), colors.HexColor("#1B6B2A")
 MANQUE = '<font color="#8A4B00"><b>à saisir</b></font>'
 
 _POLICES: tuple[str, str] | None = None
@@ -103,6 +104,18 @@ def avec_reperes(texte: str) -> str:
     return re.sub(r"\[([^\]]*) à saisir\]", lambda mt: f'<font color="#8A4B00"><b>[{mt.group(1)} à saisir]</b></font>', escape(texte))
 
 
+def avec_departs(etapes: list[dict]) -> list[dict]:
+    """Ajoute une carte virtuelle « Départ · voie X » avant la 1re étape de chaque voie d'un bloc qui ouvre le flux."""
+    out = []
+    for e in etapes:
+        par = e.get("parallele") or {}
+        if par.get("depart") is not None:
+            out.append({"virtuel": True, "n": None, "operation": f"Départ · voie {par.get('lettre', '')}", "parallele": par, "depart": par["depart"],
+                        "parametres": {}, "reactifs_detail": [], "autres": [], "equipement": []})
+        out.append(e)
+    return out
+
+
 class Flux(Flowable):
     """Cartes d'étapes reliées par des flèches ; badges sur la frise ; noms des échantillons sous les cartes."""
 
@@ -111,6 +124,11 @@ class Flux(Flowable):
     def __init__(self, etapes, prelevements, largeur):
         super().__init__()
         self.font, self.fontb = polices()
+        etapes = avec_departs(etapes)  # bloc en parallèle au départ : une carte « Départ » par voie
+        if any(e.get("parallele") for e in etapes):
+            self.ESPACE = 16 * mm  # place pour le cadre « en parallèle » et les flèches de séparation
+            if any((e.get("parallele") or {}).get("depart") is not None for e in etapes):
+                self.TETE = 25 * mm  # bloc au départ : la flèche d'entrée passe au-dessus du cadre
         self.etapes, self.largeur = etapes, largeur
         self.carte_w = (largeur - (self.PAR_LIGNE - 1) * self.GAP) / self.PAR_LIGNE
         self.cases, self.liens, self.lettres = disposer(etapes, self.PAR_LIGNE)  # étapes en parallèle : une colonne par voie
@@ -130,6 +148,16 @@ class Flux(Flowable):
     def _contenu(self, e: dict) -> dict:
         """Lignes de la carte ; la police des textes est réduite si la carte devient trop haute (§14.6)."""
         w = self.carte_w
+        if e.get("virtuel"):  # Départ d'une voie : matières et volume
+            dep = e["depart"]
+            lignes = []
+            for x in dep.get("matieres", []):
+                lignes += [(ln, self.fontb, 7.5, INK) for ln in simpleSplit(f"{x['nom']} {x.get('quantite') or ''}".strip(), self.fontb, 7.5, w - 6 * mm)]
+                if x.get("reference"):
+                    lignes += [(ln, self.font, 7, MUTED) for ln in simpleSplit(str(x["reference"]), self.font, 7, w - 6 * mm)]
+            if len(dep.get("matieres", [])) != 1 or not dep.get("volume_ml"):  # une seule matière : son volume est déjà écrit
+                lignes.append((f"{fmt_vol(dep['volume_ml'])} mL" if dep.get("volume_ml") else "matière à saisir", self.font, 7.5, TEAL))
+            return {"titre": [e["operation"].upper()], "taille_t": 7.5, "lignes": lignes, "h": 12 * mm + sum(t + 1.6 for _, _, t, _ in lignes) + 3 * mm}
         titre, taille_t = titre_lignes(e["operation"][:1].upper() + e["operation"][1:], w - 11 * mm, self.fontb)
         detail = e.get("reactifs_detail") or [{"nom": n, "quantite": ""} for n in e.get("reactifs", [])]
         cond = " · ".join(x for x in [conditions(e["parametres"])] + [f"{a['nom']} {a.get('valeur', '')}".strip() for a in e.get("autres", [])] if x)
@@ -223,25 +251,37 @@ class Flux(Flowable):
         c.drawString(0, self.haut - 4 * mm, "ENTRÉE")
         x = stringWidth("ENTRÉE", self.fontb, 7.5) + 3 * mm
         for pre in self.par_apres.get(0, []):
-            x += self.pastille(c, x, self.haut - self.TETE + 4 * mm, *self.etiquette(pre)) + 1.5 * mm
+            x += self.pastille(c, x, self.haut - 11 * mm, *self.etiquette(pre)) + 1.5 * mm
 
         positions = []
-        for i, e in enumerate(self.etapes):
+        for i in range(len(self.etapes)):
             r, k = self.cases[i]
             h = self.h_cartes[r]
-            cx = k * (w + self.GAP)
-            cy = self.haut - self.TETE - sum(self.hauteurs[:r]) - h
-            positions.append((cx, cy, r, h))
+            positions.append((k * (w + self.GAP), self.haut - self.TETE - sum(self.hauteurs[:r]) - h, r, h))
+        self._cadres_en_parallele(c, positions)  # derrière les cartes
+        for i, e in enumerate(self.etapes):
+            cx, cy, r, h = positions[i]
             ct = self.contenus[i]
-            c.setFillColor(colors.white)
-            c.setStrokeColor(LINE)
-            c.setLineWidth(1)
+            c.setFillColor(VERT_L if e.get("virtuel") else colors.white)
+            c.setStrokeColor(VERT if e.get("virtuel") else LINE)
+            c.setLineWidth(1.4 if e.get("virtuel") else 1)
             c.roundRect(cx, cy, w, h, 2.5 * mm, stroke=1, fill=1)
             haut = cy + h
             if i in self.lettres:  # début d'une voie : « VOIE A » au-dessus de la carte
                 c.setFillColor(AMBER)
                 c.setFont(self.fontb, 6.5)
-                c.drawString(cx + 1 * mm, cy + h + 1.3 * mm, f"VOIE {self.lettres[i]} · EN PARALLÈLE")
+                c.drawString(cx + 1 * mm, cy + h + 1.3 * mm, f"VOIE {self.lettres[i]}")
+            if e.get("virtuel"):  # Départ d'une voie : matières et volume
+                c.setFillColor(VERT_T)
+                c.setFont(self.fontb, ct["taille_t"])
+                c.drawString(cx + 3 * mm, haut - 6 * mm, ct["titre"][0])
+                y = haut - 11.5 * mm
+                for ligne, police, taille, couleur in ct["lignes"]:
+                    c.setFont(police, taille)
+                    c.setFillColor(couleur)
+                    c.drawString(cx + 3 * mm, y, ligne)
+                    y -= taille + 1.6
+                continue
             if e.get("groupe"):  # bandeau de la grande étape (ex. DEGUMMING)
                 c.setFillColor(TEAL_L)
                 c.roundRect(cx + 0.5, cy + h - 4.5 * mm, w - 1, 4.5 * mm - 0.5, 2.2 * mm, stroke=0, fill=1)
@@ -298,12 +338,55 @@ class Flux(Flowable):
             elif r2 > r1:  # vers une autre ligne : on descend, on traverse l'espace entre les lignes, puis on entre par le haut
                 xa, xb = x1 + w - 3 * mm, x2 + w - 3 * mm
                 depart = y1 if self.bandes[r1] == 0 else y1 - self.bandes[r1] * self.PAS
-                ym = y2 + h2 + self.ESPACE * 0.72
+                ym = y2 + h2 + self.ESPACE * 0.93
                 self.fleche(c, [(xa, depart), (xa, ym), (xb, ym), (xb, y2 + h2 + 0.4 * mm)], "bas")
 
+        entrants, sortants = {ib for _, ib in self.liens}, {ia for ia, _ in self.liens}
+        premiers = [k for k in range(len(self.etapes)) if k not in entrants]
+        y_entree = max((positions[k][1] + positions[k][3] + (self.ESPACE * 0.78 if (self.etapes[k].get("parallele") or {}).get("id") else 0) for k in premiers),
+                       default=self.haut - self.TETE) + 2.5 * mm  # au-dessus du cadre en parallèle s'il y en a un
+        for i in premiers:  # ENTRÉE → première(s) carte(s)
+            cx, cy, r, h = positions[i]
+            self.fleche(c, [(3.5 * mm, self.haut - 5.5 * mm), (3.5 * mm, y_entree), (cx + w - 3 * mm, y_entree), (cx + w - 3 * mm, cy + h + 0.4 * mm)], "bas")
         c.setFont(self.fontb, 7.5)
         c.setFillColor(MUTED)
         c.drawRightString(self.largeur, 1.5 * mm, "SORTIE · produit prétraité")
+        x_sortie = self.largeur - stringWidth("SORTIE · produit prétraité", self.fontb, 7.5) - 2 * mm
+        for i in (k for k in range(len(self.etapes)) if k not in sortants):  # dernière(s) carte(s) → SORTIE
+            cx, cy, r, h = positions[i]
+            bas = cy - self.bandes[r] * self.PAS
+            xa = cx + w - 3 * mm
+            self.fleche(c, [(xa, bas), (xa, 3 * mm), (x_sortie, 3 * mm)], "droite")
+
+    def _cadres_en_parallele(self, c, positions):
+        """Cadre ambre autour de chaque bloc en parallèle, avec le signe « || » dessiné (la police ne l'a pas toujours) et le mot EN PARALLÈLE."""
+        blocs: dict[str, list[int]] = {}
+        for i, e in enumerate(self.etapes):
+            pid = (e.get("parallele") or {}).get("id")
+            if pid:
+                blocs.setdefault(pid, []).append(i)
+        for idx in blocs.values():
+            x0 = min(positions[i][0] for i in idx) - 3 * mm
+            x1 = max(positions[i][0] for i in idx) + self.carte_w + 3 * mm
+            y_haut = max(positions[i][1] + positions[i][3] for i in idx) + self.ESPACE * 0.78
+            y_bas = min(positions[i][1] - self.bandes[positions[i][2]] * self.PAS for i in idx) - 2.5 * mm
+            c.saveState()
+            c.setFillColor(AMBER_L)
+            c.setStrokeColor(AMBER)
+            c.setLineWidth(1.2)
+            c.setDash(3, 2)
+            c.roundRect(x0, y_bas, x1 - x0, y_haut - y_bas, 3 * mm, stroke=1, fill=1)
+            c.restoreState()
+            c.saveState()
+            c.setStrokeColor(AMBER)
+            c.setLineWidth(1.3)
+            yt = y_haut - 4.6 * mm
+            c.line(x0 + 3 * mm, yt - 0.4 * mm, x0 + 3 * mm, yt + 2.6 * mm)
+            c.line(x0 + 4.6 * mm, yt - 0.4 * mm, x0 + 4.6 * mm, yt + 2.6 * mm)
+            c.restoreState()
+            c.setFillColor(AMBER)
+            c.setFont(self.fontb, 7.5)
+            c.drawString(x0 + 6.5 * mm, yt, "EN PARALLÈLE")
 
 
 def _ou(v):

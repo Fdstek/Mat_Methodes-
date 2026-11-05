@@ -217,6 +217,7 @@ class Controleur(QObject):
         m = m or self.courante
         if m is None or (m.id == self.courante_id and self.lecture_seule):
             return
+        R.synchroniser_depart(m)  # flux qui commence par des voies : volume et matière de départ = ceux des voies
         self.sales.add(m.id)
         self.statut.emit("Enregistrement automatique…", False)
         if m.lancee:

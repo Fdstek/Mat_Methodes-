@@ -24,7 +24,7 @@ from mat_methode.domain.models import (
 )
 from mat_methode.domain.prototype import contexte_depuis
 from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat
-from mat_methode.domain.regles import blocs, echantillons_tries, etiquettes, lettre_voie, numero_etape, reperes_etapes
+from mat_methode.domain.regles import bloc_au_depart, blocs, echantillons_tries, etiquettes, lettre_voie, numero_etape, reperes_etapes
 from mat_methode.domain.texte import cap, minuscule_initiale
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
 
@@ -51,7 +51,7 @@ def contexte_vers(m: Manip) -> dict:
         d["attribue"] = c.attribue
     d["tags"] = list(m.tags)
     if reperes_etapes(m):
-        d["reperes"] = [{"initiale": i, "groupe": g, "materiel": mat} for i, g, mat in reperes_etapes(m)]
+        d["reperes"] = [{"initiale": i.replace("∥", "voie "), "groupe": g, "materiel": mat} for i, g, mat in reperes_etapes(m)]
     return d
 
 
@@ -84,6 +84,12 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                 etapes[-1]["parallele"].update({"part": voie.part, "part_unite": voie.part_unite})
             if voie.autres:
                 etapes[-1]["parallele"]["autres"] = [a.model_dump() for a in voie.autres]
+            premiere = not any(x.parallele_id == par.id and x.voie_id == voie.id for x in m.etapes[:i])
+            if premiere and bloc_au_depart(m) is par:  # le bloc ouvre le flux : Départ propre à la voie (matières, volume)
+                from mat_methode.domain.volumes import volume_ajoute
+                etapes[-1]["parallele"]["depart"] = {"volume_ml": _nombre(volume_ajoute(voie)), "matieres": [
+                    {"nom": a.nom, "quantite": a.quantite_complete, "reference": (reglages.reactif(a.nom).scirius if reglages.reactif(a.nom) else "") or a.reference}
+                    for a in voie.autres if a.nom]}
         if e.apports and i > 0 and m.parallele(m.etapes[i - 1].parallele_id):  # étape qui réunit des voies : quantité prise de chacune
             pp = m.parallele(m.etapes[i - 1].parallele_id)
             etapes[-1]["apports"] = {str(k): v for k, vo in enumerate(pp.voies) if (v := e.apports.get(vo.id)) is not None}

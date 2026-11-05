@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_vol
 from mat_methode.exports.disposition import disposer
-from mat_methode.exports.pdf import code_badge, conditions, moment_texte, phrase_volumes
+from mat_methode.exports.pdf import avec_departs, code_badge, conditions, moment_texte, phrase_volumes
 from mat_methode.exports.polices import trouver
 
 TEAL, AMBER, MUTED = "0F6B5C", "8A4B00", "566360"
@@ -74,6 +74,7 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
     """Cartes d'étapes, frise du temps et badges ; noms des échantillons sous les cartes."""
     f_n, f_s, f_b, f_bs = police(False, 21), police(False, 18), police(True, 21), police(True, 17)
     par_ligne, gap = 5, 26
+    etapes = avec_departs(etapes)  # bloc en parallèle au départ : une carte « Départ » par voie
     cw = (largeur - (par_ligne - 1) * gap) // par_ligne
     par_apres: dict[int, list] = {}
     for p in prelevements:
@@ -81,6 +82,17 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
     tmp = ImageDraw.Draw(Image.new("RGB", (10, 10)))
     cartes = []
     for e in etapes:
+        if e.get("virtuel"):  # Départ d'une voie : matières et volume
+            dep = e["depart"]
+            ls = []
+            for x in dep.get("matieres", []):
+                ls += [(t, f_b, "#14201D") for t in _lignes(tmp, f"{x['nom']} {x.get('quantite') or ''}".strip(), f_b, cw - 28)]
+                if x.get("reference"):
+                    ls += [(t, f_s, "#566360") for t in _lignes(tmp, str(x["reference"]), f_s, cw - 28)]
+            if len(dep.get("matieres", [])) != 1 or not dep.get("volume_ml"):
+                ls.append((f"{fmt_vol(dep['volume_ml'])} mL" if dep.get("volume_ml") else "matière à saisir", f_n, "#0F6B5C"))
+            cartes.append({"e": e, "ls": ls, "ps": [], "tl": [e["operation"].upper()], "tfont": f_bs, "pas": 24, "extra": 0, "bande": 0, "h": 80 + 30 * len(ls)})
+            continue
         ls = []
         for r in (e.get("reactifs_detail") or [{"nom": n, "quantite": ""} for n in e.get("reactifs", [])]):
             if r.get("nom"):
@@ -104,7 +116,7 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
         grp = [cartes[i] for i, (rr, _) in enumerate(cases) if rr == r] or [{"h": 120, "ps": []}]
         hc_lignes.append(max(c["h"] for c in grp))
         hauteurs.append(hc_lignes[-1] + 64 * max(len(c["ps"]) for c in grp) + 50)
-    haut_entree = 70
+    haut_entree = 70 + (110 if any((e.get("parallele") or {}).get("depart") is not None for e in etapes) else 0)  # place pour la flèche d'entrée au-dessus du cadre
     img = Image.new("RGB", (largeur, haut_entree + sum(hauteurs) + 50), "white")
     d = ImageDraw.Draw(img)
 
@@ -130,11 +142,34 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
     positions = []
     for idx, c in enumerate(cartes):
         r, k = cases[idx]
-        x, y0, hc = k * (cw + gap), ys[r], hc_lignes[r]
-        positions.append((x, y0, hc, r, k))
+        positions.append((k * (cw + gap), ys[r], hc_lignes[r], r, k))
+    blocs: dict[str, list[int]] = {}
+    for idx, c in enumerate(cartes):
+        pid = (c["e"].get("parallele") or {}).get("id")
+        if pid:
+            blocs.setdefault(pid, []).append(idx)
+    for ids in blocs.values():  # cadre ambre autour de chaque bloc en parallèle
+        x0 = min(positions[i][0] for i in ids) - 14
+        x1 = max(positions[i][0] for i in ids) + cw + 14
+        y_haut = min(positions[i][1] for i in ids) - 62
+        y_bas = max(positions[i][1] + positions[i][2] + 64 * max(len(cartes[i]["ps"]) for i in ids) for i in ids) + 14
+        d.rounded_rectangle([x0, y_haut, x1, y_bas], 16, fill="#FDF1DC", outline="#8A4B00", width=3)
+        d.line([x0 + 18, y_haut + 12, x0 + 18, y_haut + 40], fill="#8A4B00", width=4)
+        d.line([x0 + 30, y_haut + 12, x0 + 30, y_haut + 40], fill="#8A4B00", width=4)
+        d.text((x0 + 46, y_haut + 26), "EN PARALLÈLE", font=f_bs, fill="#8A4B00", anchor="lm")
+    for idx, c in enumerate(cartes):
+        x, y0, hc, r, k = positions[idx]
         e = c["e"]
         if idx in lettres:  # début d'une voie
-            d.text((x + 4, y0 - 22), f"VOIE {lettres[idx]} · EN PARALLÈLE", font=f_bs, fill="#8A4B00")
+            d.text((x + 4, y0 - 20), f"VOIE {lettres[idx]}", font=f_bs, fill="#8A4B00")
+        if e.get("virtuel"):  # Départ d'une voie : carte verte
+            d.rounded_rectangle([x, y0, x + cw, y0 + hc], 12, fill="#E8F6EE", outline="#4AA064", width=4)
+            d.text((x + 14, y0 + 14), c["tl"][0], font=f_bs, fill="#1B6B2A")
+            ly = y0 + 50
+            for t, font, coul in c["ls"]:
+                d.text((x + 14, ly), t, font=font, fill=coul)
+                ly += 30
+            continue
         d.rounded_rectangle([x, y0, x + cw, y0 + hc], 12, fill="white", outline="#BFCBC7", width=3)
         yt = y0 + c["bande"]
         if c["bande"]:  # bandeau de la grande étape (ex. DEGUMMING)
@@ -182,8 +217,24 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
             ym = yb0 - 22
             d.line([xa, depart, xa, ym, xb, ym, xb, yb0 - 10], fill=gris, width=3, joint="curve")
             d.polygon([(xb, yb0 - 2), (xb - 8, yb0 - 14), (xb + 8, yb0 - 14)], fill=gris)
+    entrants, sortants = {ib for _, ib in liens}, {ia for ia, _ in liens}
+    y_entree = min((positions[i][1] - (62 if (cartes[i]["e"].get("parallele") or {}).get("id") else 0) for i in range(len(cartes)) if i not in entrants),
+                   default=haut_entree) - 28
+    d.line([8, 40, 8, max(y_entree, 44)], fill=gris, width=3)
+    for i in (k for k in range(len(cartes)) if k not in entrants):  # ENTRÉE → première(s) carte(s)
+        x, y0 = positions[i][0], positions[i][1]
+        xe = x + cw - 40
+        d.line([8, max(y_entree, 44), xe, max(y_entree, 44), xe, y0 - 10], fill=gris, width=3, joint="curve")
+        d.polygon([(xe, y0 - 2), (xe - 8, y0 - 14), (xe + 8, y0 - 14)], fill=gris)
     y = ys[-1] + hauteurs[-1]
     so = "SORTIE · produit prétraité"
+    x_so = largeur - d.textlength(so, font=f_bs) - 16
+    for i in (k for k in range(len(cartes)) if k not in sortants):  # dernière(s) carte(s) → SORTIE
+        x, y0, hc, r, k = positions[i]
+        bas = y0 + hc + 64 * len(cartes[i]["ps"]) + 6
+        xs = x + cw - 40
+        d.line([xs, bas, xs, y - 20, x_so - 6, y - 20], fill=gris, width=3, joint="curve")
+        d.polygon([(x_so, y - 20), (x_so - 12, y - 27), (x_so - 12, y - 13)], fill=gris)
     d.text((largeur - d.textlength(so, font=f_bs), y - 30), so, font=f_bs, fill="#566360")
     return img
 

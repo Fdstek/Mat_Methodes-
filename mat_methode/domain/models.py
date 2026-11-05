@@ -326,6 +326,7 @@ class Contexte(_Modele):
 class Communes(_Modele):
     temperature_c: Optional[float] = None
     agitation_trmin: Optional[float] = None
+    vitesse_unite: str = "tr/min"  # « tr/min » ou « g » (RCF)
     vide: Optional[Vide] = None
 
 

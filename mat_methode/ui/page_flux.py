@@ -38,8 +38,8 @@ from mat_methode.domain.models import (
 )
 from mat_methode.domain.reglages_ops import auteur, texte_statut
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
-from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_vol, norm
-from mat_methode.domain.volumes import part_voie, volumes_par_etape
+from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_num, fmt_vol, norm
+from mat_methode.domain.volumes import part_voie, volume_ajoute, volumes_par_etape
 from mat_methode.report.rapport import autres_conditions, resume_conditions
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
@@ -217,8 +217,8 @@ class PageFlux(QWidget):
         m = self.m
         if m is None:
             return
-        if self.etape_id != DEPART and not m.etape(self.etape_id):
-            self.etape_id = DEPART
+        if self.etape_id not in self.ordre():
+            self.etape_id = self.ordre()[0]
         if not m.etapes:
             self.mode = "def"
         if not structure:
@@ -860,6 +860,12 @@ class PageFlux(QWidget):
         v = QVBoxLayout(f)
         v.setContentsMargins(10, 8, 10, 8)
         v.setSpacing(6)
+        if R.bloc_au_depart(self.m) is par:  # le bloc ouvre le flux : la voie part de ses propres matières (Scirius ou à la main) et de leur volume
+            total = volume_ajoute(vo)
+            v.addWidget(etiquette(f"<b>Matière de départ de la voie {R.lettre_voie(self.m, par.id, vo.id)}</b>"
+                                  + (f" = <b>{fmt_vol(total)} mL</b>" if total else " : quantités en mL à saisir"), wrap=True))
+            v.addWidget(self._table_matieres(vo.autres, "matière"))
+            return f
         recu = part_voie(vo, sortie, len(par.voies))
         part = NumberBox(vo.part, "", "égale")
         part.setMaximumWidth(90)
@@ -1039,11 +1045,12 @@ class PageFlux(QWidget):
         defs = [("temperature_c", "Chauffage", "Température", "°C"), ("agitation_trmin", "Agitation", "Vitesse", "tr/min"),
                 ("vide", "Sous vide", "Pression (facultatif)", "mbar")]
         for k, (cle, lib, lib_v, unite) in enumerate(defs):
+            if cle == "agitation_trmin":
+                unite = c.vitesse_unite if c.vitesse_unite in UNITES_VITESSE else "tr/min"
             on = (c.vide is not None) if cle == "vide" else getattr(c, cle) is not None
             g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_commune(m, cle), self._toucher(True)),
                                         (c.vide.mbar if c.vide else None) if cle == "vide" else getattr(c, cle), lib_v, unite,
-                                        lambda v, cle=cle: self._set_commune(cle, v),
-                                        self.ctrl.reglages.vitesses_agitation if cle == "agitation_trmin" else None), 0, k)
+                                        lambda v, cle=cle: self._set_commune(cle, v), *self._vitesse_commune(cle)), 0, k)
         cl.addLayout(g)
         rem = ToggleSwitch("Remplacer aussi les valeurs déjà saisies", self.remplacer)
         rem.toggled.connect(lambda v: setattr(self, "remplacer", v))
@@ -1053,6 +1060,26 @@ class PageFlux(QWidget):
         cl.addWidget(ligne(ap, "stretch"))
         cl.addWidget(etiquette("Les étapes que tu ajouteras ensuite reprennent ces conditions automatiquement.", secondaire=True))
         return f
+
+    def _vitesse_commune(self, cle: str) -> tuple:
+        """(liste des vitesses, sélecteur d'unité tr/min ou RCF) pour l'agitation commune ; (None, None) pour les autres conditions."""
+        if cle != "agitation_trmin":
+            return None, None
+        c, r = self.m.communes, self.ctrl.reglages
+        u = c.vitesse_unite if c.vitesse_unite in UNITES_VITESSE else "tr/min"
+        unite = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})
+        unite.setMinimumWidth(110)
+        unite.setAccessibleName("Unité de la vitesse commune : tr/min ou RCF (g)")
+        unite.choisi.connect(self._changer_unite_vitesse_commune)
+        return (r.vitesses_rcf if u == "g" else r.vitesses_agitation), unite
+
+    def _changer_unite_vitesse_commune(self, unite: str):
+        r, c = self.ctrl.reglages, self.m.communes
+        liste = r.vitesses_rcf if unite == "g" else r.vitesses_agitation
+        c.vitesse_unite = unite
+        if c.agitation_trmin is not None and liste:
+            c.agitation_trmin = liste[0]
+        self._toucher(True)
 
     def _set_commune(self, cle, v):
         c = self.m.communes
@@ -1192,19 +1219,21 @@ class PageFlux(QWidget):
             q = "avant" if n == 0 else (f"à {fmt_dur(p.temps_min)}" if p.temps_min is not None else "à ?") if p.moment == "pendant" else "sortie"
             w = ambre(f"{lab[p.id]} · {fmt_vol(p.volume_ml or 0)} mL {q}" + (f" · {p.labo}" if p.labo else ""), code_badge(lab[p.id]))
             if not self.consultation:  # glisser l'échantillon vers une autre étape (ou le départ)
-                rendre_source(w, "echantillon", p.id, lambda p=p: self.aller(p.etape_id or DEPART))
+                rendre_source(w, "echantillon", p.id, lambda p=p: self.aller(p.etape_id or self.ordre()[0]))
                 w.setToolTip("Glisser vers une autre étape pour déplacer l’échantillon")
             return w
 
         dep = [p for p in ech if R.numero_etape(m, p) == 0]
-        c = self._carte_flux(DEPART, None, "Départ")
-        if not self.consultation:
-            rendre_cible(c, {"echantillon": "dedans"}, lambda genre, ident, avant: self._deposer_ech(ident, None))
-        c.layout().addWidget(etiquette(f"{m.contexte.matiere or 'matière ?'}" + (f" · {fmt_vol(m.contexte.volume_depart_ml)} mL"
-                                                                                 if m.contexte.volume_depart_ml is not None else ""), secondaire=True))
-        for p in dep:
-            c.layout().addWidget(pill(p))
-        lay.addWidget(c)
+        if not self._departs():  # flux qui commence par des voies : un « Départ » par voie, dans le cadre en parallèle
+            c = self._carte_flux(DEPART, None, "Départ")
+            if not self.consultation:
+                rendre_cible(c, {"echantillon": "dedans"}, lambda genre, ident, avant: self._deposer_ech(ident, None))
+            c.layout().addWidget(etiquette(f"{m.contexte.matiere or 'matière ?'}" + (f" · {fmt_vol(m.contexte.volume_depart_ml)} mL"
+                                                                                     if m.contexte.volume_depart_ml is not None else ""), secondaire=True))
+            for p in dep:
+                c.layout().addWidget(pill(p))
+            lay.addWidget(c)
+        volumes = {lg.indice: lg for lg in volumes_par_etape(m)}
         cible, cadre = lay, None
         for i, e in enumerate(m.etapes):
             g = m.groupe(e.groupe_id)
@@ -1229,6 +1258,9 @@ class PageFlux(QWidget):
                                    "etiquetteChamp")
                     tv.setStyleSheet(f"color:{theme.P.ambre_texte};padding-left:4px;")
                     cible.addWidget(tv)
+                    if R.bloc_au_depart(m) is par:  # bloc qui ouvre le flux : le Départ de cette voie
+                        voie_courante = next(v for v in par.voies if v.id == e.voie_id)
+                        cible.addWidget(self._carte_depart_voie(voie_courante, R.lettre_voie(m, par.id, voie_courante.id)))
             elif g is None:
                 cible = lay
             elif debut:  # cadre de la grande étape (ex. DEGUMMING · étapes 2 à 4)
@@ -1260,12 +1292,62 @@ class PageFlux(QWidget):
                 cl.addWidget(etiquette(" · ".join(e.equipements), secondaire=True, wrap=True))
             if e.remarque.strip():
                 cl.addWidget(etiquette(f"<i>Consigne : {e.remarque.strip()}</i>", wrap=True))
+            if self._matiere_recue_visible(i):
+                cl.addWidget(self._lignes_matiere_recue(i, volumes))
             ps = [p for p in ech if p.etape_id == e.id]
             if e.duree_min or ps:
                 cl.addWidget(Frise(e.duree_min, [(position(p, e), code_badge(lab[p.id])) for p in ps]))
             for p in ps:
                 cl.addWidget(pill(p))
             cible.addWidget(c)
+
+    def _premiere_de_voie(self, i: int) -> bool:
+        m, e = self.m, self.m.etapes[i]
+        return e.parallele_id is not None and (i == 0 or m.etapes[i - 1].parallele_id != e.parallele_id or m.etapes[i - 1].voie_id != e.voie_id)
+
+    def _reunit_les_voies(self, i: int) -> bool:
+        return i > 0 and self.m.etapes[i - 1].parallele_id is not None and self.m.etapes[i].parallele_id is None
+
+    def _matiere_recue_visible(self, i: int) -> bool:
+        """Carte du flux : la matière reçue s'affiche sur la 1re étape d'une voie (hors départ, qui a sa carte) et sur l'étape qui réunit les voies."""
+        e = self.m.etapes[i]
+        return (self._premiere_de_voie(i) and R.bloc_au_depart(self.m) is not self.m.parallele(e.parallele_id)) or self._reunit_les_voies(i)
+
+    def _lignes_matiere_recue(self, i: int, volumes: dict) -> QWidget:
+        m, e = self.m, self.m.etapes[i]
+        lg = volumes.get(i)
+        if self._reunit_les_voies(i):
+            par = m.parallele(m.etapes[i - 1].parallele_id)
+            morceaux = []
+            for vo in par.voies:
+                idx = [k for k, x in enumerate(m.etapes) if x.parallele_id == par.id and x.voie_id == vo.id]
+                if idx and idx[-1] in volumes:
+                    pris = e.apports.get(vo.id, volumes[idx[-1]].sortie)
+                    morceaux.append(f"voie {R.lettre_voie(m, par.id, vo.id)} {fmt_vol(pris)} mL")
+            texte = "Reçoit : " + " + ".join(morceaux) + (f" = <b>{fmt_vol(lg.entree)} mL</b>" if lg else "")
+        else:
+            par = m.parallele(e.parallele_id)
+            vo = next(v for v in par.voies if v.id == e.voie_id)
+            texte = f"Reçoit <b>{fmt_vol(lg.entree)} mL</b>" if lg else "Matière reçue à saisir"
+            if vo.part is not None:
+                texte += f" ({fmt_num(vo.part)} {vo.part_unite} de l’étape précédente)"
+            ajouts = [f"{x.nom} {x.quantite_complete}".strip() for x in vo.autres if x.nom]
+            if ajouts:
+                texte += " + " + " + ".join(ajouts)
+        return etiquette(texte, secondaire=True, wrap=True)
+
+    def _carte_depart_voie(self, vo, lettre: str) -> QFrame:
+        """Départ d'une voie d'un bloc qui ouvre le flux : ses matières de départ et son volume."""
+        c = self._carte_flux(f"depart:{vo.id}", None, f"Départ · voie {lettre}")
+        for x in vo.autres:
+            if x.nom:
+                inv = self.ctrl.reglages.reactif(x.nom)
+                ident = (inv.scirius if inv and inv.scirius else x.reference) or ""
+                c.layout().addWidget(etiquette(f"<b>{x.nom}</b> {x.quantite_complete}" + (f" <span style='color:{theme.P.texte2}'>· {ident}</span>" if ident else ""), wrap=True))
+        total = volume_ajoute(vo)
+        if len([x for x in vo.autres if x.nom]) != 1 or not total:  # une seule matière : son volume est déjà écrit
+            c.layout().addWidget(etiquette(f"{fmt_vol(total)} mL" if total else "matière et volume à saisir", secondaire=True))
+        return c
 
     def _carte_flux(self, ident, n, titre) -> QFrame:
         f = QFrame()
@@ -1292,8 +1374,14 @@ class PageFlux(QWidget):
         self.etape_id = ident
         self._actualiser()
 
+    def _departs(self) -> list:
+        """(bloc, voie) des voies d'un bloc en parallèle qui ouvre le flux : chacune a son propre « Départ » (matière et volume)."""
+        par = R.bloc_au_depart(self.m)
+        return [(par, v) for v in par.voies] if par is not None else []
+
     def ordre(self):
-        return [DEPART] + [e.id for e in self.m.etapes]
+        departs = self._departs()
+        return ([f"depart:{v.id}" for _, v in departs] if departs else [DEPART]) + [e.id for e in self.m.etapes]
 
     def precedente(self):
         o = self.ordre()
@@ -1320,7 +1408,14 @@ class PageFlux(QWidget):
         lay.setSpacing(12)
         e = m.etape(self.etape_id)
         avert = [x for x in R.avertissements(m, self.ctrl.manips)]
-        if e is None:
+        depart_voie = next(((par, vo) for par, vo in self._departs() if self.etape_id == f"depart:{vo.id}"), None)
+        if e is None and depart_voie is not None:  # flux qui commence par des voies : Départ propre à la voie
+            par, vo = depart_voie
+            lettre = R.lettre_voie(m, par.id, vo.id)
+            lay.addWidget(etiquette(f"Départ · voie {lettre}" + (f" ({vo.nom})" if vo.nom.strip() else ""), "sousTitre"))
+            lay.addWidget(self._carte_matiere_voie(par, vo, []))
+            lay.addWidget(etiquette("Cette voie démarre avec ces matières ; le volume de départ du flux est la somme des voies.", secondaire=True, wrap=True))
+        elif e is None:
             lay.addWidget(etiquette("Départ", "sousTitre"))
             f, cl = carte()
             cl.addWidget(etiquette("Matière de départ", "titreCarte"))
@@ -1346,6 +1441,11 @@ class PageFlux(QWidget):
                 gl.setStyleSheet(f"color:{theme.P.accent};font-weight:700;")
                 lay.addWidget(gl)
             lay.addWidget(ligne(numero(i + 1, 28), etiquette(cap(e.operation), "sousTitre"), "stretch"))
+            par_e = m.parallele(e.parallele_id)
+            if par_e is not None and self._premiere_de_voie(i):  # 1re étape d'une voie : la matière reçue par la voie
+                lay.addWidget(self._carte_matiere_voie(par_e, next(v for v in par_e.voies if v.id == e.voie_id), []))
+            elif self._reunit_les_voies(i):  # étape qui réunit les voies : quantité prise de chacune
+                lay.addWidget(self._panneau_convergence(i))
             lay.addWidget(self._conditions(e))
             lay.addWidget(self._reactifs(e))
         for a in avert:
@@ -1382,11 +1482,10 @@ class PageFlux(QWidget):
             if cle == "agitation_trmin":  # vitesse choisie dans la liste des Réglages ; centrifugation : tr/min ou RCF (g)
                 u = e.vitesse_unite if e.vitesse_unite in UNITES_VITESSE else "tr/min"
                 choix = self.ctrl.reglages.vitesses_rcf if u == "g" else self.ctrl.reglages.vitesses_agitation
-                if est_centrifugation(e.operation):
-                    extra = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})
-                    extra.setMinimumWidth(110)
-                    extra.setAccessibleName("Unité de la vitesse de centrifugation")
-                    extra.choisi.connect(lambda nouv, e=e: self._changer_unite_vitesse(e, nouv))
+                extra = Liste(list(UNITES_VITESSE), u, vide=None, libelles={"tr/min": "tr/min", "g": "RCF (g)"})  # tr/min ou RCF (g), agitation comme centrifugation
+                extra.setMinimumWidth(110)
+                extra.setAccessibleName("Unité de la vitesse : tr/min ou RCF (g)")
+                extra.choisi.connect(lambda nouv, e=e: self._changer_unite_vitesse(e, nouv))
             g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_condition(e, cle), self._toucher(True)), val, lib_v, u,
                                         lambda v, cle=cle: self._set_cond(e, cle, v), choix, extra), k // 2, k % 2)
         wg = QWidget()
