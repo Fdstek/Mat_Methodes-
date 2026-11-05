@@ -41,6 +41,13 @@ def maintenant_iso() -> str:
 
 UNITES_REACTIFS_DEFAUT = ["mL", "g", "µL", "mg", "%", "mol/L"]
 VITESSES_DEFAUT = [100.0, 200.0, 300.0, 500.0, 800.0]
+VITESSES_RCF_DEFAUT = [500.0, 1000.0, 3000.0, 5000.0, 10000.0]  # force centrifuge relative (g)
+UNITES_VITESSE = ("tr/min", "g")  # g = RCF (force centrifuge relative)
+DUREES = {"s": 1 / 60, "min": 1.0, "h": 60.0, "jour": 1440.0, "semaine": 10080.0}  # unité de durée -> minutes
+UNITES_DUREE_DEFAUT = list(DUREES)
+CONDITIONS_OPERATION = (("temperature_c", "Chauffage", "°C"), ("agitation_trmin", "Agitation / vitesse", "tr/min"),
+                        ("vide", "Sous vide", "mbar"), ("filtre_um", "Membrane filtrante", "µm"), ("duree_min", "Durée", "min"))
+DEFAUTS_OPERATIONS = {"chauffage": {"temperature_c": 60.0, "agitation_trmin": 300.0}, "filtration": {"filtre_um": 5.0}}
 
 
 class _Modele(BaseModel):
@@ -58,6 +65,7 @@ class Operation(_Modele):
     """Opération proposée dans « Définir le flux » (sous-étape), avec le participe passé utilisé dans le texte 2.3."""
     nom: str
     participe: str = ""
+    defauts: dict[str, float] = Field(default_factory=dict)  # conditions actives d'office pour cette opération (clé -> valeur par défaut ; vide : 0 = sans pression)
 
 
 def initiales_de(nom: str) -> str:
@@ -133,9 +141,11 @@ class Reglages(_Modele):
     materiels: list[str] = Field(default_factory=lambda: list(MATERIEL_DEFAUT))  # matériel proposé dans les étapes
     categories_a_faire: list[str] = Field(default_factory=lambda: list(CATEGORIES_A_FAIRE_DEFAUT))
     volumes_ml: list[float] = Field(default_factory=lambda: list(VOLUMES_DEFAUT))  # volumes proposés pour un échantillon
-    operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
+    operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v, defauts=dict(DEFAUTS_OPERATIONS.get(k, {}))) for k, v in OPERATIONS.items()])
     unites_reactifs: list[str] = Field(default_factory=lambda: list(UNITES_REACTIFS_DEFAUT))  # unités proposées pour les quantités de réactifs
     vitesses_agitation: list[float] = Field(default_factory=lambda: list(VITESSES_DEFAUT))  # vitesses d'agitation proposées (tr/min)
+    vitesses_rcf: list[float] = Field(default_factory=lambda: list(VITESSES_RCF_DEFAUT))  # vitesses de centrifugation proposées en g (RCF)
+    unites_duree: list[str] = Field(default_factory=lambda: list(UNITES_DUREE_DEFAUT))  # unités de durée proposées (s, min, h, jour, semaine)
     ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)
     ordre_tags: list[str] = Field(default_factory=list)  # ordre choisi des tags (Réglages › Tags) ; les autres suivent, par ordre alphabétique
     couleurs_tags: dict[str, str] = Field(default_factory=dict)  # tag (sans casse ni accents) -> couleur choisie ; sinon couleur automatique
@@ -248,13 +258,26 @@ class Etape(_Modele):
     reactifs: list[ReactifEtape] = Field(default_factory=list)
     remarque: str = ""
     groupe_id: Optional[str] = None  # grande étape (Degumming…) qui contient cette étape
+    apports: dict[str, float] = Field(default_factory=dict)  # étape qui réunit des voies : voie -> quantité prise (mL) ; absent = toute la sortie
+    duree_unite: str = "min"  # unité choisie pour saisir la durée (la durée reste stockée en minutes)
+    vitesse_unite: str = "tr/min"  # « tr/min » ou « g » (RCF) pour l'agitation / la centrifugation
     parallele_id: Optional[str] = None  # bloc « en parallèle » qui contient cette étape (jamais avec une grande étape)
     voie_id: Optional[str] = None  # voie du bloc en parallèle (A, B…)
+
+
+class Matiere(_Modele):
+    """Autre matière apportée à une voie en parallèle (réactif, quantité et unité)."""
+    nom: str = ""
+    quantite: str = ""
+    unite: str = ""
 
 
 class Voie(_Modele):
     id: str = Field(default_factory=nouvel_id)
     nom: str = ""  # facultatif (ex. « phase huile ») : la lettre A, B… vient de la place de la voie
+    part: Optional[float] = None  # part de la sortie de l'étape précédente (ou du volume de départ) reçue par la voie ; vide = part égale
+    part_unite: str = "%"  # « % » ou « mL »
+    autres: list[Matiere] = Field(default_factory=list)  # autres matières ajoutées au début de la voie
 
 
 class Parallele(_Modele):

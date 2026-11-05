@@ -52,7 +52,7 @@ def conditions(p: dict) -> str:
     if p.get("duree_min") is not None:
         out.append(fmt_dur(p["duree_min"]))
     if p.get("agitation_trmin") is not None:
-        out.append(f"{fmt_num(p['agitation_trmin'])} tr/min")
+        out.append(f"{fmt_num(p['agitation_trmin'])} {'g' if p.get('vitesse_unite') == 'g' else 'tr/min'}")
     if p.get("vide"):
         out.append("sous vide" + (f" {fmt_num(p['vide_mbar'])} mbar" if p.get("vide_mbar") else ""))
     if p.get("filtre_um") is not None:

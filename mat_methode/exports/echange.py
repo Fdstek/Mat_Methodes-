@@ -8,11 +8,13 @@ from __future__ import annotations
 from datetime import date
 
 from mat_methode.domain.models import (
+    UNITES_VITESSE,
     Etape,
     Groupe,
     Lancement,
     LigneJournal,
     Manip,
+    Matiere,
     Parallele,
     Prelevement,
     ReactifEtape,
@@ -65,6 +67,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                           "agitation_trmin": _nombre(e.agitation_trmin), "filtre_um": _nombre(e.filtre_um)})
         if e.vide is not None:
             par.update({"vide": True, "vide_mbar": _nombre(e.vide.mbar)})
+        if e.agitation_trmin is not None and e.vitesse_unite != "tr/min":
+            par["vitesse_unite"] = e.vitesse_unite
         etapes.append({"n": i + 1, "operation": e.operation, "parametres": par, "equipement": list(e.equipements),
                        "reactifs": [minuscule_initiale(x.nom) for x in e.reactifs if x.nom],
                        "reactifs_detail": [{"nom": x.nom, "quantite": x.quantite_complete} for x in e.reactifs],
@@ -76,6 +80,13 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
             voie = next((v for v in par.voies if v.id == e.voie_id), par.voies[0])
             etapes[-1]["parallele"] = {"id": par.id, "voie": par.voies.index(voie), "lettre": lettre_voie(m, par.id, voie.id),
                                        "nvoies": len(par.voies), "nom_voie": voie.nom}
+            if voie.part is not None:
+                etapes[-1]["parallele"].update({"part": voie.part, "part_unite": voie.part_unite})
+            if voie.autres:
+                etapes[-1]["parallele"]["autres"] = [a.model_dump() for a in voie.autres]
+        if e.apports and i > 0 and m.parallele(m.etapes[i - 1].parallele_id):  # étape qui réunit des voies : quantité prise de chacune
+            pp = m.parallele(m.etapes[i - 1].parallele_id)
+            etapes[-1]["apports"] = {str(k): v for k, vo in enumerate(pp.voies) if (v := e.apports.get(vo.id)) is not None}
     materiel: list[str] = []
     for e in m.etapes:
         materiel += [x for x in e.equipements if x not in materiel]
@@ -156,6 +167,7 @@ def importer(d, reglages: Reglages) -> tuple[Manip, list[int]]:
             reglages.assurer_reactif(rd.get("nom", ""))
         e = Etape(operation=(x.get("operation") or "étape libre").strip(), temperature_c=p.get("temperature_c"),
                   duree_min=p.get("duree_min"), agitation_trmin=p.get("agitation_trmin"), filtre_um=p.get("filtre_um"),
+                  vitesse_unite=p.get("vitesse_unite") if p.get("vitesse_unite") in UNITES_VITESSE else "tr/min",
                   vide=Vide(mbar=p.get("vide_mbar")) if p.get("vide") else None,
                   equipements=list(x.get("equipement") or []),
                   autres=[a for a in x.get("autres") or [] if isinstance(a, dict)],
@@ -180,7 +192,18 @@ def importer(d, reglages: Reglages) -> tuple[Manip, list[int]]:
                 m.paralleles.append(bloc)
             k = min(max(int(pj.get("voie") or 0), 0), len(bloc.voies) - 1)
             bloc.voies[k].nom = pj.get("nom_voie") or bloc.voies[k].nom
+            if pj.get("part") is not None:
+                bloc.voies[k].part = float(pj["part"])
+                bloc.voies[k].part_unite = "mL" if pj.get("part_unite") == "mL" else "%"
+            if pj.get("autres") and not bloc.voies[k].autres:
+                bloc.voies[k].autres = [Matiere(nom=a.get("nom", ""), quantite=a.get("quantite", ""), unite=a.get("unite", "")) for a in pj["autres"]
+                                        if isinstance(a, dict)]
             e.parallele_id, e.voie_id, e.groupe_id = bloc.id, bloc.voies[k].id, None
+        if isinstance(x.get("apports"), dict) and m.etapes and m.parallele(m.etapes[-1].parallele_id):  # quantités prises de chaque voie
+            bloc_prec = m.parallele(m.etapes[-1].parallele_id)
+            for cle, val in x["apports"].items():
+                if str(cle).isdigit() and int(cle) < len(bloc_prec.voies) and isinstance(val, (int, float)):
+                    e.apports[bloc_prec.voies[int(cle)].id] = float(val)
         m.etapes.append(e)
         if x.get("a_verifier"):
             a_verifier.append(i + 1)

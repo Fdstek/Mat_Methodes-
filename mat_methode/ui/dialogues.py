@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 
 from mat_methode.domain.texte import fmt_dt
 from mat_methode.ui import theme
-from mat_methode.ui.widgets import ChampTexte, Liste, bouton, champ, etiquette
+from mat_methode.ui.widgets import ChampTexte, Liste, bouton, champ, etiquette, ligne
 
 
 class Voile(QWidget):
@@ -442,3 +442,30 @@ def conflit(parent, autre: str) -> str:
     d.finir()
     d.exec()  # Échap = garder ma version en copie (aucune perte)
     return choix["v"]
+
+
+def conditions_operation(parent, operation: str, defauts: dict) -> dict | None:
+    """Conditions activées d'office (avec leur valeur) quand on ajoute cette opération à un flux. None si annulé."""
+    from mat_methode.domain.models import CONDITIONS_OPERATION
+    from mat_methode.ui.widgets import NumberBox, ToggleSwitch
+    d = Dialogue(parent, f"Conditions par défaut : {operation}")
+    d.lay.addWidget(etiquette("Ces conditions sont activées d’office quand tu ajoutes cette opération à un flux ; tu peux toujours les changer dans l’étape. "
+                              "Sous vide : laisse la pression vide pour « sous vide » sans valeur.", secondaire=True, wrap=True))
+    lignes = {}
+    for cle, libelle, unite in CONDITIONS_OPERATION:
+        on = cle in defauts
+        interrupteur = ToggleSwitch(libelle, on)
+        valeur = NumberBox(defauts.get(cle) or None, unite, "")
+        valeur.setMaximumWidth(150)
+        valeur.setEnabled(on)
+        interrupteur.toggled.connect(valeur.setEnabled)
+        d.lay.addWidget(ligne(interrupteur, "stretch", valeur))
+        lignes[cle] = (interrupteur, valeur)
+    d.boutons.addWidget(bouton("Annuler", d.reject))
+    ok = bouton("Enregistrer", d.accept, accent=True)
+    ok.setDefault(True)
+    d.boutons.addWidget(ok)
+    d.finir()
+    if d.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return {cle: (v.lire() or 0.0) for cle, (t, v) in lignes.items() if t.isChecked() and (cle == "vide" or v.lire())}

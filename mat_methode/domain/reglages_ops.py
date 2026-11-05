@@ -220,17 +220,49 @@ def supprimer_volume(r: Reglages, v: float) -> None:
     r.volumes_ml = [x for x in r.volumes_ml if x != v]
 
 
-def ajouter_vitesse(r: Reglages, v: float | None) -> bool:
-    """Vitesse d'agitation proposée (tr/min), liste triée."""
-    if v is None or v <= 0 or v in r.vitesses_agitation:
+def ajouter_vitesse(r: Reglages, v: float | None, unite: str = "tr/min") -> bool:
+    """Vitesse proposée (tr/min, ou g pour la centrifugation), liste triée."""
+    liste = r.vitesses_rcf if unite == "g" else r.vitesses_agitation
+    if v is None or v <= 0 or v in liste:
         return False
-    r.vitesses_agitation = sorted(r.vitesses_agitation + [float(v)])
+    nouvelle = sorted(liste + [float(v)])
+    if unite == "g":
+        r.vitesses_rcf = nouvelle
+    else:
+        r.vitesses_agitation = nouvelle
     return True
 
 
-def supprimer_vitesse(r: Reglages, v: float) -> None:
+def supprimer_vitesse(r: Reglages, v: float, unite: str = "tr/min") -> None:
     """Les étapes qui utilisent cette vitesse la gardent."""
-    r.vitesses_agitation = [x for x in r.vitesses_agitation if x != v]
+    if unite == "g":
+        r.vitesses_rcf = [x for x in r.vitesses_rcf if x != v]
+    else:
+        r.vitesses_agitation = [x for x in r.vitesses_agitation if x != v]
+
+
+def ajouter_unite_duree(r: Reglages, unite: str) -> bool:
+    from mat_methode.domain.models import DUREES
+    if unite not in DUREES or unite in r.unites_duree:
+        return False
+    r.unites_duree = [u for u in DUREES if u in r.unites_duree or u == unite]  # ordre naturel : s, min, h, jour, semaine
+    return True
+
+
+def retirer_unite_duree(r: Reglages, unite: str) -> bool:
+    """Au moins une unité doit rester proposée ; les étapes qui l'utilisent la gardent."""
+    if unite not in r.unites_duree or len(r.unites_duree) <= 1:
+        return False
+    r.unites_duree = [u for u in r.unites_duree if u != unite]
+    return True
+
+
+def regler_defauts_operation(r: Reglages, nom: str, defauts: dict[str, float]) -> bool:
+    o = r.operation(nom)
+    if o is None:
+        return False
+    o.defauts = dict(defauts)
+    return True
 
 
 def renommer_unite(r: Reglages, manips: list[Manip], ancien: str, nouveau: str) -> list[Manip]:
