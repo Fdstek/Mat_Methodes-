@@ -1140,6 +1140,7 @@ def test_carte_du_flux_ne_s_ecrase_pas_quand_on_ajoute_un_echantillon(fen, qtbot
     qtbot.wait(200)
     contenu = fen.p_flux._zone_flux.widget()
     assert contenu.height() >= contenu.layout().minimumHeightForWidth(contenu.width())  # jamais en dessous de la taille nécessaire
+    assert contenu.height() >= contenu.layout().totalHeightForWidth(contenu.width()) and contenu.minimumHeight() >= contenu.layout().totalHeightForWidth(contenu.width())
 
 
 def test_filtre_par_statut_comme_les_tags(fen, qtbot):

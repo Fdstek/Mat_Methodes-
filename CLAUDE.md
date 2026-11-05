@@ -118,6 +118,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - Lot du 05/11 (version 1.8.4) : carte « Réunion · voies A + B » (`echange.reunion_volumes`, `pdf.avec_departs`, `PageFlux._carte_reunion`).
 - Lot du 05/11 (version 1.9.0, schéma 22) : modèles de grandes étapes (`models.ModeleGrandeEtape`, `Reglages.modeles_grandes_etapes`, `regles.modele_depuis_groupe /
   appliquer_modele`, `reglages_ops.enregistrer_modele / renommer_modele / supprimer_modele`, bouton ★ de la grande étape, choix `mo:<nom>` dans « Où ajouter l'étape ? », carte Réglages).
+- Lot du 05/11 (version 1.9.1) : `PageFlux._epingler` fixe `contenu.setMinimumHeight(totalHeightForWidth(largeur réelle))` (cartes du flux écrasées sous Windows).
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

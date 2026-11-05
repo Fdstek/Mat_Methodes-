@@ -1,9 +1,10 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.9.0"
+VERSION = "1.9.1"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.9.1", "05/11/2026", ["Colonne « Ton flux » : une carte avec un texte à la ligne ou des échantillons n'est plus écrasée (hauteur minimale = hauteur réellement nécessaire)"]),
     ("1.9.0", "05/11/2026", ["Modèles de grandes étapes : bouton ★ pour enregistrer une grande étape (sans les quantités), à poser dans « Où ajouter l’étape ? » ; gestion dans Réglages",
                              "Nouvelle version des données (22) : installer cette version sur tous les postes en même temps"]),
     ("1.8.4", "05/11/2026", ["Réunion de deux voies : carte « Réunion · voies A + B » avec le volume de chaque voie et le volume réuni, dans le flux, les schémas PDF / Word et le détail par phase"]),
