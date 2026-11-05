@@ -1,9 +1,11 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.8.1"
+VERSION = "1.8.2"
 DATE_VERSION = "05/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.8.2", "05/11/2026", ["Colonne « Ton flux » : les cartes ne s'écrasent plus quand on ajoute un échantillon (badges coupés, pastilles qui se chevauchent)",
+                             "Un nom de laboratoire long passe à la ligne dans la pastille d'échantillon"]),
     ("1.8.1", "05/11/2026", ["Compléter les étapes : la colonne « Ton flux » reste en place (l'étape choisie est visible), seul le détail défile",
                              "PDF Protocole et Rapport : le détail du flux par phase reprend la couleur de chaque voie",
                              "Réactifs : temps de contact avec une liste déroulante d'unités (s, min, h, jour, semaine)"]),

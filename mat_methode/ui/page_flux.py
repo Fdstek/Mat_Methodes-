@@ -1222,7 +1222,7 @@ class PageFlux(QWidget):
         # « Ton flux » reste en place quand on fait défiler le détail : il suit le défilement de la page (voir _epingler)
         self._zone_flux = QScrollArea(w)
         self._zone_flux.setWidget(gauche)
-        self._zone_flux.setWidgetResizable(False)
+        self._zone_flux.setWidgetResizable(True)  # le contenu ne descend jamais sous sa taille minimale : plus de cartes écrasées
         self._zone_flux.setFrameShape(QFrame.Shape.NoFrame)
         self._zone_flux.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._zone_flux.setStyleSheet("QScrollArea{background:transparent;}")
@@ -1231,6 +1231,7 @@ class PageFlux(QWidget):
         self._hote_flux.setFixedWidth(330)
         self._zone_flux.setParent(self._hote_flux)
         self._hote_flux.installEventFilter(self)
+        gauche.installEventFilter(self)  # une carte change de taille (échantillon ajouté, texte long) : on recalcule la hauteur
         h.addWidget(self._hote_flux)
         h.addWidget(self._editeur(), 1, Qt.AlignmentFlag.AlignTop)
         QTimer.singleShot(0, self._epingler)
@@ -1243,7 +1244,8 @@ class PageFlux(QWidget):
         return p
 
     def eventFilter(self, obj, ev):
-        if obj is getattr(self, "_hote_flux", None) and ev.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+        if ev.type() in (QEvent.Type.Resize, QEvent.Type.Show, QEvent.Type.LayoutRequest) and (
+                obj is getattr(self, "_hote_flux", None) or (getattr(self, "_zone_flux", None) is not None and obj is self._zone_flux.widget())):
             QTimer.singleShot(0, self._epingler)
         return super().eventFilter(obj, ev)
 
@@ -1260,10 +1262,9 @@ class PageFlux(QWidget):
                 defil.verticalScrollBar().valueChanged.connect(lambda _v: self._epingler())
                 self._defil_connecte = defil
             contenu = zone.widget()
-            haut_contenu = contenu.layout().totalHeightForWidth(contenu.width()) if contenu.layout() else contenu.sizeHint().height()
-            contenu.resize(contenu.width(), max(haut_contenu, 10))
+            haut_contenu = contenu.layout().totalHeightForWidth(312) if contenu.layout() else contenu.sizeHint().height()
             vue = defil.viewport().height() - 16
-            haut = max(120, min(contenu.height() + 4, vue))
+            haut = max(120, min(max(haut_contenu, contenu.minimumSizeHint().height()) + 4, vue))
             hote.setMinimumHeight(haut)
             y_hote = hote.mapTo(defil.widget(), QPoint(0, 0)).y()
             decalage = max(0, defil.verticalScrollBar().value() + 8 - y_hote)
@@ -1370,6 +1371,8 @@ class PageFlux(QWidget):
             for p in ps:
                 cl.addWidget(pill(p))
             cible.addWidget(c)
+        if getattr(self, "_zone_flux", None) is not None:
+            QTimer.singleShot(0, self._epingler)  # la colonne a changé (échantillon ajouté…) : hauteur recalculée
 
     def _premiere_de_voie(self, i: int) -> bool:
         m, e = self.m, self.m.etapes[i]

@@ -112,6 +112,8 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   (initiales, « ? » si IGG inconnu) ; export « Bugs et idées » avec dossier `<nom>_pieces` ; `colonnes.Pilule(rayon)` pour les tags : poussé sur la branche.
 - Lot du 05/11 (version 1.8.1) : `PageFlux._epingler` (colonne « Ton flux » épinglée, suit le défilement de la page) ; `pdf.couleur_phase` (couleur de voie
   dans le détail par phase) ; `ReactifEtape.contact_unite / contact_complet` : poussé sur la branche.
+- Lot du 05/11 (version 1.8.2) : `PageFlux._zone_flux` en `widgetResizable` + recalcul de la hauteur à chaque changement de la colonne (cartes écrasées
+  après ajout d'un échantillon) ; `widgets.ambre` passe à la ligne si le texte est long : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

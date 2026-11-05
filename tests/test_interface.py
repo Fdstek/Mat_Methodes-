@@ -1116,9 +1116,24 @@ def test_ton_flux_reste_en_place_pendant_le_defilement(fen, qtbot):
     assert isinstance(fen.p_flux._zone_flux, QScrollArea)
     barre = defil.verticalScrollBar()
     barre.setValue(barre.maximum())
-    qtbot.wait(150)
     hote, zone = fen.p_flux._hote_flux, fen.p_flux._zone_flux
+    qtbot.waitUntil(lambda: zone.y() > 0, timeout=3000)
     # la colonne suit le défilement : elle a quitté le haut de son hôte et reste visible dans la page
     haut_visible = zone.mapTo(defil.viewport(), zone.rect().topLeft()).y()
     assert zone.y() > 0 and haut_visible + zone.height() > 0 and haut_visible < defil.viewport().height()
     assert zone.y() + zone.height() <= hote.height()
+
+
+def test_carte_du_flux_ne_s_ecrase_pas_quand_on_ajoute_un_echantillon(fen, qtbot):
+    from mat_methode.domain.models import Prelevement
+    m = ethanol(fen)
+    fen.ouvrir(m.id, "def")
+    fen.p_flux._mode("comp")
+    qtbot.wait(100)
+    e = m.etapes[4]
+    for labo in ("Ana CRES", "Biohub", "Laboratoire externe de caractérisation des corps gras"):
+        m.prelevements.append(Prelevement(etape_id=e.id, moment="effluent", volume_ml=60, labo=labo, analyses=[]))
+    fen.p_flux.rafraichir()
+    qtbot.wait(200)
+    contenu = fen.p_flux._zone_flux.widget()
+    assert contenu.height() >= contenu.layout().minimumHeightForWidth(contenu.width())  # jamais en dessous de la taille nécessaire
