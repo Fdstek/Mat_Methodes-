@@ -246,6 +246,7 @@ class ReactifEtape(_Modele):
     nom: str = ""
     quantite: str = ""
     unite: str = ""  # unité choisie dans la liste des Réglages (vide = quantité écrite en texte libre)
+    reference: str = ""  # référence saisie à la main (lot, n° interne…) quand la matière ne vient pas de Scirius
 
     @property
     def quantite_complete(self) -> str:
@@ -273,11 +274,7 @@ class Etape(_Modele):
     voie_id: Optional[str] = None  # voie du bloc en parallèle (A, B…)
 
 
-class Matiere(_Modele):
-    """Autre matière apportée à une voie en parallèle (réactif, quantité et unité)."""
-    nom: str = ""
-    quantite: str = ""
-    unite: str = ""
+Matiere = ReactifEtape  # une matière d'une voie se décrit comme un réactif d'étape
 
 
 class Voie(_Modele):
@@ -285,7 +282,7 @@ class Voie(_Modele):
     nom: str = ""  # facultatif (ex. « phase huile ») : la lettre A, B… vient de la place de la voie
     part: Optional[float] = None  # part de la sortie de l'étape précédente (ou du volume de départ) reçue par la voie ; vide = part égale
     part_unite: str = "%"  # « % » ou « mL »
-    autres: list[Matiere] = Field(default_factory=list)  # autres matières ajoutées au début de la voie
+    autres: list[ReactifEtape] = Field(default_factory=list)  # autres matières ajoutées au début de la voie (Scirius ou référence à la main)
 
 
 class Parallele(_Modele):

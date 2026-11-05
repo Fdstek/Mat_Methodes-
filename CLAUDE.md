@@ -99,7 +99,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - Lot du 05/11 11h25 (version 1.6.0) : consigne / remarque d'étape dans les cartes du flux et les PDF ; `Phase.parallele / reunion` (détail du flux
   des PDF) ; boutons à côté du titre (`Fenetre._boutons_titre`) ; « Bugs et idées » dans une fenêtre flottante (`Fenetre._fenetre_demandes /
   ouvrir_demandes`, `Qt.Tool`) ; `MENUS_DEMANDE` avec les sous-menus ; `Reglages.conditions_materiel` (`reglages_ops.appliquer_conditions_materiel`,
-  carte Réglages › Conditions par matériel) : poussé sur la branche.
+  carte Réglages › Conditions par matériel) ; tableau de matières `PageFlux._table_matieres` (réactifs d'étape et `Voie.autres` = `ReactifEtape` avec `reference`) : poussé sur la branche.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

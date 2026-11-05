@@ -996,3 +996,37 @@ def test_consigne_en_parallele_dans_les_pdf_conditions_par_materiel_et_fenetre_d
     assert [b.text().replace("&&", "&") for b in fen.actions_titre.findChildren(type(fen.nav["manips"]))] == ["+  Nouvelle manip", "Importer un ancien Mat & Méthode"]
     fen.aller("rapports")
     assert [b.text() for b in fen.actions_titre.findChildren(type(fen.nav["manips"]))] == ["Importer un ancien rapport"]
+
+
+def test_tableau_de_matieres_scirius_ou_a_la_main(fen):
+    from mat_methode.domain.models import ReactifEtape
+    from mat_methode.report.rapport import construire
+    r = fen.ctrl.reglages
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    page = fen.p_flux
+    m = fen.ctrl.courante
+    e = m.etapes[1]
+    avant = len(e.reactifs)
+    page._ajouter_a_la_main(e.reactifs)  # ligne vide : unité par défaut
+    assert len(e.reactifs) == avant + 1 and e.reactifs[-1].unite == r.unites_reactifs[0]
+    re_ = e.reactifs[-1]
+    re_.nom, re_.reference, re_.quantite = "Acide citrique", "lot AC-42", "5"
+    page._inv_par_nom(re_, "scirius", "1234567")  # n° mémorisé pour ce produit, créé dans les Réglages
+    inv = r.reactif("Acide citrique")
+    assert inv is not None and inv.scirius == "1234567"
+    # plusieurs matières dans une même voie, avec la référence à la main dans le détail des phases
+    from mat_methode.domain import regles as R
+    p = R.creer_parallele(m)
+    R.placer_dans_voie(m, m.etapes[2].id, p.id, p.voies[0].id)
+    p.voies[0].autres = [ReactifEtape(nom="Eau déminéralisée", reference="lot EA-42", quantite="50", unite="mL"),
+                         ReactifEtape(nom="Acide citrique", quantite="5", unite="g")]
+    phases = construire(m, r).phases
+    ph = next(x for x in phases if x.n == m.etapes.index(m.etapes[2]) + 1)
+    noms = {x.nom: x.scirius for x in ph.reactifs}
+    assert noms.get("Eau déminéralisée") == "lot EA-42" and noms.get("Acide citrique") == "1234567"
+    page.rafraichir()
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in page.findChildren(type(fen.titre)))
+    assert "Autres matières de la voie" in textes

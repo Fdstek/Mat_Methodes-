@@ -305,11 +305,18 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         for r in e.reactifs:
             if r.nom:
                 f = _inv(reglages, r.nom)
-                rs.append(LigneReactif(nom=r.nom, quantite=r.quantite_complete, scirius=f.get("scirius", ""), emplacement=f.get("emplacement", ""),
+                rs.append(LigneReactif(nom=r.nom, quantite=r.quantite_complete, scirius=f.get("scirius", "") or r.reference, emplacement=f.get("emplacement", ""),
                                        fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
         g = m.groupe(e.groupe_id)
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []
         par = m.parallele(e.parallele_id)
+        voie = next((v for v in par.voies if v.id == e.voie_id), None) if par else None
+        if voie is not None and not any(x.voie_id == voie.id and x.parallele_id == par.id for x in m.etapes[:i]):  # 1re étape de la voie : ses matières
+            for mat in voie.autres:
+                if mat.nom:
+                    f = _inv(reglages, mat.nom)
+                    rs.append(LigneReactif(nom=mat.nom, quantite=mat.quantite_complete, scirius=f.get("scirius", "") or mat.reference,
+                                           emplacement=f.get("emplacement", ""), fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
         voie_nom = next((v.nom.strip() for v in par.voies if v.id == e.voie_id), "") if par else ""
         en_parallele = f"EN PARALLÈLE · VOIE {lettre_voie(m, par.id, e.voie_id)}" + (f" ({voie_nom})" if voie_nom else "") if par else ""
         reunion = ""
