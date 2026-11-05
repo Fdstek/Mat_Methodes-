@@ -37,7 +37,7 @@ def ethanol(f):
 
 
 def fichier(f, m) -> dict:
-    return json.loads((f.ctrl.st.d_manips / f"{m.id}.json").read_text(encoding="utf-8"))
+    return json.loads(f.ctrl.st.chemin_manip(m.id).read_text(encoding="utf-8"))
 
 
 def test_premier_lancement_cree_donnees_et_exemples(fen, tmp_path):
@@ -103,7 +103,7 @@ def test_parcours_nouvelle_manip(fen, qtbot, monkeypatch):
     assert fen.p_flux.consultation  # validée : en lecture, sauf « Modifier »
     fen.p_flux.suivante()
     assert fen.page == "protocole"
-    qtbot.waitUntil(lambda: (fen.ctrl.st.d_manips / f"{m.id}.json").exists(), timeout=2000)
+    qtbot.waitUntil(lambda: fen.ctrl.st.chemin_manip(m.id).exists(), timeout=2000)
 
 
 def test_crit23_type_test_affiche_idee(fen):
@@ -220,7 +220,7 @@ def test_annulee_puis_suppression(fen, monkeypatch):
     fen.p_manips._statut(m, ANNULEE)
     assert m.etat == ANNULEE and fichier(fen, m)["etat"] == ANNULEE
     fen.p_manips._supprimer(m)
-    assert m not in fen.ctrl.manips and not (fen.ctrl.st.d_manips / f"{m.id}.json").exists()
+    assert m not in fen.ctrl.manips and not fen.ctrl.st.chemin_manip(m.id).exists()
     fen._annuler()  # Ctrl+Z
     assert any(x.id == m.id for x in fen.ctrl.manips)
 
@@ -921,3 +921,33 @@ def test_matiere_par_voie_unites_de_duree_vitesses_en_g_et_conditions_par_defaut
     assert lav.temperature_c == 25 and lav.vide is not None and lav.vide.mbar is None
     ch = R.ajouter_etape(m, "chauffage", None, reglages=r)
     assert ch.temperature_c == 60 and ch.agitation_trmin == 300
+
+
+def test_conflit_entre_deux_postes_choix_de_la_version(fen, monkeypatch):
+    from mat_methode.storage.stockage import Stockage
+    st = fen.ctrl.st
+    m = ethanol(fen)
+    fen.ctrl.enregistrer_tout()
+    marie = Stockage(st.racine, "marie", "PC2")
+    marie.initialiser()
+    b = marie.lire_manip(m.id)
+    b.nom = "Version Marie"
+    import mat_methode.storage.stockage as S
+    sauve = S.V.tetes
+    S.V.tetes = lambda dossier: [v for v in sauve(dossier) if v.poste.startswith("PC2")] or sauve(dossier)  # la synchronisation n'a rien apporté
+    try:
+        fen.ctrl.st.enregistrer_manip(m, forcer=False)  # (aucun changement : sans effet sur le test)
+        S.V.tetes = lambda dossier: []  # Marie enregistre sans voir la version de Pierre
+        assert marie.enregistrer_manip(b).ok
+    finally:
+        S.V.tetes = sauve
+    fen.ctrl.actualiser()
+    assert fen.ctrl.liste.conflits == [m.id]
+    fen.aller("manips")
+    QTest.qWait(50)
+    textes = " ".join(lb.text() for lb in fen.p_manips.findChildren(type(fen.titre)))
+    assert "deux versions à choisir" in textes
+    versions = fen.ctrl.versions_en_conflit(m.id)
+    assert len(versions) == 2
+    msg = fen.ctrl.resoudre_conflit(m.id, versions[0][0].fichier, False)
+    assert msg == "" and fen.ctrl.liste.conflits == []

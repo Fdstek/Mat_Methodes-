@@ -99,18 +99,59 @@ def test_crit28_dossier_inaccessible(tmp_path, ethanol):
     assert not res.ok and res.erreur == "Non enregistré : dossier inaccessible"
 
 
-def test_fichiers_illisibles_et_conflits(tmp_path, ethanol):
-    s = _st(tmp_path)
-    s.enregistrer_manip(ethanol)
+def test_fichiers_illisibles_et_ancien_format(tmp_path, ethanol):
+    """Ancien format : un fichier par manip ; il est converti en 1re version. Une copie de conflit OneDrive devient une 2e version courante."""
     d = tmp_path / "donnees" / "manips"
+    s = _st(tmp_path)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{ethanol.id}.json").write_text(json.dumps(ethanol.to_json()))
+    autre = ethanol.model_copy(deep=True)
+    autre.nom = "Version de Marie"
+    (d / f"{ethanol.id}-FR-MARIE.json").write_text(json.dumps(autre.to_json()))
     (d / "casse.json").write_text("{pas du json")
-    (d / f"{ethanol.id}-PC-MARIE.json").write_text((d / f"{ethanol.id}.json").read_text())
     (d / "futur.json").write_text(json.dumps({"schema": 99, "id": "futur"}))
     liste = s.lister()
-    assert [m.id for m in liste.manips] == [ethanol.id]
-    assert liste.conflits == [f"{ethanol.id}-PC-MARIE.json"] and any(x.startswith("casse.json") for x in liste.illisibles)
+    assert [m.id for m in liste.manips] == [ethanol.id] and liste.converties == 2
+    assert liste.conflits == [ethanol.id] and any(x.startswith("casse.json") for x in liste.illisibles)
     assert any("plus récente" in x for x in liste.illisibles)
-    assert (d / f"{ethanol.id}-PC-MARIE.json").exists()  # jamais supprimé
+    assert len(s.tetes(ethanol.id)) == 2  # deux versions courantes : à trancher
+    assert (d / "_ancien" / f"{ethanol.id}-FR-MARIE.json").exists()  # rien n'est supprimé
+
+
+def test_deux_postes_en_meme_temps_donnent_deux_versions_a_trancher(tmp_path, ethanol):
+    """Aucun fichier n'est réécrit : deux enregistrements simultanés donnent deux versions courantes, jamais une copie de conflit."""
+    pierre, marie = _st(tmp_path, "pierre", "PC1"), _st(tmp_path, "marie", "PC2")
+    pierre.enregistrer_manip(ethanol)
+    a, b = pierre.lire_manip(ethanol.id), marie.lire_manip(ethanol.id)
+    # la synchronisation n'a pas encore apporté la version de l'autre poste : chacun enregistre à partir de la même version
+    import mat_methode.storage.stockage as S
+    a.nom = "Version Pierre"
+    b.nom = "Version Marie"
+    assert pierre.enregistrer_manip(a).ok
+    sauve = S.V.tetes
+    S.V.tetes = lambda dossier: [v for v in sauve(dossier) if v.poste.startswith("PC1") is False]  # Marie ne voit pas encore la version de Pierre
+    try:
+        assert marie.enregistrer_manip(b).ok
+    finally:
+        S.V.tetes = sauve
+    assert len(pierre.tetes(ethanol.id)) == 2 and pierre.lister().conflits == [ethanol.id]
+    vers = pierre.versions_en_conflit(ethanol.id)
+    assert {m.nom for _, m in vers} == {"Version Pierre", "Version Marie"}
+    choisie = next(v.fichier for v, m in vers if m.nom == "Version Marie")
+    creees = pierre.resoudre_conflit(ethanol.id, choisie, copier_les_autres=True)
+    assert len(pierre.tetes(ethanol.id)) == 1 and pierre.lire_manip(ethanol.id).nom == "Version Marie"
+    assert len(creees) == 1 and "Version Pierre" in creees[0].nom and pierre.lire_manip(creees[0].id) is not None
+    assert pierre.lister().conflits == []
+
+
+def test_elagage_garde_les_versions_courantes(tmp_path, ethanol):
+    s = _st(tmp_path)
+    s.enregistrer_manip(ethanol)
+    for k in range(40):
+        ethanol.nom = f"v{k}"
+        assert s.enregistrer_manip(ethanol).ok
+    fichiers = list((tmp_path / "donnees" / "manips" / ethanol.id).glob("v*.json"))
+    assert 20 <= len(fichiers) <= 26 and s.lire_manip(ethanol.id).nom == "v39" and len(s.tetes(ethanol.id)) == 1
 
 
 def test_preferences(tmp_path):
@@ -144,7 +185,7 @@ def test_migration_etats_a_faire_et_lancee(tmp_path):
     f = tmp_path / "reglages.json"
     f.write_text("{}", encoding="utf-8")
     d = migrer({"schema": 4, "etats": [{"id": "brouillon", "nom": "Brouillon"}, {"id": "x", "nom": "lancée"}]}, f)
-    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée", "Réalisée"] and d["schema"] == 17
+    assert [e["nom"] for e in d["etats"]] == ["Brouillon", "À faire", "lancée", "Réalisée"] and d["schema"] == 18
     d = migrer({"schema": 5, "etats": [{"id": "encours", "nom": "En cours"}, {"id": "terminee", "nom": "Terminée"}]}, f)
     assert [e["nom"] for e in d["etats"]] == ["En cours", "Réalisée", "Terminée"]
 

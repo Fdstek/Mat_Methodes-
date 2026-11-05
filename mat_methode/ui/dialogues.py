@@ -469,3 +469,44 @@ def conditions_operation(parent, operation: str, defauts: dict) -> dict | None:
     if d.exec() != QDialog.DialogCode.Accepted:
         return None
     return {cle: (v.lire() or 0.0) for cle, (t, v) in lignes.items() if t.isChecked() and (cle == "vide" or v.lire())}
+
+
+def choisir_version(parent, nom_manip: str, versions: list, nom_de, nom_statut=lambda e: e) -> tuple[str, bool] | None:
+    """Deux postes ont enregistré une manip en même temps : les versions côte à côte, les différences en gras.
+    Retourne (fichier à garder, conserver aussi les autres comme nouvelles manips) ou None si annulé."""
+    from PySide6.QtWidgets import QFrame, QHBoxLayout
+
+    from mat_methode.domain.texte import fmt_dt
+    d = Dialogue(parent, f"Deux versions de « {nom_manip} »", largeur=860)
+    d.lay.addWidget(etiquette("Deux postes ont enregistré en même temps. Rien n’est perdu : choisis la version à garder ; l’autre reste dans l’historique "
+                              "et peut aussi devenir une nouvelle manip. Les différences sont en gras.", secondaire=True, wrap=True))
+    lignes = []
+    for v, m in versions:
+        lignes.append([("Nom", m.nom), ("Statut", nom_statut(m.etat)), ("Version n°", str(m.rev)), ("Enregistrée le", fmt_dt(m.maj)),
+                       ("Par", nom_de(m.modifie_par) if m.modifie_par else "—"), ("Poste", v.poste.split("_")[0]),
+                       ("Étapes", str(len(m.etapes))), ("Échantillons", str(len(m.prelevements))), ("Objectif", m.contexte.objectif or "—"),
+                       ("Journal", f"{len(m.journal)} modification(s)")])
+    choix: dict = {}
+    cartes = QHBoxLayout()
+    cartes.setSpacing(12)
+    for k, ((v, m), champs) in enumerate(zip(versions, lignes)):
+        f = QFrame()
+        f.setObjectName("sousCarte")
+        lv = QVBoxLayout(f)
+        lv.setContentsMargins(12, 10, 12, 10)
+        lv.setSpacing(4)
+        lv.addWidget(etiquette(f"Version {k + 1}" + (" · la plus récente" if k == 0 else ""), "titreCarte"))
+        for j, (lib, val) in enumerate(champs):
+            diff = len({lignes[i][j][1] for i in range(len(lignes))}) > 1
+            lv.addWidget(etiquette(f"{lib} : <b>{val}</b>" if diff else f"{lib} : {val}", wrap=True))
+        lv.addStretch(1)
+        lv.addWidget(bouton("Garder cette version", lambda f=v.fichier: (choix.update(fichier=f, copier=False), d.accept()), accent=True))
+        lv.addWidget(bouton("Garder celle-ci et l’autre en nouvelle manip", lambda f=v.fichier: (choix.update(fichier=f, copier=True), d.accept()),
+                            tip="La version non choisie devient une nouvelle manip « (version de <poste>) »"))
+        cartes.addWidget(f, 1)
+    d.lay.addLayout(cartes)
+    d.boutons.addWidget(bouton("Plus tard", d.reject))
+    d.finir()
+    if d.exec() != QDialog.DialogCode.Accepted or not choix:
+        return None
+    return choix["fichier"], choix["copier"]
