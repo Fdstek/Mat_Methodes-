@@ -17,6 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_vol
+from mat_methode.exports.disposition import disposer
 from mat_methode.exports.pdf import code_badge, conditions, moment_texte, phrase_volumes
 from mat_methode.exports.polices import trouver
 
@@ -94,11 +95,13 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
         ps = par_apres.get(e["n"], [])
         cartes.append({"e": e, "ls": ls, "ps": ps, "tl": tl, "tfont": tfont, "pas": pas, "extra": extra, "bande": 30 if e.get("groupe") else 0,
                        "h": (30 if e.get("groupe") else 0) + 70 + extra + 30 * len(ls) + 90})
-    nb = max(1, -(-len(etapes) // par_ligne))
-    hauteurs = []
+    cases, liens, lettres = disposer(etapes, par_ligne)  # étapes en parallèle : une colonne par voie
+    nb = max([r for r, _ in cases] + [0]) + 1
+    hauteurs, hc_lignes = [], []
     for r in range(nb):
-        grp = cartes[r * par_ligne:(r + 1) * par_ligne] or [{"h": 120, "ps": []}]
-        hauteurs.append(max(c["h"] for c in grp) + 64 * max(len(c["ps"]) for c in grp) + 50)
+        grp = [cartes[i] for i, (rr, _) in enumerate(cases) if rr == r] or [{"h": 120, "ps": []}]
+        hc_lignes.append(max(c["h"] for c in grp))
+        hauteurs.append(hc_lignes[-1] + 64 * max(len(c["ps"]) for c in grp) + 50)
     haut_entree = 70
     img = Image.new("RGB", (largeur, haut_entree + sum(hauteurs) + 50), "white")
     d = ImageDraw.Draw(img)
@@ -118,53 +121,66 @@ def image_flux(etapes, prelevements, largeur=1900) -> Image.Image:
     px = d.textlength("ENTRÉE", font=f_bs) + 18
     for p in par_apres.get(0, []):
         px += pastille(px, 4, p) + 12
-    y = haut_entree
+    ys, y = [], haut_entree
     for r in range(nb):
-        grp = cartes[r * par_ligne:(r + 1) * par_ligne]
-        if not grp:
-            break
-        hc = max(c["h"] for c in grp)
-        for k, c in enumerate(grp):
-            x = k * (cw + gap)
-            e = c["e"]
-            d.rounded_rectangle([x, y, x + cw, y + hc], 12, fill="white", outline="#BFCBC7", width=3)
-            yt = y + c["bande"]
-            if c["bande"]:  # bandeau de la grande étape (ex. DEGUMMING)
-                d.rounded_rectangle([x + 2, y + 2, x + cw - 2, y + 30], 10, fill="#E1F0EC")
-                nom = e["groupe"].upper()
-                while len(nom) > 3 and d.textlength(nom, font=f_bs) > cw - 30:
-                    nom = nom[:-2] + "…"
-                d.text((x + 14, y + 16), nom, font=f_bs, fill="#0F6B5C", anchor="lm")
-            d.ellipse([x + 12, yt + 12, x + 48, yt + 48], fill="#0F6B5C")
-            d.text((x + 30, yt + 30), str(e["n"]), font=f_bs, fill="white", anchor="mm")
-            for k_l, lg in enumerate(c["tl"]):
-                d.text((x + 60, yt + 14 + k_l * c["pas"]), lg, font=c["tfont"], fill="#14201D")
-            ly = yt + 62 + c["extra"]
-            for t, font, coul in c["ls"]:
-                d.text((x + 14, ly), t, font=font, fill=coul)
-                ly += 30
-            dur = e["parametres"].get("duree_min")
-            if dur or c["ps"]:
-                fy = y + hc - 66
-                x0, x1 = x + 22, x + cw - 22
-                d.line([x0, fy + 12, x1, fy + 12], fill="#C9D3CF", width=5)
-                d.text((x0, fy + 36), "0", font=f_s, fill="#566360")
-                dl = fmt_dur(dur) if dur else "fin"
-                d.text((x1 - d.textlength(dl, font=f_s), fy + 36), dl, font=f_s, fill="#566360")
-                for p in c["ps"]:
-                    pct = 1.0
-                    if p.get("moment") == "pendant":
-                        pct = min(1, max(0, p["temps_min"] / dur)) if dur and p.get("temps_min") is not None else 0.5
-                    bx = x0 + (x1 - x0) * pct
-                    d.ellipse([bx - 15, fy - 3, bx + 15, fy + 27], fill="#8A4B00")
-                    d.text((bx, fy + 12), code_badge(p["id"]), font=f_bs, fill="white", anchor="mm")
-            if k < len(grp) - 1:
-                ay = y + 30
-                d.line([x + cw + 4, ay, x + cw + gap - 8, ay], fill="#566360", width=3)
-                d.polygon([(x + cw + gap - 4, ay), (x + cw + gap - 14, ay - 7), (x + cw + gap - 14, ay + 7)], fill="#566360")
-            for j, p in enumerate(c["ps"]):
-                pastille(x, y + hc + 12 + j * 64, p)
+        ys.append(y)
         y += hauteurs[r]
+    positions = []
+    for idx, c in enumerate(cartes):
+        r, k = cases[idx]
+        x, y0, hc = k * (cw + gap), ys[r], hc_lignes[r]
+        positions.append((x, y0, hc, r, k))
+        e = c["e"]
+        if idx in lettres:  # début d'une voie
+            d.text((x + 4, y0 - 22), f"VOIE {lettres[idx]} · EN PARALLÈLE", font=f_bs, fill="#8A4B00")
+        d.rounded_rectangle([x, y0, x + cw, y0 + hc], 12, fill="white", outline="#BFCBC7", width=3)
+        yt = y0 + c["bande"]
+        if c["bande"]:  # bandeau de la grande étape (ex. DEGUMMING)
+            d.rounded_rectangle([x + 2, y0 + 2, x + cw - 2, y0 + 30], 10, fill="#E1F0EC")
+            nom = e["groupe"].upper()
+            while len(nom) > 3 and d.textlength(nom, font=f_bs) > cw - 30:
+                nom = nom[:-2] + "…"
+            d.text((x + 14, y0 + 16), nom, font=f_bs, fill="#0F6B5C", anchor="lm")
+        d.ellipse([x + 12, yt + 12, x + 48, yt + 48], fill="#0F6B5C")
+        d.text((x + 30, yt + 30), str(e["n"]), font=f_bs, fill="white", anchor="mm")
+        for k_l, lg in enumerate(c["tl"]):
+            d.text((x + 60, yt + 14 + k_l * c["pas"]), lg, font=c["tfont"], fill="#14201D")
+        ly = yt + 62 + c["extra"]
+        for t, font, coul in c["ls"]:
+            d.text((x + 14, ly), t, font=font, fill=coul)
+            ly += 30
+        dur = e["parametres"].get("duree_min")
+        if dur or c["ps"]:
+            fy = y0 + hc - 66
+            x0, x1 = x + 22, x + cw - 22
+            d.line([x0, fy + 12, x1, fy + 12], fill="#C9D3CF", width=5)
+            d.text((x0, fy + 36), "0", font=f_s, fill="#566360")
+            dl = fmt_dur(dur) if dur else "fin"
+            d.text((x1 - d.textlength(dl, font=f_s), fy + 36), dl, font=f_s, fill="#566360")
+            for p in c["ps"]:
+                pct = 1.0
+                if p.get("moment") == "pendant":
+                    pct = min(1, max(0, p["temps_min"] / dur)) if dur and p.get("temps_min") is not None else 0.5
+                bx = x0 + (x1 - x0) * pct
+                d.ellipse([bx - 15, fy - 3, bx + 15, fy + 27], fill="#8A4B00")
+                d.text((bx, fy + 12), code_badge(p["id"]), font=f_bs, fill="white", anchor="mm")
+        for j, p in enumerate(c["ps"]):
+            pastille(x, y0 + hc + 12 + j * 64, p)
+    gris = "#566360"
+    for ia, ib in liens:
+        xa0, ya0, ha, ra, ka = positions[ia]
+        xb0, yb0, hb, rb, kb = positions[ib]
+        if ra == rb and kb == ka + 1:
+            ay = ya0 + 30
+            d.line([xa0 + cw + 4, ay, xa0 + cw + gap - 8, ay], fill=gris, width=3)
+            d.polygon([(xa0 + cw + gap - 4, ay), (xa0 + cw + gap - 14, ay - 7), (xa0 + cw + gap - 14, ay + 7)], fill=gris)
+        elif rb > ra:
+            xa, xb = xa0 + cw - 40, xb0 + cw - 40
+            depart = ya0 + ha + 64 * len(cartes[ia]["ps"]) + 4
+            ym = yb0 - 22
+            d.line([xa, depart, xa, ym, xb, ym, xb, yb0 - 10], fill=gris, width=3, joint="curve")
+            d.polygon([(xb, yb0 - 2), (xb - 8, yb0 - 14), (xb + 8, yb0 - 14)], fill=gris)
+    y = ys[-1] + hauteurs[-1]
     so = "SORTIE · produit prétraité"
     d.text((largeur - d.textlength(so, font=f_bs), y - 30), so, font=f_bs, fill="#566360")
     return img

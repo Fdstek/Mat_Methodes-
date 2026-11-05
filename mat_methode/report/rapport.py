@@ -18,9 +18,11 @@ from mat_methode.domain.regles import (
     est_entree,
     est_test,
     etiquettes,
+    lettre_voie,
     moment_court,
     numero_etape,
     plage,
+    segments,
 )
 from mat_methode.domain.texte import (
     cap,
@@ -139,7 +141,7 @@ def clause_etape(e: Etape, reglages: Reglages | None = None) -> str:
         b.append(f"sur membrane de {fmt_num(e.filtre_um)} µm")
     reacs = [r for r in e.reactifs if r.nom]
     if reacs:
-        b.append("en présence " + liste([de(minuscule_initiale(r.nom)) + (f" ({quantite_texte(r.quantite)})" if r.quantite.strip() else "")
+        b.append("en présence " + liste([de(minuscule_initiale(r.nom)) + (f" ({quantite_texte(r.quantite_complete)})" if r.quantite_complete.strip() else "")
                                           for r in reacs]))
     if e.temperature_c is not None:
         b.append(f"à {fmt_num(e.temperature_c)} °C")
@@ -152,6 +154,23 @@ def clause_etape(e: Etape, reglages: Reglages | None = None) -> str:
     rem = e.remarque.strip()
     part = reglages.participe(e.operation) if reglages is not None else participe(e.operation)
     return part + ("".join(" " + x for x in b)) + (f" ({rem})" if rem else "")
+
+
+def phrase_paralleles(m: Manip) -> list[str]:
+    """Une phrase par bloc d'étapes en parallèle : voies, étapes de chaque voie et étape qui les réunit."""
+    out = []
+    for genre, p, voies in segments(m):
+        if genre != "par" or not any(voies):
+            continue
+        morceaux = []
+        for k, idx in enumerate(voies):
+            if idx:
+                nom = p.voies[k].nom.strip()
+                morceaux.append(f"voie {lettre_voie(m, p.id, p.voies[k].id)}{' (' + nom + ')' if nom else ''} : {etapes_txt([i + 1 for i in idx])}")
+        fin = max(i for v in voies for i in v)
+        suite = f", réunies à l’étape {fin + 2}" if fin + 1 < len(m.etapes) else ""
+        out.append("Étapes réalisées en parallèle : " + " ; ".join(morceaux) + suite + ".")
+    return out
 
 
 def sujet(i: int, n: int) -> str:
@@ -215,7 +234,8 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
            "Volume de départ : " + (f"{fmt_vol(c.volume_depart_ml)} mL" if c.volume_depart_ml is not None else ph("volume de départ"))
            + (f", dont {fmt_vol(b.preleve)} mL prélevés pendant le flux sous forme de {b.n} échantillon{'s' if b.n > 1 else ''}" if b.n else "") + ".",
            (f"Le flux comporte {ne} étape{'s' if ne > 1 else ''}{f' (étapes 1 à {ne})' if ne > 1 else ''}, décrites en 2.3." if ne else ""),
-           ("Grandes étapes : " + " ; ".join(f"{g.nom} ({plage([i + 1 for i in idx])})" for g, idx in grands) + "." if grands else "")]
+           ("Grandes étapes : " + " ; ".join(f"{g.nom} ({plage([i + 1 for i in idx])})" for g, idx in grands) + "." if grands else ""),
+           *phrase_paralleles(m)]
     t21 = "\n".join(x for x in l21 if x)
     sections.append(Section("2.1 Échantillon", t21))
 
@@ -242,7 +262,16 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
     for g, idx in blocs(m):
         if g is not None:
             morceaux23.append(f"{g.nom} ({plage([i + 1 for i in idx])}).")
-        morceaux23 += [f"Étape {i + 1} : {sujet(i, ne)} {clause_etape(m.etapes[i], reglages)}." for i in idx]
+        for i in idx:
+            e = m.etapes[i]
+            if e.parallele_id:
+                lib = f"Étape {i + 1} (voie {lettre_voie(m, e.parallele_id, e.voie_id)}, en parallèle)"
+            elif i > 0 and m.etapes[i - 1].parallele_id:  # première étape après un bloc : elle réunit les voies
+                voies = sorted({lettre_voie(m, m.etapes[i - 1].parallele_id, x.voie_id) for x in m.etapes if x.parallele_id == m.etapes[i - 1].parallele_id})
+                lib = f"Étape {i + 1} (réunion des voies {' et '.join(voies)})"
+            else:
+                lib = f"Étape {i + 1}"
+            morceaux23.append(f"{lib} : {sujet(i, ne)} {clause_etape(e, reglages)}.")
     t23 = "\n".join(morceaux23) if ne else ph("protocole")
     sections.append(Section("2.3 Méthodes", t23))
 
@@ -274,7 +303,7 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         for r in e.reactifs:
             if r.nom:
                 f = _inv(reglages, r.nom)
-                rs.append(LigneReactif(nom=r.nom, quantite=r.quantite, scirius=f.get("scirius", ""), emplacement=f.get("emplacement", ""),
+                rs.append(LigneReactif(nom=r.nom, quantite=r.quantite_complete, scirius=f.get("scirius", ""), emplacement=f.get("emplacement", ""),
                                        fournisseur=f.get("fournisseur", ""), lot=f.get("lot", ""), etapes=[i + 1]))
         g = m.groupe(e.groupe_id)
         nums = [k + 1 for gg, idx in blocs(m) if gg is g and i in idx for k in idx] if g else []

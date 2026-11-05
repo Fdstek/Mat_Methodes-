@@ -5,7 +5,6 @@ repères « à saisir » en ambre dans le texte, bandeau complet (type, tags, ve
 """
 from __future__ import annotations
 
-import math
 import re
 from xml.sax.saxutils import escape
 
@@ -21,6 +20,7 @@ from reportlab.platypus import Flowable, KeepTogether, Paragraph, SimpleDocTempl
 
 from mat_methode.domain.regles import plage
 from mat_methode.domain.texte import fmt_dt, fmt_dur, fmt_num, fmt_vol
+from mat_methode.exports.disposition import disposer
 from mat_methode.exports.polices import trouver
 
 TEAL, TEAL_L = colors.HexColor("#0F6B5C"), colors.HexColor("#E1F0EC")
@@ -113,14 +113,15 @@ class Flux(Flowable):
         self.font, self.fontb = polices()
         self.etapes, self.largeur = etapes, largeur
         self.carte_w = (largeur - (self.PAR_LIGNE - 1) * self.GAP) / self.PAR_LIGNE
-        self.lignes = max(1, math.ceil(len(etapes) / self.PAR_LIGNE))
+        self.cases, self.liens, self.lettres = disposer(etapes, self.PAR_LIGNE)  # étapes en parallèle : une colonne par voie
+        self.lignes = max([r for r, _ in self.cases] + [0]) + 1
         self.par_apres: dict[int, list] = {}
         for p in prelevements:
             self.par_apres.setdefault(p["apres_etape"], []).append(p)
         self.contenus = [self._contenu(e) for e in etapes]
         self.bandes, self.h_cartes = [], []
         for r in range(self.lignes):
-            grp = range(r * self.PAR_LIGNE, min(len(etapes), (r + 1) * self.PAR_LIGNE))
+            grp = [i for i, (rr, _) in enumerate(self.cases) if rr == r]
             self.bandes.append(max([len(self.par_apres.get(etapes[i]["n"], [])) for i in grp] + [0]))
             self.h_cartes.append(max([self.CARTE_MIN] + [self.contenus[i]["h"] for i in grp]))
         self.hauteurs = [hc + b * self.PAS + self.ESPACE for hc, b in zip(self.h_cartes, self.bandes)]
@@ -146,8 +147,11 @@ class Flux(Flowable):
                 break
         return {"titre": titre, "taille_t": taille_t, "lignes": lignes, "h": h}
 
-    def wrap(self, *_):
-        return self.largeur, self.haut
+    def wrap(self, dispo_l=0, dispo_h=0, *_):
+        """Un flux plus haut que la page (étapes en parallèle sur plusieurs lignes) est réduit pour tenir sur une page."""
+        cible = min(165 * mm, dispo_h - 22 * mm) if dispo_h else self.haut  # reste de la 1re page après l'en-tête, avec titre et légende
+        self.echelle = min(1.0, max(0.4, cible / self.haut))
+        return self.largeur * self.echelle, self.haut * self.echelle
 
     def badge(self, c, x, y, code):
         c.setFillColor(AMBER)
@@ -209,6 +213,9 @@ class Flux(Flowable):
 
     def draw(self):
         c, w = self.canv, self.carte_w
+        s = getattr(self, "echelle", 1.0)
+        if s < 1.0:
+            c.scale(s, s)
         c.setFont(self.fontb, 7.5)
         c.setFillColor(MUTED)
         c.drawString(0, self.haut - 4 * mm, "ENTRÉE")
@@ -218,7 +225,7 @@ class Flux(Flowable):
 
         positions = []
         for i, e in enumerate(self.etapes):
-            r, k = divmod(i, self.PAR_LIGNE)
+            r, k = self.cases[i]
             h = self.h_cartes[r]
             cx = k * (w + self.GAP)
             cy = self.haut - self.TETE - sum(self.hauteurs[:r]) - h
@@ -229,6 +236,10 @@ class Flux(Flowable):
             c.setLineWidth(1)
             c.roundRect(cx, cy, w, h, 2.5 * mm, stroke=1, fill=1)
             haut = cy + h
+            if i in self.lettres:  # début d'une voie : « VOIE A » au-dessus de la carte
+                c.setFillColor(AMBER)
+                c.setFont(self.fontb, 6.5)
+                c.drawString(cx + 1 * mm, cy + h + 1.3 * mm, f"VOIE {self.lettres[i]} · EN PARALLÈLE")
             if e.get("groupe"):  # bandeau de la grande étape (ex. DEGUMMING)
                 c.setFillColor(TEAL_L)
                 c.roundRect(cx + 0.5, cy + h - 4.5 * mm, w - 1, 4.5 * mm - 0.5, 2.2 * mm, stroke=0, fill=1)
@@ -277,16 +288,16 @@ class Flux(Flowable):
             for j, pre in enumerate(prels):
                 self.pastille(c, cx, cy - (j + 1) * self.PAS, *self.etiquette(pre))
 
-        for i in range(len(self.etapes) - 1):
-            (x1, y1, r1, h1), (x2, y2, r2, h2) = positions[i], positions[i + 1]
-            if r1 == r2:
+        for ia, ib in self.liens:
+            (x1, y1, r1, h1), (x2, y2, r2, h2) = positions[ia], positions[ib]
+            if r1 == r2 and self.cases[ib][1] == self.cases[ia][1] + 1:
                 ym = y1 + h1 - 5 * mm
                 self.fleche(c, [(x1 + w + 0.8 * mm, ym), (x2 - 0.4 * mm, ym)], "droite")
-            else:
+            elif r2 > r1:  # vers une autre ligne : on descend, on traverse l'espace entre les lignes, puis on entre par le haut
                 xa, xb = x1 + w - 3 * mm, x2 + w - 3 * mm
-                bas = y1 - self.bandes[r1] * self.PAS
-                ym = bas - self.ESPACE / 2
-                self.fleche(c, [(xa, y1 if self.bandes[r1] == 0 else bas), (xa, ym), (xb, ym), (xb, y2 + h2 + 0.4 * mm)], "bas")
+                depart = y1 if self.bandes[r1] == 0 else y1 - self.bandes[r1] * self.PAS
+                ym = y2 + h2 + self.ESPACE * 0.72
+                self.fleche(c, [(xa, depart), (xa, ym), (xb, ym), (xb, y2 + h2 + 0.4 * mm)], "bas")
 
         c.setFont(self.fontb, 7.5)
         c.setFillColor(MUTED)

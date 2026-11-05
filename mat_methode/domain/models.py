@@ -39,6 +39,10 @@ def maintenant_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+UNITES_REACTIFS_DEFAUT = ["mL", "g", "µL", "mg", "%", "mol/L"]
+VITESSES_DEFAUT = [100.0, 200.0, 300.0, 500.0, 800.0]
+
+
 class _Modele(BaseModel):
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
@@ -130,6 +134,8 @@ class Reglages(_Modele):
     categories_a_faire: list[str] = Field(default_factory=lambda: list(CATEGORIES_A_FAIRE_DEFAUT))
     volumes_ml: list[float] = Field(default_factory=lambda: list(VOLUMES_DEFAUT))  # volumes proposés pour un échantillon
     operations: list[Operation] = Field(default_factory=lambda: [Operation(nom=k, participe=v) for k, v in OPERATIONS.items()])
+    unites_reactifs: list[str] = Field(default_factory=lambda: list(UNITES_REACTIFS_DEFAUT))  # unités proposées pour les quantités de réactifs
+    vitesses_agitation: list[float] = Field(default_factory=lambda: list(VITESSES_DEFAUT))  # vitesses d'agitation proposées (tr/min)
     ordre_protocoles: list[str] = Field(default_factory=list)  # identifiants des manips, dans l'ordre de réalisation (Protocole)
     ordre_tags: list[str] = Field(default_factory=list)  # ordre choisi des tags (Réglages › Tags) ; les autres suivent, par ordre alphabétique
     couleurs_tags: dict[str, str] = Field(default_factory=dict)  # tag (sans casse ni accents) -> couleur choisie ; sinon couleur automatique
@@ -221,6 +227,12 @@ class Condition(_Modele):
 class ReactifEtape(_Modele):
     nom: str = ""
     quantite: str = ""
+    unite: str = ""  # unité choisie dans la liste des Réglages (vide = quantité écrite en texte libre)
+
+    @property
+    def quantite_complete(self) -> str:
+        """« 250 mL » : la quantité suivie de son unité."""
+        return (f"{self.quantite} {self.unite}".strip() if self.quantite.strip() else "")
 
 
 class Etape(_Modele):
@@ -236,6 +248,19 @@ class Etape(_Modele):
     reactifs: list[ReactifEtape] = Field(default_factory=list)
     remarque: str = ""
     groupe_id: Optional[str] = None  # grande étape (Degumming…) qui contient cette étape
+    parallele_id: Optional[str] = None  # bloc « en parallèle » qui contient cette étape (jamais avec une grande étape)
+    voie_id: Optional[str] = None  # voie du bloc en parallèle (A, B…)
+
+
+class Voie(_Modele):
+    id: str = Field(default_factory=nouvel_id)
+    nom: str = ""  # facultatif (ex. « phase huile ») : la lettre A, B… vient de la place de la voie
+
+
+class Parallele(_Modele):
+    """Étapes réalisées en même temps (voies côte à côte) ; l'étape qui suit le bloc réunit les voies."""
+    id: str = Field(default_factory=nouvel_id)
+    voies: list[Voie] = Field(default_factory=lambda: [Voie(), Voie()])
 
 
 class Prelevement(_Modele):
@@ -337,6 +362,7 @@ class Manip(_Modele):
     etapes: list[Etape] = Field(default_factory=list)
     prelevements: list[Prelevement] = Field(default_factory=list)
     groupes: list[Groupe] = Field(default_factory=list)
+    paralleles: list[Parallele] = Field(default_factory=list)  # blocs d'étapes en parallèle
     a_faire: list[Tache] = Field(default_factory=list)
     rapports: list[RapportEmis] = Field(default_factory=list)  # documents émis, le plus récent en dernier
     statuts: list[ChangementStatut] = Field(default_factory=list)  # historique des changements de statut
@@ -359,6 +385,9 @@ class Manip(_Modele):
 
     def groupe(self, ident: str | None) -> Optional[Groupe]:
         return next((g for g in self.groupes if g.id == ident), None)
+
+    def parallele(self, ident: str | None) -> Optional[Parallele]:
+        return next((p for p in self.paralleles if p.id == ident), None)
 
     def prelevement(self, ident: str) -> Optional[Prelevement]:
         return next((p for p in self.prelevements if p.id == ident), None)

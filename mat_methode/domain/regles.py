@@ -13,9 +13,11 @@ from mat_methode.domain.models import (
     Etape,
     Groupe,
     Manip,
+    Parallele,
     Prelevement,
     Reglages,
     Vide,
+    Voie,
     maintenant_iso,
     nouvel_id,
 )
@@ -249,6 +251,112 @@ def texte_reperes(m: Manip) -> str:
     return " ; ".join(f"{i} : {mat}" if mat else i for i, _, mat in reperes_etapes(m))
 
 
+# ------------------------------------------------------------------ étapes en parallèle
+LETTRES_VOIES = "ABCDEF"
+
+
+def lettre_voie(m: Manip, parallele_id: str | None, voie_id: str | None) -> str:
+    p = m.parallele(parallele_id)
+    k = next((j for j, v in enumerate(p.voies) if v.id == voie_id), 0) if p else 0
+    return LETTRES_VOIES[min(k, len(LETTRES_VOIES) - 1)]
+
+
+def segments(m: Manip) -> list[tuple[str, object, list]]:
+    """Le flux en segments consécutifs : ("seq", None, [index d'étapes]) ou ("par", Parallele, [[index de la voie 1], [voie 2]…]).
+    Un bloc en parallèle encore vide est aussi rendu (voies vides)."""
+    out: list[tuple[str, object, list]] = []
+    vus: set[str] = set()
+    for i, e in enumerate(m.etapes):
+        p = m.parallele(e.parallele_id)
+        if p is None:
+            if out and out[-1][0] == "seq":
+                out[-1][2].append(i)
+            else:
+                out.append(("seq", None, [i]))
+            continue
+        if p.id in vus:
+            continue
+        vus.add(p.id)
+        voies = [[j for j, x in enumerate(m.etapes) if x.parallele_id == p.id and x.voie_id == v.id] for v in p.voies]
+        out.append(("par", p, voies))
+    for p in m.paralleles:  # bloc encore vide
+        if p.id not in vus:
+            out.append(("par", p, [[] for _ in p.voies]))
+    return out
+
+
+def creer_parallele(m: Manip, nvoies: int = 2) -> Parallele:
+    p = Parallele(voies=[Voie() for _ in range(max(2, min(nvoies, len(LETTRES_VOIES))))])
+    m.paralleles.append(p)
+    return p
+
+
+def ajouter_voie(m: Manip, parallele_id: str) -> bool:
+    p = m.parallele(parallele_id)
+    if p is None or len(p.voies) >= 4:
+        return False
+    p.voies = p.voies + [Voie()]
+    return True
+
+
+def supprimer_voie(m: Manip, parallele_id: str, voie_id: str) -> bool:
+    """Une voie disparaît ; ses étapes passent dans la première voie restante (il faut garder au moins 2 voies)."""
+    p = m.parallele(parallele_id)
+    if p is None or len(p.voies) <= 2 or not any(v.id == voie_id for v in p.voies):
+        return False
+    p.voies = [v for v in p.voies if v.id != voie_id]
+    for e in m.etapes:
+        if e.parallele_id == p.id and e.voie_id == voie_id:
+            e.voie_id = p.voies[0].id
+    normaliser(m)
+    return True
+
+
+def placer_dans_voie(m: Manip, etape_id: str, parallele_id: str, voie_id: str) -> bool:
+    """Range une étape dans une voie d'un bloc en parallèle (elle quitte sa grande étape). Le bloc reste d'un seul tenant."""
+    e, p = m.etape(etape_id), m.parallele(parallele_id)
+    if e is None or p is None or not any(v.id == voie_id for v in p.voies):
+        return False
+    e.groupe_id, e.parallele_id, e.voie_id = None, p.id, voie_id
+    normaliser(m)
+    return True
+
+
+def sortir_de_parallele(m: Manip, etape_id: str) -> bool:
+    """L'étape quitte le bloc en parallèle et se place juste après lui (elle réunit alors les voies)."""
+    e = m.etape(etape_id)
+    if e is None or e.parallele_id is None:
+        return False
+    pid = e.parallele_id
+    e.parallele_id = e.voie_id = None
+    membres = [i for i, x in enumerate(m.etapes) if x.parallele_id == pid]
+    m.etapes = [x for x in m.etapes if x is not e]
+    pos = (max(i for i, x in enumerate(m.etapes) if x.parallele_id == pid) + 1) if membres else len(m.etapes)
+    m.etapes.insert(min(pos, len(m.etapes)), e)
+    return True
+
+
+def defaire_parallele(m: Manip, parallele_id: str) -> None:
+    for e in m.etapes:
+        if e.parallele_id == parallele_id:
+            e.parallele_id = e.voie_id = None
+    m.paralleles = [p for p in m.paralleles if p.id != parallele_id]
+
+
+def normaliser(m: Manip) -> None:
+    """Chaque bloc en parallèle redevient d'un seul tenant, étapes classées par voie (A, puis B…), à la place de sa 1re étape."""
+    for p in list(m.paralleles):
+        place = [i for i, e in enumerate(m.etapes) if e.parallele_id == p.id]
+        if not place:
+            continue
+        ordre = {v.id: k for k, v in enumerate(p.voies)}
+        membres = sorted((m.etapes[i] for i in place), key=lambda e: ordre.get(e.voie_id, 0))  # tri stable : l'ordre dans la voie est gardé
+        premier = place[0]
+        avant = [e for e in m.etapes[:premier] if e.parallele_id != p.id]
+        apres = [e for e in m.etapes[premier:] if e.parallele_id != p.id]
+        m.etapes = avant + membres + apres
+
+
 def creer_groupe(m: Manip, nom: str) -> Groupe:
     g = Groupe(nom=nom.strip() or "Grande étape")
     m.groupes.append(g)
@@ -264,6 +372,7 @@ def placer_dans_groupe(m: Manip, etape_id: str, groupe_id: str | None) -> None:
     e.groupe_id = groupe_id
     if groupe_id is None:
         return
+    e.parallele_id = e.voie_id = None  # une étape est dans une grande étape OU dans une voie, pas les deux
     i = m.etapes.index(e)
     autres = [k for k, x in enumerate(m.etapes) if x.groupe_id == groupe_id and x is not e]
     if not autres or (i - 1 in autres or i + 1 in autres):
@@ -289,6 +398,7 @@ def deplacer_groupe(m: Manip, groupe_id: str, sens: int) -> bool:
         return False
     bl[k], bl[k + sens] = bl[k + sens], bl[k]
     m.etapes = [m.etapes[i] for _, idx in bl for i in idx]
+    normaliser(m)
     return True
 
 
@@ -300,12 +410,15 @@ def deplacer_etape_vers(m: Manip, etape_id: str, cible_id: str, avant: bool = Tr
         return False
     m.etapes = [x for x in m.etapes if x is not e]
     k = m.etapes.index(c)
-    g = c.groupe_id
+    g, par, voie = c.groupe_id, c.parallele_id, c.voie_id
     voisin = (m.etapes[k - 1] if k > 0 else None) if avant else (m.etapes[k + 1] if k + 1 < len(m.etapes) else None)
     if g and (voisin is None or voisin.groupe_id != g):  # bord de la grande étape : on reste à l'extérieur
         g = None
-    e.groupe_id = g
+    if par and (voisin is None or voisin.parallele_id != par):  # bord d'un bloc en parallèle : idem
+        par = voie = None
+    e.groupe_id, e.parallele_id, e.voie_id = g, par, voie
     m.etapes.insert(k if avant else k + 1, e)
+    normaliser(m)
     return True
 
 
@@ -318,8 +431,8 @@ def deplacer_groupe_vers(m: Manip, groupe_id: str, cible_id: str, avant: bool = 
     if not propres:
         return False
     reste = [e for e in m.etapes if e.groupe_id != groupe_id]
-    if c.groupe_id:  # cible dans une autre grande étape : on se place avant ou après tout son bloc
-        bloc = [i for i, e in enumerate(reste) if e.groupe_id == c.groupe_id]
+    if c.groupe_id or c.parallele_id:  # cible dans une autre grande étape ou un bloc en parallèle : avant ou après tout son bloc
+        bloc = [i for i, e in enumerate(reste) if (c.groupe_id and e.groupe_id == c.groupe_id) or (c.parallele_id and e.parallele_id == c.parallele_id)]
         pos = bloc[0] if avant else bloc[-1] + 1
     else:
         k = reste.index(c)
@@ -405,6 +518,7 @@ def deplacer_etape(m: Manip, etape_id: str, sens: int) -> bool:
     if not 0 <= j < len(m.etapes):
         return False
     m.etapes[i], m.etapes[j] = m.etapes[j], m.etapes[i]
+    normaliser(m)
     return True
 
 
@@ -499,13 +613,19 @@ def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
     c.contexte.ref = ""
     c.contexte.lot = ""
     c.contexte.experience = ""  # chaque expérience a son numéro
-    corresp, groupes = {}, {}
+    corresp, groupes, paralleles, voies = {}, {}, {}, {}
     for g in c.groupes:
         groupes[g.id] = g.id = nouvel_id()
+    for par in c.paralleles:
+        paralleles[par.id] = par.id = nouvel_id()
+        for v in par.voies:
+            voies[v.id] = v.id = nouvel_id()
     for e in c.etapes:
         corresp[e.id] = e.id = nouvel_id()
         if e.groupe_id:
             e.groupe_id = groupes.get(e.groupe_id)
+        if e.parallele_id:
+            e.parallele_id, e.voie_id = paralleles.get(e.parallele_id), voies.get(e.voie_id)
     for p in c.prelevements:
         p.id = nouvel_id()
         if p.etape_id:

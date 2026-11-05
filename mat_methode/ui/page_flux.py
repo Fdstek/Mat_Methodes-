@@ -29,6 +29,7 @@ from mat_methode.ui.glisser import Poignee, rendre_cible, rendre_source
 from mat_methode.ui.widgets import (
     ChampTexte,
     ChipSupprimable,
+    ChoixVitesse,
     ChoixVolume,
     Expander,
     InfoBar,
@@ -143,6 +144,7 @@ class PageFlux(QWidget):
         self.etape_id = DEPART
         self.inserer_apres: int | None = None
         self.groupe_cible: str | None = None  # grande étape où vont les étapes ajoutées
+        self.voie_cible: tuple[str, str] | None = None  # (bloc en parallèle, voie) où vont les étapes ajoutées
         self.remplacer = False
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
@@ -185,6 +187,7 @@ class PageFlux(QWidget):
         self.etape_id = DEPART
         self.inserer_apres = None
         self.groupe_cible = None
+        self.voie_cible = None
 
     def _actualiser(self):
         """Reconstruit la page sans la faire remonter (position gardée par la fenêtre)."""
@@ -591,20 +594,32 @@ class PageFlux(QWidget):
             cl.addWidget(etiquette("Aucune étape pour l’instant.", secondaire=True))
         catalogue = [o.nom for o in self.ctrl.reglages.operations]
         groupes_vus = set()
-        for g, idx in R.blocs(m):
-            if g is None:
-                for i in idx:
-                    cl.addWidget(self._ligne_etape(i, catalogue))
+        bl = R.blocs(m)
+        for genre, par, voies in R.segments(m):
+            if genre == "par":  # étapes en parallèle : cadre avec une colonne par voie
+                cl.addWidget(self._bloc_parallele(par, voies, catalogue))
                 continue
-            groupes_vus.add(g.id)
-            cl.addWidget(self._bloc_groupe(g, idx, catalogue))
+            dans = set(voies)
+            for g, idx in bl:
+                if not idx or idx[0] not in dans:
+                    continue
+                if g is None:
+                    for i in idx:
+                        cl.addWidget(self._ligne_etape(i, catalogue))
+                    continue
+                groupes_vus.add(g.id)
+                cl.addWidget(self._bloc_groupe(g, idx, catalogue))
         for g in m.groupes:  # grande étape encore vide
             if g.id not in groupes_vus:
                 cl.addWidget(self._bloc_groupe(g, [], catalogue))
         ia, gc = self.inserer_apres, m.groupe(self.groupe_cible)
         if gc is None:
             self.groupe_cible = None
-        if gc is not None:
+        vc = self.voie_cible if self.voie_cible and m.parallele(self.voie_cible[0]) else None
+        self.voie_cible = vc
+        if vc is not None:
+            q = f"Voie {R.lettre_voie(m, vc[0], vc[1])} (en parallèle) : que fais-tu dans cette voie ?"
+        elif gc is not None:
             nums = R.numeros_groupe(m, gc.id)
             q = f"{gc.nom} · étape {(nums[-1] + 1) if nums else len(m.etapes) + 1} : que fais-tu dans cette grande étape ?"
         elif ia is not None:
@@ -616,13 +631,19 @@ class PageFlux(QWidget):
             choix.update({f"g:{g.id}": f"Dans {g.nom} ({R.plage(R.numeros_groupe(m, g.id))})" for g in m.groupes})
             choix.update({f"n:{n}": f"Nouvelle grande étape : {n}" for n in self.ctrl.reglages.grandes_etapes})
             choix["n:*"] = "Nouvelle grande étape (autre nom)…"
-            ou = Liste(list(choix), f"g:{gc.id}" if gc else "", vide=None, libelles=choix)
+            choix["p:new"] = "Nouveau bloc en parallèle (2 voies)…"
+            for kp, par in enumerate(m.paralleles):
+                for vo in par.voies:
+                    choix[f"v:{par.id}|{vo.id}"] = f"En parallèle · bloc {kp + 1} · voie {R.lettre_voie(m, par.id, vo.id)}"
+            ou = Liste(list(choix), f"v:{vc[0]}|{vc[1]}" if vc else (f"g:{gc.id}" if gc else ""), vide=None, libelles=choix)
             ou.setAccessibleName("Où ajouter l’étape")
             ou.setMinimumWidth(320)
             ou.choisi.connect(self._choisir_cible)
-            cl.addWidget(ligne(champ("1. Où ajouter l’étape ? (grande étape)", ou), "stretch"))
+            cl.addWidget(ligne(champ("1. Où ajouter l’étape ? (grande étape ou voie en parallèle)", ou), "stretch"))
         cl.addWidget(etiquette(("2. " if ia is None else "") + q, "titreCarte"))
-        if gc is not None:
+        if vc is not None:
+            cl.addWidget(ligne(bouton("Terminer le bloc en parallèle (l’étape suivante réunira les voies)", self._finir_voie), "stretch"))
+        elif gc is not None:
             cl.addWidget(ligne(bouton(f"Terminer « {gc.nom} »", self._finir_groupe), "stretch"))
         elif ia is not None:
             cl.addWidget(ligne(bouton("Annuler l’insertion", lambda: self._inserer(None)), "stretch"))
@@ -640,7 +661,7 @@ class PageFlux(QWidget):
         lay.addWidget(ligne(b, "stretch"))
         return w
 
-    def _ligne_etape(self, i: int, catalogue: list[str], dans_groupe: bool = False) -> QWidget:
+    def _ligne_etape(self, i: int, catalogue: list[str], dans_groupe: bool = False, dans_voie: bool = False) -> QWidget:
         m, e = self.m, self.m.etapes[i]
         sf = QFrame()
         sf.setObjectName("sousCarte")
@@ -653,24 +674,106 @@ class PageFlux(QWidget):
         op = Liste(catalogue, e.operation, vide=None, libelles={o: cap(o) for o in catalogue + [e.operation]})
         op.setAccessibleName(f"Opération de l’étape {i + 1}")
         op.choisi.connect(lambda v, e=e: (setattr(e, "operation", v), self._toucher(True)))
+        if dans_voie:  # voie étroite : la liste des opérations peut se réduire
+            op.setMinimumWidth(100)
         h.addWidget(op, 1)
-        if m.groupes:  # ranger l'étape dans une grande étape
+        par = m.parallele(e.parallele_id)
+        if dans_voie and par is not None:  # dans une voie : changer de voie ou sortir du bloc (l'étape réunit alors les voies)
+            choix = {v.id: f"Voie {R.lettre_voie(m, par.id, v.id)}" for v in par.voies}
+            vo = Liste(list(choix), e.voie_id or "", vide="Sortir du bloc", libelles=choix)
+            vo.setAccessibleName(f"Voie de l’étape {i + 1}")
+            vo.setMinimumWidth(90)
+            vo.setMaximumWidth(120)
+            vo.choisi.connect(lambda val, e=e: (R.placer_dans_voie(m, e.id, e.parallele_id, val) if val else R.sortir_de_parallele(m, e.id),
+                                                self._toucher(True)))
+            h.addWidget(vo)
+        elif m.groupes and not dans_voie:  # ranger l'étape dans une grande étape
             choix = {g.id: f"{g.nom} ({R.plage(R.numeros_groupe(m, g.id))})" for g in m.groupes}
             gr = Liste(list(choix), e.groupe_id or "", vide="Hors grande étape", libelles=choix)
             gr.setAccessibleName(f"Grande étape de l’étape {i + 1}")
             gr.setMaximumWidth(230)
-            gr.choisi.connect(lambda v, e=e: (R.placer_dans_groupe(m, e.id, v or None), self._toucher(True)))
+            gr.choisi.connect(lambda val, e=e: (R.placer_dans_groupe(m, e.id, val or None), self._toucher(True)))
             h.addWidget(gr)
+        if m.paralleles and not dans_voie:  # mettre l'étape dans une voie d'un bloc en parallèle
+            choix = {f"{p.id}|{v.id}": f"Bloc {kp + 1} · voie {R.lettre_voie(m, p.id, v.id)}" for kp, p in enumerate(m.paralleles) for v in p.voies}
+            pa = Liste(list(choix), "", vide="Pas parallèle", libelles=choix)
+            pa.setAccessibleName(f"Mettre l’étape {i + 1} en parallèle")
+            pa.setMinimumWidth(120)
+            pa.setMaximumWidth(150)
+            pa.choisi.connect(lambda val, e=e: (R.placer_dans_voie(m, e.id, *val.split("|")) if val else None, self._toucher(True)))
+            h.addWidget(pa)
         haut = icone("↑", f"Monter l’étape {i + 1}", lambda e=e: self._deplacer(e, -1))
-        haut.setEnabled(i > 0)
         bas = icone("↓", f"Descendre l’étape {i + 1}", lambda e=e: self._deplacer(e, 1))
-        bas.setEnabled(i < len(m.etapes) - 1)
+        if dans_voie:  # dans une voie : seulement à l'intérieur de la voie
+            haut.setEnabled(i > 0 and m.etapes[i - 1].voie_id == e.voie_id and m.etapes[i - 1].parallele_id == e.parallele_id)
+            bas.setEnabled(i < len(m.etapes) - 1 and m.etapes[i + 1].voie_id == e.voie_id and m.etapes[i + 1].parallele_id == e.parallele_id)
+        else:
+            haut.setEnabled(i > 0)
+            bas.setEnabled(i < len(m.etapes) - 1)
         h.addWidget(haut)
         h.addWidget(bas)
         h.addWidget(icone("⧉", f"Dupliquer l’étape {i + 1}", lambda e=e: self._dupliquer_etape(e)))
-        h.addWidget(bouton("+ Insérer après", lambda i=i: self._inserer(i)))
+        if not dans_voie:
+            h.addWidget(bouton("+ Insérer après", lambda i=i: self._inserer(i)))
         h.addWidget(icone("✕", f"Supprimer l’étape {i + 1}", lambda e=e: self._supprimer_etape(e), danger=True))
         return sf
+
+    def _bloc_parallele(self, par, voies: list[list[int]], catalogue: list[str]) -> QWidget:
+        """Cadre « En parallèle » : une colonne par voie ; l'étape qui suit le cadre réunit les voies."""
+        m, p = self.m, theme.P
+        f = QFrame()
+        f.setObjectName("parallele")
+        f.setStyleSheet(f"QFrame#parallele{{border:2px solid {p.ambre_trait};border-radius:10px;background:{p.ambre_fond};}}")
+        v = QVBoxLayout(f)
+        v.setContentsMargins(10, 8, 10, 10)
+        v.setSpacing(6)
+        tous = [i for idx in voies for i in idx]
+        titre = etiquette(f"EN PARALLÈLE · {R.plage([i + 1 for i in tous])}" if tous else "EN PARALLÈLE · vide", "etiquetteChamp")
+        titre.setStyleSheet(f"color:{p.ambre_texte};font-weight:700;")
+        entete = [titre, "stretch"]
+        if not self.consultation:
+            ajout = bouton("+ Ajouter une voie", lambda: (R.ajouter_voie(m, par.id), self._toucher(True)), tip="Jusqu’à 4 voies côte à côte")
+            ajout.setEnabled(len(par.voies) < 4)
+            entete += [ajout, bouton("Défaire", lambda: (setattr(self, "voie_cible", None), R.defaire_parallele(m, par.id), self._toucher(True)),
+                                     tip="Défaire le bloc (ses étapes restent dans le flux, l’une après l’autre)")]
+        v.addWidget(ligne(*entete))
+        cols = QHBoxLayout()
+        cols.setSpacing(10)
+        for k, vo in enumerate(par.voies):
+            lettre = R.lettre_voie(m, par.id, vo.id)
+            actif = self.voie_cible == (par.id, vo.id)
+            lane = QFrame()
+            lane.setObjectName("voie")
+            lane.setStyleSheet(f"QFrame#voie{{border:{'2px solid ' + p.accent if actif else '1px dashed ' + p.ambre_trait};border-radius:8px;"
+                               f"background:{p.carte};}}")
+            lv = QVBoxLayout(lane)
+            lv.setContentsMargins(8, 6, 8, 8)
+            lv.setSpacing(6)
+            nom = ChampTexte(vo.nom, "nom de la voie (facultatif)")
+            nom.modifie.connect(lambda val, vo=vo: (setattr(vo, "nom", val), self._toucher()))
+            tete = [etiquette(f"VOIE {lettre}", "etiquetteChamp"), nom]
+            if not self.consultation:
+                tete.append(bouton("+ sous-étape", lambda vo=vo: self._viser_voie(par.id, vo.id), tip=f"Ajouter une étape dans la voie {lettre}"))
+                if len(par.voies) > 2:
+                    tete.append(icone("✕", f"Supprimer la voie {lettre}", lambda vo=vo: (R.supprimer_voie(m, par.id, vo.id), self._toucher(True)), danger=True))
+            lv.addWidget(ligne(*tete))
+            for i in voies[k]:
+                lv.addWidget(self._ligne_etape(i, catalogue, dans_voie=True))
+            if not voies[k]:
+                lv.addWidget(etiquette("Aucune étape : « + sous-étape » ou glisse une étape ici.", secondaire=True, wrap=True))
+            lv.addStretch(1)
+            if not self.consultation:
+                rendre_cible(lane, {"etape": "dedans"}, lambda genre, ident, avant, vo=vo: self._deposer_dans_voie(ident, par.id, vo.id))
+            cols.addWidget(lane, 1)
+        v.addLayout(cols)
+        v.addWidget(etiquette("Les voies sont réalisées en même temps ; l’étape qui suit ce cadre les réunit.", secondaire=True, wrap=True))
+        return f
+
+    def _deposer_dans_voie(self, ident: str, pid: str, vid: str):
+        self.ctrl.memoriser_manip()
+        if R.placer_dans_voie(self.m, ident, pid, vid):
+            self._toucher(True)
+            self.ctrl.toast.emit("Étape rangée dans la voie (Ctrl+Z pour annuler)")
 
     def _bloc_groupe(self, g, idx: list[int], catalogue: list[str]) -> QWidget:
         """Cadre d'une grande étape : nom, ses étapes, ajout d'une sous-étape."""
@@ -725,9 +828,20 @@ class PageFlux(QWidget):
 
     def _choisir_cible(self, v: str):
         """Liste « Où ajouter l'étape ? » : hors grande étape, dans une existante, ou en commencer une."""
-        if not v:
+        if v == "p:new":
+            p = R.creer_parallele(self.m)
+            self.voie_cible, self.groupe_cible, self.inserer_apres = (p.id, p.voies[0].id), None, None
+            self._toucher(True)
+            self.ctrl.toast.emit("Bloc en parallèle créé : ajoute les étapes de la voie A, puis choisis la voie B")
+        elif v.startswith("v:"):
+            pid, _, vid = v[2:].partition("|")
+            self.voie_cible, self.groupe_cible, self.inserer_apres = (pid, vid), None, None
+            self._actualiser()
+        elif not v:
+            self.voie_cible = None
             self._finir_groupe()
         elif v.startswith("g:"):
+            self.voie_cible = None
             self._viser_groupe(v[2:])
         elif v == "n:*":
             from mat_methode.ui.dialogues import demander_texte
@@ -748,16 +862,24 @@ class PageFlux(QWidget):
             self.ctrl.reglages.grandes_etapes.append(nom)
             self.ctrl.toucher_reglages()
         g = R.creer_groupe(self.m, nom)
-        self.groupe_cible, self.inserer_apres = g.id, None
+        self.groupe_cible, self.inserer_apres, self.voie_cible = g.id, None, None
         self._toucher(True)
         self.ctrl.toast.emit(f"Grande étape « {nom} » : ajoute ses sous-étapes")
 
     def _viser_groupe(self, gid):
-        self.groupe_cible, self.inserer_apres = gid, None
+        self.groupe_cible, self.inserer_apres, self.voie_cible = gid, None, None
         self._actualiser()
 
     def _finir_groupe(self):
         self.groupe_cible = None
+        self._actualiser()
+
+    def _finir_voie(self):
+        self.voie_cible = None
+        self._actualiser()
+
+    def _viser_voie(self, pid: str, vid: str):
+        self.voie_cible, self.groupe_cible, self.inserer_apres = (pid, vid), None, None
         self._actualiser()
 
     def _defaire_groupe(self, g):
@@ -781,7 +903,8 @@ class PageFlux(QWidget):
             on = (c.vide is not None) if cle == "vide" else getattr(c, cle) is not None
             g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_commune(m, cle), self._toucher(True)),
                                         (c.vide.mbar if c.vide else None) if cle == "vide" else getattr(c, cle), lib_v, unite,
-                                        lambda v, cle=cle: self._set_commune(cle, v)), 0, k)
+                                        lambda v, cle=cle: self._set_commune(cle, v),
+                                        self.ctrl.reglages.vitesses_agitation if cle == "agitation_trmin" else None), 0, k)
         cl.addLayout(g)
         rem = ToggleSwitch("Remplacer aussi les valeurs déjà saisies", self.remplacer)
         rem.toggled.connect(lambda v: setattr(self, "remplacer", v))
@@ -801,7 +924,7 @@ class PageFlux(QWidget):
             setattr(c, cle, v)
         self._toucher()
 
-    def _condition(self, libelle, on, basculer, valeur, lib_v, unite, changer) -> QWidget:
+    def _condition(self, libelle, on, basculer, valeur, lib_v, unite, changer, choix: list[float] | None = None) -> QWidget:
         sf = QFrame()
         sf.setObjectName("sousCarte")
         v = QVBoxLayout(sf)
@@ -809,7 +932,11 @@ class PageFlux(QWidget):
         t = ToggleSwitch(libelle, on)
         t.toggled.connect(lambda *_: basculer())
         v.addWidget(t)
-        if on:
+        if on and choix is not None:  # vitesse choisie dans la liste des Réglages (ou « Autre valeur… »)
+            lv = ChoixVitesse(choix, valeur)
+            lv.choisi.connect(lambda val: (changer(val), self._toucher(val is None or val not in choix)))
+            v.addWidget(champ(lib_v, lv))
+        elif on:
             nb = NumberBox(valeur, unite)
             nb.valeur.connect(changer)
             v.addWidget(champ(lib_v, nb))
@@ -827,7 +954,10 @@ class PageFlux(QWidget):
             self.ctrl.toast.emit("Écris le nom de l’étape")
             return
         gc = self.m.groupe(self.groupe_cible)
-        if gc is not None:  # ajout dans la grande étape en cours, après sa dernière sous-étape
+        if self.voie_cible and self.m.parallele(self.voie_cible[0]):  # ajout dans une voie du bloc en parallèle
+            e = R.ajouter_etape(self.m, op, None)
+            R.placer_dans_voie(self.m, e.id, *self.voie_cible)
+        elif gc is not None:  # ajout dans la grande étape en cours, après sa dernière sous-étape
             nums = R.numeros_groupe(self.m, gc.id)
             R.ajouter_etape(self.m, op, nums[-1] - 1 if nums else None, groupe_id=gc.id)
         else:
@@ -839,6 +969,7 @@ class PageFlux(QWidget):
     def _inserer(self, i):
         self.inserer_apres = i
         self.groupe_cible = None
+        self.voie_cible = None
         self._actualiser()
 
     # ------------------------------------------------------------ glisser-déposer
@@ -939,7 +1070,27 @@ class PageFlux(QWidget):
         for i, e in enumerate(m.etapes):
             g = m.groupe(e.groupe_id)
             debut = g is not None and (i == 0 or m.etapes[i - 1].groupe_id != g.id)
-            if g is None:
+            par = m.parallele(e.parallele_id)
+            if par is not None:  # étapes en parallèle : cadre ambre, voies l'une sous l'autre avec leur lettre
+                prec = m.etapes[i - 1] if i > 0 else None
+                if prec is None or prec.parallele_id != par.id:
+                    cadre = QFrame()
+                    cadre.setObjectName("parallele")
+                    cadre.setStyleSheet(f"QFrame#parallele{{border:2px solid {theme.P.ambre_trait};border-radius:8px;background:{theme.P.ambre_fond};}}")
+                    cv = QVBoxLayout(cadre)
+                    cv.setContentsMargins(6, 6, 6, 6)
+                    cv.setSpacing(6)
+                    t = etiquette("EN PARALLÈLE", "etiquetteChamp")
+                    t.setStyleSheet(f"color:{theme.P.ambre_texte};font-weight:700;padding-left:4px;")
+                    cv.addWidget(t)
+                    lay.addWidget(cadre)
+                    cible = cv
+                if prec is None or prec.parallele_id != par.id or prec.voie_id != e.voie_id:
+                    tv = etiquette(f"VOIE {R.lettre_voie(m, par.id, e.voie_id)}" + (f" · {next((v.nom for v in par.voies if v.id == e.voie_id), '')}".rstrip(" ·")),
+                                   "etiquetteChamp")
+                    tv.setStyleSheet(f"color:{theme.P.ambre_texte};padding-left:4px;")
+                    cible.addWidget(tv)
+            elif g is None:
                 cible = lay
             elif debut:  # cadre de la grande étape (ex. DEGUMMING · étapes 2 à 4)
                 fin = i
@@ -963,7 +1114,7 @@ class PageFlux(QWidget):
             cl = c.layout()
             for r in e.reactifs:
                 if r.nom:
-                    cl.addWidget(etiquette(f"<b>{r.nom}</b> <span style='color:{theme.P.texte2}'>{r.quantite}</span>", wrap=True))
+                    cl.addWidget(etiquette(f"<b>{r.nom}</b> <span style='color:{theme.P.texte2}'>{r.quantite_complete}</span>", wrap=True))
             cond = " · ".join(x for x in [resume_conditions(e)] + autres_conditions(e) if x)
             cl.addWidget(etiquette(cond, "conditions", wrap=True) if cond else etiquette("conditions à compléter", "aCompleter"))
             if e.equipements:
@@ -1087,7 +1238,8 @@ class PageFlux(QWidget):
             on = (e.vide is not None) if cle == "vide" else getattr(e, cle) is not None
             val = (e.vide.mbar if e.vide else None) if cle == "vide" else getattr(e, cle)
             g.addWidget(self._condition(lib, on, lambda cle=cle: (R.basculer_condition(e, cle), self._toucher(True)), val, lib_v, unite,
-                                        lambda v, cle=cle: self._set_cond(e, cle, v)), k // 2, k % 2)
+                                        lambda v, cle=cle: self._set_cond(e, cle, v),
+                                        self.ctrl.reglages.vitesses_agitation if cle == "agitation_trmin" else None), k // 2, k % 2)
         wg = QWidget()
         wg.setLayout(g)
         x.ajouter(wg)
@@ -1173,7 +1325,11 @@ class PageFlux(QWidget):
                                                       tip="Remplit le n° Scirius, l’emplacement et le fournisseur depuis le fichier Scirius")]))
             q = ChampTexte(re_.quantite, "ex. 1 : 1 (v/v)", mono=True)
             q.modifie.connect(lambda val, re_=re_: (setattr(re_, "quantite", val), self._toucher()))
-            v.addWidget(champ("Quantité ou ratio", q))
+            u = Liste(r.unites_reactifs, re_.unite, vide="—")
+            u.setMinimumWidth(110)
+            u.setAccessibleName("Unité de la quantité (liste dans Réglages › Unités des réactifs)")
+            u.choisi.connect(lambda val, re_=re_: (setattr(re_, "unite", val), self._toucher()))
+            v.addWidget(ligne(champ("Quantité ou ratio", q), champ("Unité", u), espacement=10))
             inv = r.reactif(re_.nom) if re_.nom else None
             if inv is not None:  # mémorisé par nom de réactif, repris partout
                 sc = ChampTexte(inv.scirius, "à saisir", mono=True)
@@ -1187,7 +1343,7 @@ class PageFlux(QWidget):
         wg = QWidget()
         wg.setLayout(g)
         x.ajouter(wg)
-        x.ajouter(flux_widgets([bouton("+ Ajouter un réactif à cette étape", lambda: (e.reactifs.append(ReactifEtape()), self._toucher(True)), ajout=True),
+        x.ajouter(flux_widgets([bouton("+ Ajouter un réactif à cette étape", lambda: (e.reactifs.append(ReactifEtape(unite=(r.unites_reactifs or [""])[0])), self._toucher(True)), ajout=True),
                                 bouton("Gérer la liste des réactifs (Réglages)", lambda: self.voir_reglages.emit("reactifs"), lien=True)]))
         return x
 

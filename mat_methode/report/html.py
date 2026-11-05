@@ -45,7 +45,7 @@ def rapport_html(m: Manip, reglages: Reglages) -> str:
             '<div class="c">'
             + (f'<div class="g">{e(m.groupe(et.groupe_id).nom.upper())}</div>' if m.groupe(et.groupe_id) else "")
             + f'<b>{i + 1}. {e(cap(et.operation))}</b>'
-            + "".join(f'<div class="r">{e(x.nom)}{" (" + e(quantite_texte(x.quantite)) + ")" if x.quantite else ""}</div>' for x in et.reactifs if x.nom)
+            + "".join(f'<div class="r">{e(x.nom)}{" (" + e(quantite_texte(x.quantite_complete)) + ")" if x.quantite_complete else ""}</div>' for x in et.reactifs if x.nom)
             + f'<div class="p">{e(resume_conditions(et))}</div><div class="e">{e(", ".join(et.equipements))}</div>'
             + "".join(f'<div class="s"><b>{e(lab[p.id])}</b> · {fmt_vol(p.volume_ml or 0)} mL<br><small>{e(moment_court(m, p))}</small></div>' for p in ps)
             + "</div>")
