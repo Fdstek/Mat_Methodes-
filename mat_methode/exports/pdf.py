@@ -147,6 +147,8 @@ class Flux(Flowable):
         self.par_apres: dict[int, list] = {}
         for p in prelevements:
             self.par_apres.setdefault(p["apres_etape"], []).append(p)
+        if self.par_apres.get(0):
+            self.TETE = max(self.TETE, 27 * mm)  # échantillons d'entrée : la flèche ENTRÉE passe sous leurs pastilles
         self.contenus = [self._contenu(e) for e in etapes]
         self.bandes, self.h_cartes = [], []
         for r in range(self.lignes):
@@ -358,7 +360,8 @@ class Flux(Flowable):
             elif r2 > r1:  # vers une autre ligne : on descend, on traverse l'espace entre les lignes, puis on entre par le haut
                 xa, xb = x1 + w - 3 * mm, x2 + w - 3 * mm
                 depart = y1 if self.bandes[r1] == 0 else y1 - self.bandes[r1] * self.PAS
-                ym = y2 + h2 + self.ESPACE * 0.93
+                en_parallele = any((self.etapes[k].get("parallele") or {}).get("id") for k in range(len(self.etapes)) if self.cases[k][0] == r2)
+                ym = y2 + h2 + self.ESPACE * (0.86 if en_parallele else 0.5)  # milieu de l'espace entre les rangées (au-dessus du cadre « en parallèle »)
                 self.fleche(c, [(xa, depart), (xa, ym), (xb, ym), (xb, y2 + h2 + 0.4 * mm)], "bas")
 
         entrants, sortants = {ib for _, ib in self.liens}, {ia for ia, _ in self.liens}
@@ -376,7 +379,11 @@ class Flux(Flowable):
             cx, cy, r, h = positions[i]
             bas = cy - self.bandes[r] * self.PAS
             xa = cx + w - 3 * mm
-            self.fleche(c, [(xa, bas), (xa, 3 * mm), (x_sortie, 3 * mm)], "droite")
+            if xa >= x_sortie:  # au-dessus du libellé : on descend droit dessus
+                self.fleche(c, [(xa, bas), (xa, 5.4 * mm)], "bas")
+            else:  # à gauche du libellé : on descend, on avance, puis on entre par le haut du libellé
+                x_fin = x_sortie + 6 * mm
+                self.fleche(c, [(xa, bas), (xa, 7.5 * mm), (x_fin, 7.5 * mm), (x_fin, 5.4 * mm)], "bas")
 
     def _cadres_en_parallele(self, c, positions):
         """Cadre ambre autour de chaque bloc en parallèle, avec le signe « || » dessiné (la police ne l'a pas toujours) et le mot EN PARALLÈLE."""

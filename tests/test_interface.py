@@ -1140,6 +1140,10 @@ def test_carte_du_flux_ne_s_ecrase_pas_quand_on_ajoute_un_echantillon(fen, qtbot
     qtbot.wait(200)
     contenu = fen.p_flux._zone_flux.widget()
     assert contenu.height() >= contenu.layout().minimumHeightForWidth(contenu.width())  # jamais en dessous de la taille nécessaire
+    qtbot.wait(200)
+    from PySide6.QtWidgets import QFrame
+    cartes = [f for f in contenu.findChildren(QFrame) if f.objectName() == "carteFlux"]
+    assert cartes and all(f.minimumHeight() >= f.layout().totalHeightForWidth(f.width()) > 0 and f.height() >= f.minimumHeight() for f in cartes)  # aucune carte écrasée
     assert contenu.height() >= contenu.layout().totalHeightForWidth(contenu.width()) and contenu.minimumHeight() >= contenu.layout().totalHeightForWidth(contenu.width())
 
 
