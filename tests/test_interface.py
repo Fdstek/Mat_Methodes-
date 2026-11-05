@@ -85,6 +85,10 @@ def test_parcours_nouvelle_manip(fen, qtbot, monkeypatch):
     assert [e.operation for e in m.etapes] == ["chauffage", "neutralisation"]
     fen.p_flux._vers_completer()
     fen.p_flux.aller(m.etapes[0].id)
+    assert m.etapes[0].temperature_c == 60 and m.etapes[0].agitation_trmin == 300  # conditions par défaut de « chauffage » (Réglages)
+    t = next(x for x in fen.p_flux.findChildren(ToggleSwitch) if x.text() == "Chauffage")
+    t.click()
+    assert m.etapes[0].temperature_c is None
     t = next(x for x in fen.p_flux.findChildren(ToggleSwitch) if x.text() == "Chauffage")
     t.click()
     assert m.etapes[0].temperature_c == 60
