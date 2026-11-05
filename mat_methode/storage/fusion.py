@@ -11,7 +11,7 @@ from mat_methode.domain.models import Reglages
 
 LISTES = {  # liste -> clé d'identité (None = chaîne)
     "laboratoires": "nom", "analyses": None, "personnes": "nom", "types_demande": None, "etats": "id", "reactifs": "nom",
-    "grandes_etapes": None, "operations": "nom", "volumes_ml": None, "categories_a_faire": None, "scirius_noms": None, "materiels": None,
+    "grandes_etapes": None, "modeles_grandes_etapes": "nom", "operations": "nom", "volumes_ml": None, "categories_a_faire": None, "scirius_noms": None, "materiels": None,
     "ordre_protocoles": None, "ordre_tags": None, "unites_reactifs": None, "vitesses_agitation": None, "vitesses_rcf": None, "unites_duree": None,
 }
 

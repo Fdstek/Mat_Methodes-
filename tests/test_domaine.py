@@ -70,3 +70,25 @@ def test_temps_de_contact_avec_unite():
     assert ReactifEtape(nom="A", contact="1,5", contact_unite="h").contact_complet == "1,5 h"
     assert ReactifEtape(nom="A", contact="une nuit", contact_unite="min").contact_complet == "une nuit"
     assert ReactifEtape(nom="A").contact_complet == ""
+
+
+def test_modele_de_grande_etape_garde_les_etapes_sans_les_quantites(exemples):
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.models import Reglages
+    m = exemples[1][0]
+    g = R.creer_groupe(m, "Bleaching")
+    R.placer_dans_groupe(m, m.etapes[0].id, g.id)
+    from mat_methode.domain.models import ReactifEtape
+    m.etapes[0].reactifs = [ReactifEtape(nom="Acide citrique", quantite="12", unite="g")]
+    r = Reglages()
+    modele = R.modele_depuis_groupe(m, g.id)
+    assert modele.nom == "Bleaching" and len(modele.etapes) == 1 and modele.etapes[0].id != m.etapes[0].id
+    assert all(x.quantite == "" for x in modele.etapes[0].reactifs) and m.etapes[0].reactifs[0].quantite == "12"
+    assert O.enregistrer_modele(r, modele) is False and O.enregistrer_modele(r, modele) is True and len(r.modeles_grandes_etapes) == 1
+    n = len(m.etapes)
+    ng = R.appliquer_modele(m, r.modeles_grandes_etapes[0])
+    assert len(m.etapes) == n + 1 and m.etapes[-1].groupe_id == ng.id and ng.id != g.id and m.etapes[-1].operation == m.etapes[0].operation
+    assert O.renommer_modele(r, "Bleaching", "Blanchiment") and r.modeles_grandes_etapes[0].nom == "Blanchiment"
+    O.supprimer_modele(r, "Blanchiment")
+    assert r.modeles_grandes_etapes == []

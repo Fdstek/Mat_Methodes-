@@ -456,3 +456,25 @@ def couleur_donneur(r: Reglages, nom: str) -> str:
     except ValueError:
         i = 0
     return PALETTE_DONNEURS[i % len(PALETTE_DONNEURS)]
+
+
+def enregistrer_modele(r: Reglages, modele) -> bool:
+    """Ajoute le modèle de grande étape ; un modèle du même nom est remplacé. Retourne True si un modèle existait déjà."""
+    ancien = next((x for x in r.modeles_grandes_etapes if norm(x.nom) == norm(modele.nom)), None)
+    if ancien is not None:
+        r.modeles_grandes_etapes.remove(ancien)
+    r.modeles_grandes_etapes.append(modele)
+    return ancien is not None
+
+
+def renommer_modele(r: Reglages, ancien: str, nouveau: str) -> bool:
+    nouveau = nouveau.strip()
+    m = next((x for x in r.modeles_grandes_etapes if x.nom == ancien), None)
+    if m is None or not nouveau or any(norm(x.nom) == norm(nouveau) and x is not m for x in r.modeles_grandes_etapes):
+        return False
+    m.nom = nouveau
+    return True
+
+
+def supprimer_modele(r: Reglages, nom: str) -> None:
+    r.modeles_grandes_etapes = [x for x in r.modeles_grandes_etapes if x.nom != nom]

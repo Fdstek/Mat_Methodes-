@@ -146,6 +146,7 @@ class Reglages(_Modele):
     etats: list[Etat] = Field(default_factory=lambda: [e.model_copy() for e in ETATS_DEFAUT])
     reactifs: list[ReactifInventaire] = Field(default_factory=list)
     grandes_etapes: list[str] = Field(default_factory=lambda: list(GRANDES_ETAPES_DEFAUT))
+    modeles_grandes_etapes: list[ModeleGrandeEtape] = Field(default_factory=list)  # grandes étapes enregistrées comme modèles (étapes sans quantités)
     materiels: list[str] = Field(default_factory=lambda: list(MATERIEL_DEFAUT))  # matériel proposé dans les étapes
     categories_a_faire: list[str] = Field(default_factory=lambda: list(CATEGORIES_A_FAIRE_DEFAUT))
     volumes_ml: list[float] = Field(default_factory=lambda: list(VOLUMES_DEFAUT))  # volumes proposés pour un échantillon
@@ -282,6 +283,12 @@ class Etape(_Modele):
     vitesse_unite: str = "tr/min"  # « tr/min » ou « g » (RCF) pour l'agitation / la centrifugation
     parallele_id: Optional[str] = None  # bloc « en parallèle » qui contient cette étape (jamais avec une grande étape)
     voie_id: Optional[str] = None  # voie du bloc en parallèle (A, B…)
+
+
+class ModeleGrandeEtape(_Modele):
+    """Modèle de grande étape (ex. Bleaching) : ses étapes, conditions et réactifs, sans les quantités ; partagé entre les postes."""
+    nom: str
+    etapes: list[Etape] = Field(default_factory=list)
 
 
 Matiere = ReactifEtape  # une matière d'une voie se décrit comme un réactif d'étape

@@ -76,6 +76,7 @@ class PageReglages(QWidget):
             ("analyses", "Analyses", "Analyses disponibles pour les laboratoires", f"{len(r.analyses)}", self._analyses),
             ("types", "Types de demande", "Support, R&D, Test d’idée…", f"{len(r.types_demande)}", self._types),
             ("grandes", "Grandes étapes", "Degumming, Neutralisation…", f"{len(r.grandes_etapes)}", self._grandes),
+            ("modeles", "Modèles de grandes étapes", "Grandes étapes enregistrées depuis un flux (Bleaching…)", f"{len(r.modeles_grandes_etapes)}", self._modeles),
             ("a_faire", "Catégories « À faire »", "Réflexion, Matériel manquant, Réactif manquant…",
              f"{len(r.categories_a_faire)}", self._categories),
             ("tags", "Tags", "Ajouter, renommer, retirer, ordre et couleur des tags", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
@@ -420,6 +421,26 @@ class PageReglages(QWidget):
 
             nom.returnPressed.connect(ajout)
             x.ajouter(ligne(champ("Nouvelle condition", nom), champ("Unité", unite), champ("Valeur par défaut", defaut), bouton("Ajouter", ajout), "stretch"))
+
+    def _modeles(self):
+        from mat_methode.ui.dialogues import demander_texte
+        x = self._section("Modèles de grandes étapes", f"{len(self.r.modeles_grandes_etapes)}")
+        x.ajouter(etiquette("Un modèle se crée dans le flux d’une manip : bouton ★ de la grande étape. Il garde les étapes, leurs conditions et leurs réactifs, "
+                            "sans les quantités, et se pose ensuite dans « Où ajouter l’étape ? ». Il est partagé avec tous les postes.", secondaire=True, wrap=True))
+        if not self.r.modeles_grandes_etapes:
+            x.ajouter(etiquette("Aucun modèle pour l’instant.", secondaire=True))
+        for mo in list(self.r.modeles_grandes_etapes):
+            def renommer(mo=mo):
+                nouveau = demander_texte(self, "Renommer le modèle", "Nouveau nom", mo.nom)
+                if nouveau and O.renommer_modele(self.r, mo.nom, nouveau):
+                    self._changer()
+                    self._actualiser()
+                elif nouveau:
+                    self.ctrl.toast.emit("Ce nom est déjà pris par un autre modèle")
+
+            etapes = " → ".join(e.operation for e in mo.etapes) or "aucune étape"
+            x.ajouter(ligne(etiquette(f"<b>{mo.nom}</b> · {etapes}", wrap=True), "stretch", bouton("Renommer", renommer),
+                            bouton("Supprimer", lambda mo=mo: (O.supprimer_modele(self.r, mo.nom), self._changer(), self._actualiser()))))
 
     def _unites(self):
         self._liste_simple("Unités des réactifs", self.r.unites_reactifs, lambda v: self.r.unites_reactifs.remove(v),
