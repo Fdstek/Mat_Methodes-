@@ -1210,3 +1210,55 @@ def test_modele_de_grande_etape_enregistre_puis_pose_dans_un_autre_flux(fen, qtb
     n = len(m.etapes)
     page._choisir_cible("mo:Bleaching")
     assert len(m.etapes) == n + 1 and len(m.groupes) == 2 and m.etapes[-1].groupe_id == m.groupes[-1].id
+
+
+def test_pastille_demandes_export_bug_avec_photos_et_modeles_en_tete(fen, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    from mat_methode.domain import reglages_ops as O
+    from mat_methode.domain import regles as R
+    from mat_methode.domain.demandes import Demande
+    from mat_methode.storage import demandes as S
+    from mat_methode.ui.widgets import Liste
+    st = fen.ctrl.st
+    # pastille : nombre de demandes « Nouvelle »
+    fen.maj_pastille_demandes()
+    assert fen.pastille_demandes.isHidden()
+    d = Demande(titre="Bug", texte="un", auteur="pierre", pieces=["capture.png"])
+    dossier = S.dossier_pieces(st, d)
+    dossier.mkdir(parents=True, exist_ok=True)
+    (dossier / "capture.png").write_bytes(b"png")
+    S.enregistrer(st, d)
+    S.enregistrer(st, Demande(titre="Idée", texte="deux", auteur="pierre"))
+    fen.maj_pastille_demandes()
+    assert fen.pastille_demandes.text() == "2" and not fen.pastille_demandes.isHidden()
+    # export : dossier donnees/exports/bug proposé ; avec une photo, le .md et la photo sont dans le même dossier
+    proposes = []
+    cible = st.donnees / "exports" / "bug" / "Bugs_test.md"
+
+    def choisir(parent, titre, defaut, filtre):
+        proposes.append(defaut)
+        return str(cible), ""
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", staticmethod(choisir))
+    fen.ouvrir_demandes()
+    fen.p_demandes.ouvrir_fichier.disconnect()
+    fen.p_demandes._exporter()
+    assert Path(proposes[0]).parent == st.donnees / "exports" / "bug"
+    md = st.donnees / "exports" / "bug" / "Bugs_test" / "Bugs_test.md"
+    assert md.exists() and (md.parent / f"{d.id[:6]}_capture.png").exists()
+    assert f"]({d.id[:6]}_capture.png)" in md.read_text(encoding="utf-8")
+    fen.maj_pastille_demandes()
+    assert fen.pastille_demandes.isHidden()  # exportées : passées à « À vérifier »
+    # les modèles viennent juste après « Hors grande étape »
+    m = ethanol(fen)
+    m.etat = "brouillon"
+    fen.ouvrir(m.id, "def")
+    m = fen.ctrl.courante
+    g = R.creer_groupe(m, "Degumming")
+    R.placer_dans_groupe(m, m.etapes[0].id, g.id)
+    O.enregistrer_modele(fen.ctrl.reglages, R.modele_depuis_groupe(m, g.id))
+    fen.p_flux.rafraichir()
+    listes = [x for x in fen.p_flux.findChildren(Liste) if "Où ajouter l’étape" in x.accessibleName()]
+    assert listes
+    textes = [listes[0].itemText(i) for i in range(listes[0].count())]
+    assert textes[0] == "Hors grande étape" and textes[1].startswith("Modèle de grande étape : Degumming")

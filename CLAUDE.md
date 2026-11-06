@@ -29,7 +29,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - `donnees\reglages.json` : écriture atomique, contrôle de `rev`, fusion à trois voies (`storage/fusion.py`, `LISTES`).
 - `donnees\manips\<id>\vNNNNNN_<poste>_<alea>.json` : **un fichier par version, jamais réécrit** (`storage/versions.py`) ; chaque fichier commence par `"parents"` ; la version courante est celle dont aucune autre ne découle ; deux versions courantes = conflit à trancher (`Stockage.versions_en_conflit / resoudre_conflit`, dialogue `choisir_version`) ; élagage à 25 versions ; l'ancien format (`<id>.json`) est converti au 1er lancement (originaux dans `manips\_ancien`).
 - `verrous\` (battement de 30 s, expiration à 3 min), `preferences\<user>.json`, `sauvegardes\AAAA-MM-JJ` (gardées 10 jours).
-- `exports\Rapports\` et `exports\Protocoles\` (partagés, pas de dossier par personne ; le document s'ouvre après l'export). On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
+- `exports\Rapports\`, `exports\Protocoles\` et `exports\bug\` (export « Bugs et idées » ; partagés, pas de dossier par personne ; le document s'ouvre après l'export). On y trouve aussi `cache\` (Scirius, 30 min), `logs\` et `temp\` (TMP et TEMP y sont redirigés).
 - `SCHEMA_DONNEES = 22` (5-6 : états, commentaire d'échantillon ; 7 : statuts fixes Brouillon / Validée / En cours / Réalisée / Annulée, `Reglages.ordre_protocoles` ; 8 : `Reglages.ordre_tags` ; 9 : `Reglages.couleurs_tags` ; 10 : `Reglages.couleurs_types` ; 11 : `Contexte.emplacement` ; 12 : `Manip.statuts` (historique des statuts) ; 13 : `Contexte.experience`, `Contexte.attribue`, `Personne.manipule` ; 14 : `Personne.fait_mm`, `Demande.tags` ; 15 : `Manip.paralleles`, `Etape.parallele_id / voie_id`, `ReactifEtape.unite`, `Reglages.unites_reactifs / vitesses_agitation` ; 16 : `Operation.defauts`, `Reglages.vitesses_rcf / unites_duree`, `Etape.duree_unite / vitesse_unite` ; 17 : `Voie.part / part_unite / autres`, `Etape.apports` ; 18 : manips en un fichier par version ; 19 : `Reglages.conditions_materiel` ; 20 : `Communes.vitesse_unite` ; 21 : `ReactifEtape.contact / consigne` ; 22 : `Reglages.modeles_grandes_etapes`) (dans `mat_methode/__init__.py`). Une version plus ancienne de l'application refuse un fichier plus récent. Incrémenter ce numéro à chaque ajout de champ persistant.
 - Identité : l'IGG est lu dans le chemin OneDrive ou dans USERPROFILE (`C:\Users\<IGG>`), en majuscules. Le nom affiché vient de `reglages.personnes`.
 
@@ -123,6 +123,9 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   pastilles d'entrée, retour à la ligne au milieu de l'espace, SORTIE vers le haut du libellé).
 - Lot du 06/11 (version 1.9.3) : `Phase.reunion_voies` (fiche « Réunion · voies A + B » dans le détail par phase, JSON `reunion_voies`, `pdf.couleur_phase` en vert) ;
   `volumes.reunion_volumes` (déplacée depuis `echange`) ; carte du flux en vert (`PageFlux._carte_reunion`).
+- Lot du 06/11 (version 1.9.4) : modèles en tête de « Où ajouter l'étape ? » ; pastille des demandes « Nouvelle » (`Fenetre.maj_pastille_demandes`, `PageDemandes.changement`,
+  relecture chaque minute) ; export « Bugs et idées » dans `donnees\exports\bug` (avec des photos : un dossier au nom du .md contient le .md et les photos) ;
+  `regles.avertissements` : même n° Aramis dans la même étape = normal, dans des étapes différentes = erreur, n° Scirius en double = toujours une erreur.
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
