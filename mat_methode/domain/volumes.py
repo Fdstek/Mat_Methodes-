@@ -95,3 +95,16 @@ def volumes_par_etape(m: Manip) -> list[LigneVolume]:
         if voies:
             bloc_precedent = None
     return [lignes[i] for i in sorted(lignes)]
+
+
+def reunion_volumes(m: Manip, i: int, lignes: dict) -> dict:
+    """Réunion des voies avant l'étape i : volume pris dans chaque voie (lettre, mL) et volume total (None si aucun volume connu)."""
+    e, par = m.etapes[i], m.parallele(m.etapes[i - 1].parallele_id)
+    voies = []
+    for vo in par.voies:
+        idx = [k for k, x in enumerate(m.etapes) if x.parallele_id == par.id and x.voie_id == vo.id]
+        if idx and idx[-1] in lignes:
+            sortie = lignes[idx[-1]].sortie
+            voies.append({"lettre": lettre_voie(m, par.id, vo.id), "volume_ml": max(0.0, min(e.apports.get(vo.id, sortie), sortie))})
+    total = sum(v["volume_ml"] for v in voies)
+    return {"voies": voies, "volume_ml": total if total else None}

@@ -26,7 +26,7 @@ from mat_methode.domain.prototype import contexte_depuis
 from mat_methode.domain.reglages_ops import auteur, nom_auteur, nom_etat
 from mat_methode.domain.regles import bloc_au_depart, blocs, echantillons_tries, etiquettes, lettre_voie, numero_etape, reperes_etapes
 from mat_methode.domain.texte import cap, minuscule_initiale
-from mat_methode.domain.volumes import volumes_par_etape
+from mat_methode.domain.volumes import reunion_volumes, volumes_par_etape
 from mat_methode.report.rapport import construire, reactifs_utilises, vers_markdown
 
 
@@ -58,19 +58,6 @@ def contexte_vers(m: Manip) -> dict:
 
 def _nombre(v):
     return int(v) if isinstance(v, float) and v.is_integer() else v
-
-
-def reunion_volumes(m: Manip, i: int, lignes: dict) -> dict:
-    """Réunion des voies avant l'étape i : volume pris dans chaque voie (lettre, mL) et volume total (None si aucun volume connu)."""
-    e, par = m.etapes[i], m.parallele(m.etapes[i - 1].parallele_id)
-    voies = []
-    for vo in par.voies:
-        idx = [k for k, x in enumerate(m.etapes) if x.parallele_id == par.id and x.voie_id == vo.id]
-        if idx and idx[-1] in lignes:
-            sortie = lignes[idx[-1]].sortie
-            voies.append({"lettre": lettre_voie(m, par.id, vo.id), "volume_ml": max(0.0, min(e.apports.get(vo.id, sortie), sortie))})
-    total = sum(v["volume_ml"] for v in voies)
-    return {"voies": voies, "volume_ml": total if total else None}
 
 
 def exporter(m: Manip, reglages: Reglages) -> dict:
@@ -133,7 +120,7 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                           "volume_ml": _nombre(p.volume_ml), "scirius": p.scirius or None, "aramis": p.aramis or None,
                           "labo": p.labo, "analyses": list(p.analyses),
                           **({"commentaire": p.commentaire.strip()} if p.commentaire.strip() else {})} for p in echantillons_tries(m)],
-        "phases": [{**({"n": ph.n} if any(x.depart_voie for x in r.phases) else {}), "titre": ph.titre, "conditions": ph.conditions, "materiel": ph.materiel,
+        "phases": [{**({"n": ph.n} if any(x.depart_voie or x.reunion_voies for x in r.phases) else {}), "titre": ph.titre, "conditions": ph.conditions, "materiel": ph.materiel,
                     "reactifs": [{"nom": x.nom, "quantite": x.quantite, "scirius": x.scirius, "emplacement": x.emplacement,
                                   "fournisseur": x.fournisseur, "lot": x.lot,
                                   **({"contact": x.contact} if x.contact else {}), **({"consigne": x.consigne} if x.consigne else {})} for x in ph.reactifs],
@@ -142,7 +129,8 @@ def exporter(m: Manip, reglages: Reglages) -> dict:
                                       **({"commentaire": x.commentaire} if x.commentaire else {})} for x in ph.echantillons],
                     **({"remarque": ph.remarque} if ph.remarque else {}),
                     **({"parallele": ph.parallele} if ph.parallele else {}), **({"reunion": ph.reunion} if ph.reunion else {}),
-                    **({"depart_voie": True} if ph.depart_voie else {}), **({"entree_voies": True} if ph.entree_voies else {})} for ph in r.phases],
+                    **({"depart_voie": True} if ph.depart_voie else {}),
+                    **({"reunion_voies": True} if ph.reunion_voies else {}), **({"entree_voies": True} if ph.entree_voies else {})} for ph in r.phases],
         "inventaire_reactifs": [{"nom": minuscule_initiale(n), **{k: (getattr(reglages.reactif(n), k, "") or None)
                                                                  for k in ("scirius", "emplacement", "fournisseur", "lot")}}
                                 for n, _ in used],

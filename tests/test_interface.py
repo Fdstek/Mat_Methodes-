@@ -970,7 +970,7 @@ def test_consigne_en_parallele_dans_les_pdf_conditions_par_materiel_et_fenetre_d
     m.etapes[0].remarque = "Chauffer sans dépasser 60 °C"
     d = exporter(m, r)
     assert [ph.get("parallele") for ph in d["phases"][1:4]] == [None, "EN PARALLÈLE · VOIE A", "EN PARALLÈLE · VOIE B"]
-    assert d["phases"][4]["reunion"] .startswith("Réunit les voies A et B")
+    assert d["phases"][5]["reunion"].startswith("Réunit les voies A et B")
     for i, ecrire in enumerate((ecrire_pdf, ecrire_protocole)):
         ecrire(d, tmp_path / f"{i}.pdf")
         with pdfplumber.open(tmp_path / f"{i}.pdf") as pdf:
@@ -1187,7 +1187,9 @@ def test_reunion_des_voies_volume_reuni_dans_le_flux_et_les_pdf(fen, tmp_path):
     d = exporter(m, fen.ctrl.reglages)
     reu = next(e["reunion"] for e in d["etapes"] if e.get("reunion"))
     assert [v["lettre"] for v in reu["voies"]] == ["A", "B"] and reu["volume_ml"] == pytest.approx(sum(v["volume_ml"] for v in reu["voies"])) and reu["volume_ml"] > 0
-    assert any("volume réuni" in ph.get("reunion", "") for ph in d["phases"])
+    phase = next(ph for ph in d["phases"] if ph.get("reunion_voies"))
+    assert phase["titre"] == "Réunion · voies A + B" and phase["conditions"].startswith("Total ") and [r["nom"] for r in phase["reactifs"]] == ["Voie A", "Voie B"]
+    assert any(ph.get("reunion") == "Réunit les voies A et B" for ph in d["phases"])
     ecrire_pdf(d, tmp_path / "r.pdf")
     with pdfplumber.open(tmp_path / "r.pdf") as pdf:
         texte = " ".join(pg.extract_text() for pg in pdf.pages)

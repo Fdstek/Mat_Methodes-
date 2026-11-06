@@ -121,6 +121,8 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - Lot du 05/11 (version 1.9.1) : `PageFlux._epingler` fixe `contenu.setMinimumHeight(totalHeightForWidth(largeur réelle))` (cartes du flux écrasées sous Windows).
 - Lot du 05/11 (version 1.9.2) : `PageFlux._figer_hauteurs` (hauteur minimale explicite des cartes et cadres du flux) ; flèches du schéma PDF (`Flux.draw` : ENTRÉE sous les
   pastilles d'entrée, retour à la ligne au milieu de l'espace, SORTIE vers le haut du libellé).
+- Lot du 06/11 (version 1.9.3) : `Phase.reunion_voies` (fiche « Réunion · voies A + B » dans le détail par phase, JSON `reunion_voies`, `pdf.couleur_phase` en vert) ;
+  `volumes.reunion_volumes` (déplacée depuis `echange`) ; carte du flux en vert (`PageFlux._carte_reunion`).
 - À vérifier par l'utilisateur sous Windows :
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;

@@ -59,6 +59,8 @@ def phases_a_remplir(data: dict, s: dict) -> list:
                 f" · n° Scirius {escape(ctx['scirius'])}" if ctx.get("scirius") else "") + (
                 f" · <b>emplacement :</b> {escape(ctx['emplacement'])}" if ctx.get("emplacement") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
+        elif ph.get("reunion_voies"):  # volume de chaque voie, puis le total
+            info = "<br/>".join(f"<b>{escape(r['nom'])}</b> · {escape(r['quantite'])}" for r in ph["reactifs"]) + f"<br/><b>{escape(ph.get('conditions') or '')}</b>"
         else:
             info = escape(ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (
                 f"<br/><font color='#566360'>Matériel : {escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
@@ -74,8 +76,8 @@ def phases_a_remplir(data: dict, s: dict) -> list:
         tete.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fond), ("BOX", (0, 0), (-1, -1), 1.2, trait),
                                   ("VALIGN", (0, 0), (-1, -1), "TOP")]))
         contenu = [tete]
-        ps = [p for p in pre if p["apres_etape"] == n] if not ph.get("depart_voie") else []
-        if ph.get("depart_voie"):
+        ps = [p for p in pre if p["apres_etape"] == n] if not (ph.get("depart_voie") or ph.get("reunion_voies")) else []
+        if ph.get("depart_voie") or ph.get("reunion_voies"):
             pass  # le Départ d'une voie n'a pas d'échantillon : ceux de l'entrée sont dans le Départ commun
         elif ps:
             lignes = [[Paragraph(h, cellb) for h in ["Éch.", "Volume · moment", "Labo · analyses", "N° Scirius", "N° Aramis"]]]
