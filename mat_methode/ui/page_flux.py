@@ -40,8 +40,7 @@ from mat_methode.domain.models import (
 from mat_methode.domain.reglages_ops import auteur, texte_statut
 from mat_methode.domain.regles import code_badge, echantillons_tries, etiquettes
 from mat_methode.domain.texte import cap, fmt_dt, fmt_dur, fmt_num, fmt_vol, norm
-from mat_methode.domain.volumes import part_voie, volume_ajoute, volumes_par_etape
-from mat_methode.exports.echange import reunion_volumes
+from mat_methode.domain.volumes import part_voie, reunion_volumes, volume_ajoute, volumes_par_etape
 from mat_methode.report.rapport import autres_conditions, resume_conditions
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
@@ -1486,12 +1485,16 @@ class PageFlux(QWidget):
         """Réunion des voies avant l'étape i : volume pris dans chaque voie et volume réuni (un clic ouvre l'étape qui réunit)."""
         reu = reunion_volumes(self.m, i, {k: lg for k, lg in volumes.items()})
         lettres = " + ".join(v["lettre"] for v in reu["voies"])
-        c = self._carte_flux(e.id, None, f"Réunion · voies {lettres}")
+        c = self._carte_flux(e.id, None, f"RÉUNION · voies {lettres}")
         c.setProperty("sel", False)
+        p = theme.P  # vert « succès » : se repère d'un coup d'œil entre les étapes, comme le Départ d'une voie
+        c.setStyleSheet(f"QFrame#carteFlux{{background:{p.succes_fond};border:1px solid {p.succes};border-left:4px solid {p.succes};border-radius:8px;}}"
+                        f"QFrame#carteFlux:hover{{border-color:{p.succes};}}")
         for v in reu["voies"]:
-            c.layout().addWidget(etiquette(f"<b>Voie {v['lettre']}</b> {fmt_vol(v['volume_ml'])} mL", wrap=True))
-        if reu["volume_ml"] is not None:
-            c.layout().addWidget(etiquette(f"<b>Total {fmt_vol(reu['volume_ml'])} mL</b>", secondaire=True))
+            c.layout().addWidget(etiquette(f"<b>Voie {v['lettre']}</b> · {fmt_vol(v['volume_ml'])} mL", wrap=True))
+        total = etiquette(f"Total {fmt_vol(reu['volume_ml'])} mL" if reu["volume_ml"] is not None else "volume à saisir", wrap=True)
+        total.setStyleSheet(f"color:{p.succes};font-weight:700;font-size:11pt;")
+        c.layout().addWidget(total)
         return c
 
     def _carte_flux(self, ident, n, titre) -> QFrame:

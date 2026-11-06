@@ -422,13 +422,15 @@ def _ou(v):
 
 def couleur_phase(ph: dict):
     """(trait, fond, texte) de la voie d'une phase « EN PARALLÈLE · VOIE B » ; couleurs habituelles pour les autres phases."""
+    if ph.get("reunion_voies"):
+        return VERT, VERT_L, VERT_T  # la réunion des voies : même vert que sa carte du schéma
     mt = re.search(r"VOIE ([A-D])", ph.get("parallele") or "")
     return COULEURS_VOIES[ord(mt.group(1)) - 65] if mt else (LINE, TEAL_L, AMBER)
 
 
 def _depart_commun(ph: dict, i: int) -> bool:
     """Phase « Départ » commune (matière et volume de la manip) ; un « Départ · voie X » se présente comme une étape de sa voie."""
-    return not ph.get("depart_voie") and not ph.get("entree_voies") and (ph["n"] == 0 if "n" in ph else i == 0)
+    return not ph.get("depart_voie") and not ph.get("entree_voies") and not ph.get("reunion_voies") and (ph["n"] == 0 if "n" in ph else i == 0)
 
 
 def blocs_phases(data: dict, corps) -> list:
@@ -443,6 +445,8 @@ def blocs_phases(data: dict, corps) -> list:
                 f" · fournisseur {escape(ctx['fournisseur'])}" if ctx.get("fournisseur") else "") + (
                 f" · emplacement {escape(ctx['emplacement'])}" if ctx.get("emplacement") else "") + (
                 f" · {fmt_vol(ctx['volumeDepart'])} mL" if ctx.get("volumeDepart") is not None else "")
+        elif ph.get("reunion_voies"):  # volume de chaque voie, puis le total
+            sous = "<br/>".join(f"<b>{escape(r['nom'])}</b> · {escape(r['quantite'])}" for r in ph["reactifs"]) + f"<br/><b>{escape(ph.get('conditions') or '')}</b>"
         else:
             sous = escape(ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (
                 f"<br/><font color='#566360'>{escape(', '.join(ph['materiel']))}</font>" if ph.get("materiel") else "") + (
@@ -452,7 +456,7 @@ def blocs_phases(data: dict, corps) -> list:
                 + (f"<font size='7' color='#0F6B5C'><b>{escape(ph['groupe'].upper())}</b></font><br/>" if ph.get("groupe") else "") + f"<b>{escape(ph['titre'])}</b>"
                 + (f"<br/><font size='7' color='#0F6B5C'><b>{escape(ph['reunion'])}</b></font>" if ph.get("reunion") else ""))
         lignes = [[Paragraph(tete, petit), Paragraph(sous, petit)]]
-        if not _depart_commun(ph, i) and not ph.get("entree_voies"):
+        if not _depart_commun(ph, i) and not ph.get("entree_voies") and not ph.get("reunion_voies"):
             txt = "<br/>".join(
                 f"• <b>{escape(r['nom'])}</b>{' · ' + escape(r['quantite']) if r.get('quantite') else ''}"
                 f"{' · contact ' + escape(r['contact']) if r.get('contact') else ''}"
@@ -467,7 +471,7 @@ def blocs_phases(data: dict, corps) -> list:
             f"<br/><font color='#566360'>n° Scirius</font> {_ou(x.get('scirius'))} · <font color='#566360'>n° Aramis</font> {_ou(x.get('aramis'))}"
             + (f"<br/><i>Commentaire : {escape(x['commentaire'])}</i>" if x.get("commentaire") else "")
             for x in ph["echantillons"]) or "aucun"
-        if not ph.get("depart_voie"):
+        if not ph.get("depart_voie") and not ph.get("reunion_voies"):
             lignes.append([Paragraph("Échantillons", petit), Paragraph(txt, petit)])
         t = Table(lignes, colWidths=[34 * mm, 140 * mm])
         t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, trait), ("BACKGROUND", (0, 0), (-1, 0), fond), ("BOX", (0, 0), (-1, -1), 1.2, trait),

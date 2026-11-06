@@ -366,18 +366,20 @@ def ecrire_docx(data: dict, chemin) -> None:
             entete = (f"{ctx.get('matiere') or ''}" + (f" · n° Scirius {ctx['scirius']}" if ctx.get("scirius") else "")
                       + (f" · fournisseur {ctx['fournisseur']}" if ctx.get("fournisseur") else "")
                       + (f" · emplacement {ctx['emplacement']}" if ctx.get("emplacement") else "")) + (f" · {fmt_vol(vd)} mL" if vd is not None else "")
+        elif ph.get("reunion_voies"):  # volume de chaque voie, puis le total
+            entete = "\n".join(f"{r['nom']} · {r['quantite']}" for r in ph["reactifs"]) + f"\n{ph.get('conditions') or ''}"
         else:
             entete = (ph.get("conditions") or ("" if ph.get("entree_voies") else "conditions à compléter")) + (" — " + ", ".join(ph["materiel"]) if ph.get("materiel") else "") + (
                 f"\nConsigne / remarque : {ph['remarque']}" if ph.get("remarque") else "")
         lignes = [((ph["parallele"] + "\n" if ph.get("parallele") else "") + (ph["groupe"].upper() + " · " if ph.get("groupe") else "") + ph["titre"]
                    + ("\n" + ph["reunion"] if ph.get("reunion") else ""), entete)]
-        if not _depart_commun(ph, i) and not ph.get("entree_voies"):
+        if not _depart_commun(ph, i) and not ph.get("entree_voies") and not ph.get("reunion_voies"):
             lignes.append(("Réactifs", "\n".join(
                 f"• {r['nom']}{' · ' + r['quantite'] if r.get('quantite') else ''}{' · contact ' + r['contact'] if r.get('contact') else ''}"
                 f"{' · Consigne : ' + r['consigne'] if r.get('consigne') else ''} — n° Scirius {manque(r.get('scirius'))}, "
                 f"emplacement {manque(r.get('emplacement'))}, fournisseur {manque(r.get('fournisseur'))}"
                 for r in ph["reactifs"]) or "aucun"))
-        if not ph.get("depart_voie"):
+        if not ph.get("depart_voie") and not ph.get("reunion_voies"):
             lignes.append(("Échantillons", "\n".join(
                 f"{x['id']} · {fmt_vol(x['volume'] or 0)} mL · {x['moment']} · {x.get('labo', '')} · {', '.join(x.get('analyses', [])) or 'aucune analyse'} — "
                 f"n° Scirius {manque(x.get('scirius'))}, n° Aramis {manque(x.get('aramis'))}"

@@ -97,6 +97,7 @@ class Phase:
     parallele: str = ""  # « EN PARALLÈLE · VOIE A » pour une étape d'une voie
     reunion: str = ""  # « Réunit les voies A et B » pour l'étape qui suit un bloc en parallèle
     depart_voie: bool = False  # « Départ · voie A » : matière et volume propres à une voie d'un bloc qui ouvre le flux
+    reunion_voies: bool = False  # « Réunion · voies A + B » : volume de chaque voie et volume réuni, avant l'étape qui les réunit
     entree_voies: bool = False  # échantillons d'entrée d'un flux qui commence par des voies (pas de matière ni de volume communs)
 
 
@@ -344,10 +345,12 @@ def construire(m: Manip, reglages: Reglages) -> Rapport:
         if par is None and i > 0 and m.etapes[i - 1].parallele_id:
             lettres = sorted({lettre_voie(m, m.etapes[i - 1].parallele_id, x.voie_id) for x in m.etapes if x.parallele_id == m.etapes[i - 1].parallele_id})
             reunion = "Réunit les voies " + " et ".join(lettres)
-            from mat_methode.domain.volumes import volumes_par_etape
-            lg = next((x for x in volumes_par_etape(m) if x.indice == i), None)
-            if lg is not None and lg.entree:
-                reunion += f" · volume réuni {fmt_vol(lg.entree)} mL"
+            from mat_methode.domain.volumes import reunion_volumes, volumes_par_etape
+            reu = reunion_volumes(m, i, {x.indice: x for x in volumes_par_etape(m)})
+            phases.append(Phase(0, "Réunion · voies " + " + ".join(v["lettre"] for v in reu["voies"]),
+                                f"Total {fmt_vol(reu['volume_ml'])} mL" if reu["volume_ml"] else "volume à saisir",
+                                [], [LigneReactif(nom=f"Voie {v['lettre']}", quantite=f"{fmt_vol(v['volume_ml'])} mL", etapes=[i + 1]) for v in reu["voies"]], [],
+                                reunion_voies=True))
         phases.append(Phase(i + 1, f"{i + 1} · {cap(e.operation)}", conditions_phase(e), list(e.equipements), rs,
                             [ligne_ech(p) for p in ech if p.etape_id == e.id], groupe=g.nom if g else "",
                             groupe_plage=plage(nums) if g else "", debut_groupe=bool(g) and nums[0] == i + 1,
