@@ -172,6 +172,7 @@ QPushButton[lien="true"] {{ background: transparent; border: none; color: {p.acc
 QPushButton[lien="true"]:hover {{ text-decoration: underline; }}
 QPushButton[icone="true"] {{ padding: 4px; min-width: 24px; max-width: 32px; }}
 QPushButton[nav="true"] {{ background: transparent; border: none; text-align: left; padding: 8px 12px; border-radius: 4px; }}
+QLabel#pastilleNav {{ background: {p.danger}; color: #FFFFFF; border-radius: 9px; font-size: 8pt; font-weight: 700; padding: 1px 6px; min-width: 6px; }}
 QPushButton[nav="true"]:hover {{ background: {p.selection}; }}
 QPushButton[nav="true"][actif="true"] {{ background: {p.selection}; font-weight: 600; border-left: 3px solid {p.accent}; }}
 QPushButton[nav="true"][sous="true"] {{ padding-left: 34px; font-size: 9pt; }}

@@ -20,6 +20,7 @@ from mat_methode.ui.widgets import ChampTexte, Liste, bouton, carte, champ, etiq
 
 class PageDemandes(QWidget):
     ouvrir_fichier = Signal(str)
+    changement = Signal()  # la liste a été relue : la pastille « nouvelles demandes » du menu se met à jour
 
     def _actualiser(self):
         f = getattr(self, "sur_place", None)
@@ -46,6 +47,7 @@ class PageDemandes(QWidget):
 
     # ------------------------------------------------------------ affichage
     def rafraichir(self):
+        self.changement.emit()
         vider(self.lay)
         self.lay.addWidget(etiquette("Signale un bug ou propose une bonne idée. Tout le monde voit les demandes ; "
                                      "chacun peut en changer le statut (le nom et la date sont gardés).", secondaire=True, wrap=True))
@@ -198,23 +200,30 @@ class PageDemandes(QWidget):
             self.ctrl.toast.emit("Aucune nouvelle demande à exporter")
             return
         horodatage = datetime.now().strftime("%Y-%m-%d_%Hh%M")
-        defaut = str(self.ctrl.st.donnees / "exports" / f"Bugs_et_idees_{horodatage}.md")
+        dossier_bug = self.ctrl.st.donnees / "exports" / "bug"  # les fichiers « Bugs et idées » sont rangés ici
+        try:
+            dossier_bug.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            dossier_bug = self.ctrl.st.donnees / "exports"
+        defaut = str(dossier_bug / f"Bugs_et_idees_{horodatage}.md")
         chemin, _ = QFileDialog.getSaveFileName(self, f"Exporter les {len(nouvelles)} nouvelle(s) demande(s)", defaut, "Fichier Markdown (*.md)")
         if not chemin:
             return
         try:
             cible = Path(chemin)
             copies: dict[tuple[str, str], str] = {}
-            if any(d.pieces for d in nouvelles):  # les pièces jointes sont copiées dans un dossier voisin du .md
-                dossier = cible.with_name(cible.stem + "_pieces")
+            if any(d.pieces for d in nouvelles):  # avec des pièces jointes : un dossier au nom du .md contient le .md ET les photos
+                dossier = cible.parent / cible.stem
                 dossier.mkdir(parents=True, exist_ok=True)
+                cible = dossier / cible.name
+                chemin = str(cible)
                 for d in nouvelles:
                     for nom in d.pieces:
                         source = S.dossier_pieces(self.ctrl.st, d) / nom
                         if source.exists():
                             nouveau = f"{d.id[:6]}_{nom}"
                             shutil.copy2(source, dossier / nouveau)
-                            copies[(d.id, nom)] = f"{dossier.name}/{nouveau}".replace(" ", "%20")
+                            copies[(d.id, nom)] = nouveau.replace(" ", "%20")  # lien relatif : la photo est à côté du .md
             cible.write_text(vers_markdown(nouvelles, self._nom, f"{NOM_APPLICATION} {VERSION}", lambda d, nom: copies.get((d.id, nom))), encoding="utf-8")
         except OSError as ex:
             self.ctrl.toast.emit(f"Export impossible : {ex}")

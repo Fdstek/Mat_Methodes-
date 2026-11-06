@@ -1,10 +1,13 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.9.3"
+VERSION = "1.9.4"
 DATE_VERSION = "06/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
-    ("1.9.3", "06/11/2026", ["Réunion des voies plus visible : carte verte dans le flux, et fiche « Réunion · voies A + B » (volume de chaque voie et total) dans le détail par phase des PDF et du Word"]),
+    ("1.9.4", "06/11/2026", ["« Où ajouter l'étape ? » : les modèles de grandes étapes sont en tête de liste, juste après « Hors grande étape »",
+                             "Bugs et idées : pastille avec le nombre de nouvelles demandes à côté du nom ; export rangé dans donnees\\exports\\bug (le .md et ses photos dans un même dossier)",
+                             "Doublons : un même n° Aramis dans une même étape n'est plus signalé (dans des étapes différentes, oui) ; un n° Scirius en double est toujours signalé"]),
+    ("1.9.3", "06/11/2026", ["Réunion des voies plus visible : carte verte dans le flux, et fiche « Réunion · voies A + B » (volume de chaque voie et total) dans le détail par phase des PDF / Word"]),
     ("1.9.2", "05/11/2026", ["Schéma du flux des PDF : les flèches ENTRÉE, de retour à la ligne et SORTIE ne traversent plus les pastilles d'échantillons ni le texte",
                              "Colonne « Ton flux » : chaque carte garde sa hauteur minimale (titre, conditions et frise du temps ne s'écrasent plus)"]),
     ("1.9.1", "05/11/2026", ["Colonne « Ton flux » : une carte avec un texte à la ligne ou des échantillons n'est plus écrasée (hauteur minimale = hauteur réellement nécessaire)"]),

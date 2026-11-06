@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QMainWindow,
     QScrollArea,
     QStackedWidget,
@@ -23,6 +24,7 @@ from mat_methode.domain.models import ARCHIVEE, REALISEE, STATUTS_PROTOCOLE
 from mat_methode.domain.texte import nom_fichier
 from mat_methode.exports.echange import ImportInvalide, importer
 from mat_methode.exports.echange import exporter as exporter_json
+from mat_methode.storage import demandes as Sdemandes
 from mat_methode.ui import dialogues as D
 from mat_methode.ui import theme
 from mat_methode.ui.controleur import Controleur
@@ -234,6 +236,11 @@ class Fenetre(QMainWindow):
         self.p_protocole.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_protocole.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents(protocole=True))))
         self.p_demandes.ouvrir_fichier.connect(self.ouvrir_fichier)
+        self.p_demandes.changement.connect(self.maj_pastille_demandes)
+        self._minuteur_demandes = QTimer(self)  # les autres postes ajoutent des demandes : relecture chaque minute
+        self._minuteur_demandes.timeout.connect(self.maj_pastille_demandes)
+        self._minuteur_demandes.start(60000)
+        self.maj_pastille_demandes()
         self.p_rapport.ouvrir_fichier.connect(self.ouvrir_fichier)
         self.p_rapport.ouvrir_dossier.connect(lambda: self.ouvrir_fichier(str(self.dossier_documents())))
         self.p_rapport.journal.connect(lambda: D.journal(self, ctrl.courante, ctrl.reglages))
@@ -255,8 +262,30 @@ class Fenetre(QMainWindow):
         b.setIconSize(QSize(20, 20))
         b.setIcon(icone_menu(*b._glyphe, theme.P.texte))
         b.clicked.connect(lambda *_: self.ouvrir_demandes() if k == "demandes" else self.aller(k))
+        if k == "demandes":  # pastille : nombre de nouvelles demandes, à droite du nom
+            bl = QHBoxLayout(b)
+            bl.setContentsMargins(0, 0, 8, 0)
+            self.pastille_demandes = QLabel("")
+            self.pastille_demandes.setObjectName("pastilleNav")
+            self.pastille_demandes.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            self.pastille_demandes.hide()
+            bl.addStretch(1)
+            bl.addWidget(self.pastille_demandes)
         self.nav[k] = b
         return b
+
+    def maj_pastille_demandes(self):
+        """Nombre de demandes « Nouvelle » à côté de « Bugs et idées » (lu sur disque : les autres postes en ajoutent aussi)."""
+        p = getattr(self, "pastille_demandes", None)
+        if p is None:
+            return
+        try:
+            n = sum(1 for d in Sdemandes.lister(self.ctrl.st) if d.statut == "Nouvelle")
+        except OSError:
+            n = 0
+        p.setText(str(n) if n < 100 else "99+")
+        p.setVisible(n > 0)
+        p.setToolTip(f"{n} nouvelle(s) demande(s)")
 
     def _fenetre_demandes(self):
         """Fenêtre « Bugs et idées » : flottante au-dessus de l'application (non bloquante), pour saisir une demande ou vérifier un point

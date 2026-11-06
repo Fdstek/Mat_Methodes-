@@ -831,14 +831,20 @@ def avertissements(m: Manip, autres: list[Manip] | None = None) -> list[str]:
             out.append(f"{lab[p.id]} : prélevé à {fmt_dur(p.temps_min)}, après la fin de l’étape ({fmt_dur(e.duree_min)})")
     for champ, libelle in (("scirius", "Scirius"), ("aramis", "Aramis")):
         miens: dict[str, str] = {}
+        vus: dict[str, list] = {}  # numéro -> échantillons déjà rencontrés
         for p in echantillons_tries(m):
             v = getattr(p, champ).strip()
             if not v:
                 continue
             if v in miens:
-                out.append(f"N° {libelle} {v} en double : {miens[v]} et {lab[p.id]}")
+                # Aramis : le même numéro dans une même étape est normal ; dans des étapes différentes, c'est une erreur.
+                # Scirius : jamais de doublon, quelle que soit l'étape.
+                autre = next((q for q in vus[v] if champ == "scirius" or q.etape_id != p.etape_id), None)
+                if autre is not None:
+                    out.append(f"N° {libelle} {v} en double : {lab[autre.id]} et {lab[p.id]}")
             else:
                 miens[v] = lab[p.id]
+            vus.setdefault(v, []).append(p)
         signales = set()
         for mm in autres or []:
             if mm.id == m.id:

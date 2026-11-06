@@ -671,11 +671,11 @@ class PageFlux(QWidget):
             q = f"Étape {len(m.etapes) + 1} : que fais-tu {'ensuite' if m.etapes else 'en premier'} ?"
         if ia is None:  # choix de la grande étape AVANT l'opération
             choix = {"": "Hors grande étape"}
+            choix.update({f"mo:{x.nom}": f"Modèle de grande étape : {x.nom} ({len(x.etapes)} étape{'s' if len(x.etapes) > 1 else ''})"
+                          for x in self.ctrl.reglages.modeles_grandes_etapes})  # les modèles en tête de liste
             choix.update({f"g:{g.id}": f"Dans {g.nom} ({R.plage(R.numeros_groupe(m, g.id))})" for g in m.groupes})
             choix.update({f"n:{n}": f"Nouvelle grande étape : {n}" for n in self.ctrl.reglages.grandes_etapes})
             choix["n:*"] = "Nouvelle grande étape (autre nom)…"
-            choix.update({f"mo:{x.nom}": f"Modèle de grande étape : {x.nom} ({len(x.etapes)} étape{'s' if len(x.etapes) > 1 else ''})"
-                          for x in self.ctrl.reglages.modeles_grandes_etapes})
             choix["p:new"] = "Nouveau bloc en parallèle (2 voies)…"
             for kp, par in enumerate(m.paralleles):
                 for vo in par.voies:

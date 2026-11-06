@@ -205,3 +205,19 @@ def test_dupliquer_echantillon(reglages):
     lab = R.etiquettes(m)
     assert [lab[x.id] for x in m.prelevements] == ["S1a", "S1b", "S1c"]
     assert all(c.scirius == "" and c.commentaire == "flacon ambré" and c.etape_id == e.id for c in copies)
+
+
+def test_doublons_aramis_et_scirius(ethanol):
+    from mat_methode.domain.models import Prelevement
+    m = ethanol
+    e1, e2 = m.etapes[1], m.etapes[2]
+    m.prelevements = [Prelevement(etape_id=e1.id, moment="effluent", aramis="A1", scirius="S1"),
+                      Prelevement(etape_id=e1.id, moment="effluent", aramis="A1", scirius="S2"),  # même Aramis, même étape : normal
+                      Prelevement(etape_id=e2.id, moment="effluent", aramis="A2", scirius="S3")]
+    msgs = R.avertissements(m)
+    assert not any("Aramis" in x for x in msgs) and not any("Scirius" in x for x in msgs)
+    m.prelevements[2].aramis = "A1"  # même Aramis dans une autre étape : erreur
+    assert any("Aramis A1 en double" in x for x in R.avertissements(m))
+    m.prelevements[2].aramis = "A2"
+    m.prelevements[1].scirius = "S1"  # même Scirius, même étape : toujours une erreur
+    assert any("Scirius S1 en double" in x for x in R.avertissements(m))
