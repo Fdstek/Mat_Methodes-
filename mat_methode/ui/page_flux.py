@@ -176,6 +176,27 @@ class PageFlux(QWidget):
         QVBoxLayout(self._lancement).setContentsMargins(0, 0, 0, 0)
         self.actions_bandeau = None  # fonction -> boutons en plus (Protocole : exporter, dossier)
         self._colonne = None
+        ctrl.analyses_pretes.connect(self._analyses_lues)  # résultats d'ana explorer lus en arrière-plan
+
+    def _analyses_lues(self, _lu=None):
+        """Résultats d'analyses arrivés : seule la colonne du flux est redessinée (l'édition en cours n'est pas touchée)."""
+        if self.isVisible() and self._colonne is not None and self.m is not None:
+            try:
+                self._remplir_colonne()
+            except RuntimeError:
+                pass
+
+    def _resultats_flux(self) -> dict:
+        """Résultats des échantillons (étiquette -> données) déjà lus dans ana explorer ; rien si la lecture n'est pas faite."""
+        lu = getattr(self.ctrl, "_analyses", None)
+        if lu is None or lu.vide:
+            if lu is None:
+                self.ctrl.precharger_analyses()
+            return {}
+        lab = etiquettes(self.m)
+        res = lu.pour_export([{"id": lab[p.id], "aramis": p.aramis, "scirius": p.scirius} for p in echantillons_tries(self.m)
+                              if p.aramis or p.scirius])
+        return {"_res": res, **{e["id"]: e for e in res["echantillons"]}} if res else {}
 
     @property
     def m(self):
@@ -1338,6 +1359,23 @@ class PageFlux(QWidget):
         m, lay = self.m, self._colonne.layout()
         vider(lay)
         lab, ech = etiquettes(m), echantillons_tries(m)
+        resultats = self._resultats_flux()
+
+        def ligne_resultats(p):
+            """Valeurs principales rendues par les labos (ana explorer), sous la pastille de l'échantillon ; toutes au survol."""
+            from mat_methode.analyses_ptt import resume_echantillon
+            e = resultats.get(lab[p.id])
+            if e is None:
+                return None
+            court = resume_echantillon(resultats["_res"], lab[p.id], limite=4)
+            from html import escape
+            morceaux = [escape(x).replace(" ", "&nbsp;") for x in court.split(" · ")]  # retour à la ligne entre deux analyses seulement
+            w = etiquette(f"<span style='color:{theme.P.succes}'><b>✓</b></span> " + " · ".join(morceaux), wrap=True)
+            w.setObjectName("resultatsEch")
+            w.setStyleSheet("QLabel#resultatsEch{font-size:8.5pt;padding-left:4px;}")
+            w.setToolTip(f"Résultats {lab[p.id]} (ana explorer" + (f", {', '.join(e['labos'])}" if e.get("labos") else "") + ") :\n"
+                         + resume_echantillon(resultats["_res"], lab[p.id]).replace(" · ", "\n"))
+            return w
 
         def pill(p):
             n = R.numero_etape(m, p)
@@ -1357,6 +1395,8 @@ class PageFlux(QWidget):
                                                                                      if m.contexte.volume_depart_ml is not None else ""), secondaire=True))
             for p in dep:
                 c.layout().addWidget(pill(p))
+                if (r := ligne_resultats(p)) is not None:
+                    c.layout().addWidget(r)
             lay.addWidget(c)
         volumes = {lg.indice: lg for lg in volumes_par_etape(m)}
         cible, cadre = lay, None
@@ -1429,6 +1469,8 @@ class PageFlux(QWidget):
                 cl.addWidget(Frise(e.duree_min, [(position(p, e), code_badge(lab[p.id])) for p in ps]))
             for p in ps:
                 cl.addWidget(pill(p))
+                if (r := ligne_resultats(p)) is not None:
+                    cl.addWidget(r)
             cible.addWidget(c)
         if getattr(self, "_zone_flux", None) is not None:
             QTimer.singleShot(0, self._epingler)  # la colonne a changé (échantillon ajouté…) : hauteur recalculée

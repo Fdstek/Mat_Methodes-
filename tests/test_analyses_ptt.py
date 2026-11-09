@@ -120,3 +120,26 @@ def test_carte_resultats_rapport_et_protocole(qtbot, tmp_path, qapp):
     f.p_protocole.rafraichir()
     assert any(x._titre == "Résultats d’analyses" for x in f.p_protocole.findChildren(Expander))
     ctrl.fermer()
+
+
+def test_resultats_dans_le_flux(qtbot, tmp_path, qapp):
+    from PySide6.QtWidgets import QLabel
+
+    from mat_methode.storage.stockage import Stockage
+    from mat_methode.ui import theme
+    from mat_methode.ui.controleur import Controleur
+    from mat_methode.ui.fenetre import Fenetre
+    theme.appliquer(qapp, "clair")
+    ctrl = Controleur(Stockage(tmp_path, "pierre", "PC1"))
+    f = Fenetre(ctrl)
+    qtbot.addWidget(f)
+    ctrl.demarrer()
+    m = next(x for x in ctrl.manips if x.nom == "Désacidification éthanol")
+    m.prelevements[1].aramis = "2026-005555"
+    ctrl._analyses = A.Resultats.depuis(A.lire_classeur(classeur(tmp_path / A.FICHIER)), "essai")
+    f.ouvrir(m.id, "comp")
+    f.p_flux.rafraichir()
+    lignes = [x for x in f.p_flux.findChildren(QLabel) if x.objectName() == "resultatsEch"]
+    assert len(lignes) == 1 and "Phosphore&nbsp;3,4&nbsp;ppm" in lignes[0].text() and "&lt;5" in lignes[0].text()
+    assert "Indice de peroxyde 2,1 meq AO/kg" in lignes[0].toolTip()
+    ctrl.fermer()

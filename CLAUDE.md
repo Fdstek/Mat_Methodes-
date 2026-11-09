@@ -133,6 +133,9 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   cache `donnees\cache\Cache_Analyses_PTT.json`) ; `Controleur.lire_analyses / resultats_manip / precharger_analyses` (signal `analyses_pretes`) ;
   clé JSON `resultats` ajoutée par `Fenetre._ajouter_resultats` ; `pdf.bloc_resultats` (rapport et protocole), tableau Word, ligne « Résultats Sx » dans les
   phases du protocole ; `page_rapport.carte_resultats` (Rapport et Protocole) ; carte Réglages « Résultats d'analyses ». Tests : `MATMETHODE_SANS_ANALYSES`.
+- Lot du 09/11 (version 1.10.1) : tableaux de résultats en « une ligne par échantillon, une colonne par analyse » (`analyses_ptt.tableaux`, coupés toutes les 7
+  analyses, 6 dans le Word) ; colonne du flux : ligne « ✓ Phosphore 12,5 ppm · … » sous la pastille (`PageFlux._resultats_flux`, `ligne_resultats`,
+  objectName `resultatsEch`, 4 analyses, toutes en infobulle ; colonne seule redessinée par `PageFlux._analyses_lues`).
 - À vérifier par l'utilisateur sous Windows :
   - la lecture réelle du classeur des analyses (Réglages › Résultats d'analyses › « Tester la lecture ») ;
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;

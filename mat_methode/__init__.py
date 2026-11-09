@@ -1,9 +1,11 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.10.0"
+VERSION = "1.10.1"
 DATE_VERSION = "09/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.10.1", "09/11/2026", ["Flux (Mat & Méthode et Protocole) : les résultats d’analyses s’affichent sous chaque échantillon (4 premières analyses, toutes au survol)",
+                              "Tableaux de résultats : une ligne par échantillon, une colonne par analyse"]),
     ("1.10.0", "09/11/2026", ["Résultats d’analyses : les résultats des échantillons déjà rendus dans ana explorer (retrouvés par leur n° Aramis) s’affichent dans Rapport et Protocole",
                               "PDF du rapport, Word et Protocole : tableau « Résultats d’analyses » ; dans le Protocole, résultats aussi sous chaque échantillon de sa phase",
                               "Réglages › Résultats d’analyses : classeur trouvé tout seul (celui d’ana explorer, puis OneDrive) ou choisi à la main ; « Tester la lecture »"]),
