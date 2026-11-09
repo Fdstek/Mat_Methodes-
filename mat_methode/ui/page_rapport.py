@@ -85,6 +85,62 @@ def ligne_emis(m, types: tuple[str, ...], ouvrir, fin: list, vide: str = "Aucun 
     return ligne(dernier, tous, info, "stretch", *fin)
 
 
+def prelevements_manip(m) -> list[dict]:
+    """Échantillons de la manip (étiquette, n° Aramis, n° Scirius), dans l'ordre du flux."""
+    lab = R.etiquettes(m)
+    return [{"id": lab[p.id], "aramis": p.aramis, "scirius": p.scirius} for p in R.echantillons_tries(m)]
+
+
+def carte_resultats(ctrl: Controleur, m, rafraichir, ouvert: bool = True) -> QWidget | None:
+    """Carte « Résultats d'analyses » : résultats des échantillons retrouvés dans ana explorer par leur n° Aramis.
+    Rien quand aucun échantillon n'a de n° ; lecture lancée en arrière-plan si les résultats ne sont pas encore chargés."""
+    from mat_methode.analyses_ptt import libelle
+    from mat_methode.ui.widgets import Expander
+    pre = prelevements_manip(m)
+    if not any(p["aramis"] or p["scirius"] for p in pre):
+        return None
+    x = Expander("Résultats d’analyses", "(ana explorer)", ouvert=ouvert)
+
+    def actualiser():
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            ctrl.lire_analyses(forcer=True)
+        finally:
+            QApplication.restoreOverrideCursor()
+        rafraichir()
+
+    lu = ctrl._analyses
+    if lu is None:
+        ctrl.precharger_analyses()
+        x.ajouter(ligne(etiquette("Lecture du classeur des analyses en cours…", secondaire=True), "stretch",
+                        bouton("Lire maintenant", actualiser)))
+        return x
+    res = lu.pour_export(pre)
+    if not res:
+        txt = ("Aucun résultat pour l’instant dans ana explorer pour les n° Aramis de cette manip." if not lu.vide else
+               "Classeur des analyses introuvable : " + (" | ".join(lu.ecartes[:2]) or "aucune source") + " (Réglages › Résultats d’analyses).")
+        x.ajouter(ligne(etiquette(txt, secondaire=True, wrap=True), "stretch", bouton("Actualiser", actualiser)))
+        return x
+    n, total = len(res["echantillons"]), sum(1 for p in pre if p["aramis"] or p["scirius"])
+    x.changer_note(f"{n} / {total} échantillon{'s' if total > 1 else ''}")
+    x.ajouter(ligne(etiquette(f"Retrouvés par le n° Aramis · {lu.origine}. Repris dans le PDF du rapport, le Word et le Protocole.",
+                              secondaire=True, wrap=True), "stretch", bouton("Actualiser", actualiser, tip="Relire le classeur des analyses")))
+    echs = res["echantillons"]
+    entetes = ["Analyse"] + [f"{e['id']} · {e['aramis']}" if e.get("aramis") else e["id"] for e in echs]
+    lignes = [[libelle(a)] + [e["valeurs"].get(a["nom"], "—") for e in echs] for a in res["analyses"]]
+    lignes.append(["Laboratoires"] + [", ".join(e.get("labos", [])) or "—" for e in echs])
+    t = table(entetes, lignes)
+    t.horizontalHeader().setSectionResizeMode(len(entetes) - 1, QHeaderView.ResizeMode.ResizeToContents)
+    for i, e in enumerate(echs):
+        for k, a in enumerate(res["analyses"]):
+            it = t.item(k, i + 1)
+            if it is not None and e["sources"].get(a["nom"]):
+                it.setToolTip(f"{a['nom']} : {e['valeurs'].get(a['nom'], '')} {a.get('unite', '')} — {e['sources'][a['nom']]}")
+    x.ajouter(t)
+    return x
+
+
 class PageRapport(QWidget):
     exporter_pdf = Signal()
     exporter_word = Signal()
@@ -99,6 +155,7 @@ class PageRapport(QWidget):
         self.lay = QVBoxLayout(self)
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
+        ctrl.analyses_pretes.connect(lambda _: self.isVisible() and self.rafraichir())  # résultats lus en arrière-plan
 
     def rafraichir(self, structure=True):
         m, r = self.ctrl.courante, self.ctrl.reglages
@@ -202,6 +259,9 @@ class PageRapport(QWidget):
             self.lay.addWidget(table(["Éch.", "Étape", "Moment", "Volume", "N° Scirius", "N° Aramis", "Laboratoire", "Analyses"],
                                      [[x.id, x.etape, x.moment, f"{fmt_vol(x.volume or 0)} mL", x.scirius, x.aramis, x.labo, ", ".join(x.analyses)]
                                       for x in rap.echantillons]))
+        res = carte_resultats(self.ctrl, m, self.rafraichir)  # résultats des échantillons (ana explorer)
+        if res is not None:
+            self.lay.addWidget(res)
         if m.statuts:
             self.lay.addWidget(etiquette("Historique des statuts", "sousTitre"))
             self.lay.addWidget(table(["Date et heure", "Par", "Changement de statut"],

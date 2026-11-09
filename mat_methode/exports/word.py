@@ -432,6 +432,17 @@ def ecrire_docx(data: dict, chemin) -> None:
                 [[p["id"], "entrée" if not p["apres_etape"] else f"{p['apres_etape']} · {etapes[p['apres_etape'] - 1]['operation']}", moment_texte(p),
                   f"{fmt_vol(p['volume_ml'] or 0)} mL", p.get("scirius"), p.get("aramis"), p.get("labo"), ", ".join(p.get("analyses", []))] for p in pre],
                 [1.2, 3.0, 2.4, 1.7, 1.9, 1.9, 2.0, 2.9])
+    res = data.get("resultats")
+    if res and res.get("echantillons"):  # résultats lus dans ana explorer
+        from mat_methode.analyses_ptt import tableaux
+        n = len(res["echantillons"])
+        for k, (entetes, lignes) in enumerate(tableaux(res, 5)):
+            nb = len(entetes) - 1
+            tableau("Résultats d’analyses" if k == 0 else "Résultats d’analyses (suite)", [h.replace("\n", " · ") for h in entetes], lignes,
+                    [4.5] + [12.5 / max(nb, 1)] * nb)
+            if k == 0:
+                ecrire(doc.add_paragraph(), f"{n} échantillon{'s' if n > 1 else ''} avec des résultats, retrouvé{'s' if n > 1 else ''} par le n° Aramis dans ana explorer"
+                       + (f" ({res['source']})" if res.get("source") else "") + ". « — » : pas de résultat.", 8, couleur=MUTED)
     if lanc:
         if jr:
             tableau("Modifications après lancement", ["Date et heure", "Par", "Modification"],

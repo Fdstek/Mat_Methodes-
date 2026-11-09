@@ -31,6 +31,7 @@ class Controleur(QObject):
     alerte = Signal(str)
     presence_changee = Signal()  # quelqu'un a ouvert / fermé l'application ou changé de manip
     scirius_pret = Signal(object)  # lecture du fichier Scirius terminée en arrière-plan
+    analyses_pretes = Signal(object)  # lecture des résultats d'analyses (ana explorer) terminée en arrière-plan
 
     def __init__(self, stockage: Stockage):
         super().__init__()
@@ -51,6 +52,9 @@ class Controleur(QObject):
         self._scirius = None
         self._prechargement = False
         self.scirius_pret.connect(self._scirius_lu)
+        self._analyses = None
+        self._lecture_analyses = False
+        self.analyses_pretes.connect(self._analyses_lues)
         self.presents: list[dict] = []  # autres personnes présentes (fichiers donnees\\presence)
         self._t_battement = QTimer(self, interval=30_000)
         self._t_battement.timeout.connect(self._battement)
@@ -82,6 +86,7 @@ class Controleur(QObject):
         self._t_battement.start()
         self.actualiser_presence()
         QTimer.singleShot(3000, self.precharger_scirius)  # après l'ouverture de la fenêtre, sans la ralentir
+        QTimer.singleShot(6000, self.precharger_analyses)
         self._t_actualiser.start()
         self._t_dossier.start()
         if st.lecture_seule:
@@ -284,6 +289,66 @@ class Controleur(QObject):
         if lu is not None and getattr(lu, "lignes", None) and not (self._scirius is not None and self._scirius.lignes):
             self._scirius = lu
             log.info("Scirius chargé en arrière-plan : %s lignes (%s)", len(lu.lignes), getattr(lu, "origine", ""))
+
+    # ------------------------------------------------------------ résultats d'analyses (ana explorer)
+    def fichier_analyses(self) -> str:
+        """Classeur des analyses choisi à la main sur ce poste (préférence personnelle ; vide = recherche automatique)."""
+        return str(self.st.lire_preferences().get("analyses_fichier") or "")
+
+    def choisir_fichier_analyses(self, chemin: str) -> None:
+        p = self.st.lire_preferences()
+        p["analyses_fichier"] = chemin
+        self.st.ecrire_preferences(p)
+        self._analyses = None
+
+    def _source_analyses(self):
+        from mat_methode.analyses_ptt import SourceAnalyses
+        return SourceAnalyses(self.st.donnees / "cache", self.fichier_analyses())
+
+    def lire_analyses(self, forcer: bool = False, etape=lambda t: None):
+        """Résultats d'analyses du classeur d'ana explorer (voir mat_methode.analyses_ptt), gardés en mémoire pendant la session."""
+        if not forcer and self._analyses is not None and not self._analyses.vide:
+            return self._analyses
+        try:
+            self._analyses = self._source_analyses().lire(forcer=forcer, etape=etape)
+        except Exception as ex:  # jamais bloquant : les documents sortent sans les résultats
+            from mat_methode.analyses_ptt import Resultats
+            log.info("Résultats d'analyses : %s", ex)
+            self._analyses = Resultats(ecartes=[str(ex)])
+        return self._analyses
+
+    def resultats_manip(self, prelevements: list[dict]) -> dict | None:
+        """Bloc « resultats » des documents pour ces échantillons (ceux du JSON d'échange), None sans résultat."""
+        import os
+        if os.environ.get("MATMETHODE_SANS_ANALYSES"):
+            return None
+        if not any(p.get("aramis") or p.get("scirius") for p in prelevements):
+            return None
+        return self.lire_analyses().pour_export(prelevements)
+
+    def precharger_analyses(self) -> None:
+        import os
+        import threading
+        if os.environ.get("MATMETHODE_SANS_ANALYSES") or self._lecture_analyses or self._analyses is not None:
+            return
+        self._lecture_analyses = True
+        src = self._source_analyses()
+
+        def travail():
+            try:
+                lu = src.lire()
+            except Exception as ex:
+                log.info("Résultats d'analyses en arrière-plan : %s", ex)
+                lu = None
+            self.analyses_pretes.emit(lu)
+
+        threading.Thread(target=travail, name="analyses", daemon=True).start()
+
+    def _analyses_lues(self, lu) -> None:
+        self._lecture_analyses = False
+        if lu is not None and self._analyses is None:
+            self._analyses = lu
+            log.info("Résultats d'analyses chargés : %s n° Aramis (%s)", len(lu.par_aramis), lu.origine)
 
     def nom_utilisateur(self) -> str:
         """Nom de la personne connectée (liste des personnes des Réglages, retrouvée par son IGG), sinon l'IGG."""

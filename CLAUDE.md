@@ -126,7 +126,15 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
 - Lot du 06/11 (version 1.9.4) : modèles en tête de « Où ajouter l'étape ? » ; pastille des demandes « Nouvelle » (`Fenetre.maj_pastille_demandes`, `PageDemandes.changement`,
   relecture chaque minute) ; export « Bugs et idées » dans `donnees\exports\bug` (avec des photos : un dossier au nom du .md contient le .md et les photos) ;
   `regles.avertissements` : même n° Aramis dans la même étape = normal, dans des étapes différentes = erreur, n° Scirius en double = toujours une erreur.
+- Lot du 09/11 (version 1.10.0, pas de changement de schéma) : résultats d'analyses d'ana explorer (`mat_methode/analyses_ptt.py` : classeur
+  « Récapitulatif Analyses PTT.xlsm », onglet « Suivi analyses », en-tête repérée par « N° expérience » + « Produit », unités sur la ligne au-dessus ;
+  une ligne par échantillon et par labo, réunies par n° Aramis (sinon n° Scirius exact) ; chlore d'ATCO, colonnes BV « Phosphore2 »… en secours ;
+  sources : préférence `analyses_fichier` (propre au poste), `%LOCALAPPDATA%\PTTAnalysisExplorer\settings.json` (clé `workbook`), OneDrive ;
+  cache `donnees\cache\Cache_Analyses_PTT.json`) ; `Controleur.lire_analyses / resultats_manip / precharger_analyses` (signal `analyses_pretes`) ;
+  clé JSON `resultats` ajoutée par `Fenetre._ajouter_resultats` ; `pdf.bloc_resultats` (rapport et protocole), tableau Word, ligne « Résultats Sx » dans les
+  phases du protocole ; `page_rapport.carte_resultats` (Rapport et Protocole) ; carte Réglages « Résultats d'analyses ». Tests : `MATMETHODE_SANS_ANALYSES`.
 - À vérifier par l'utilisateur sous Windows :
+  - la lecture réelle du classeur des analyses (Réglages › Résultats d'analyses › « Tester la lecture ») ;
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
   - la police Segoe UI dans les PDF.

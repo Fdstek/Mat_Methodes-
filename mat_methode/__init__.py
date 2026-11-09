@@ -1,9 +1,12 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.9.4"
-DATE_VERSION = "06/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
+VERSION = "1.10.0"
+DATE_VERSION = "09/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.10.0", "09/11/2026", ["Résultats d’analyses : les résultats des échantillons déjà rendus dans ana explorer (retrouvés par leur n° Aramis) s’affichent dans Rapport et Protocole",
+                              "PDF du rapport, Word et Protocole : tableau « Résultats d’analyses » (une colonne par échantillon) ; dans le Protocole, les résultats sont aussi sous chaque échantillon de sa phase",
+                              "Réglages › Résultats d’analyses : classeur trouvé automatiquement (celui d’ana explorer sur ce poste, puis OneDrive), ou choisi à la main ; bouton « Tester la lecture »"]),
     ("1.9.4", "06/11/2026", ["« Où ajouter l'étape ? » : les modèles de grandes étapes sont en tête de liste, juste après « Hors grande étape »",
                              "Bugs et idées : pastille avec le nombre de nouvelles demandes à côté du nom ; export rangé dans donnees\\exports\\bug (le .md et ses photos dans un même dossier)",
                              "Doublons : un même n° Aramis dans une même étape n'est plus signalé (dans des étapes différentes, oui) ; un n° Scirius en double est toujours signalé"]),

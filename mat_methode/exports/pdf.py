@@ -659,6 +659,41 @@ def table_echantillons(data: dict, s: dict, a_remplir: bool = False) -> Table | 
     return tab
 
 
+def bloc_resultats(data: dict, s: dict) -> list:
+    """Résultats d'analyses des échantillons lus dans ana explorer (une ligne par analyse, une colonne par échantillon), s'il y en a."""
+    from mat_methode.analyses_ptt import tableaux
+    res = data.get("resultats")
+    if not res or not res.get("echantillons"):
+        return []
+    cell, cellb, petit = s["cell"], s["cellb"], s["petit"]
+    n = len(res["echantillons"])
+    bloc = [Paragraph("Résultats d’analyses", s["h2"]),
+            Paragraph(escape(f"{n} échantillon{'s' if n > 1 else ''} avec des résultats, retrouvé{'s' if n > 1 else ''} par le n° Aramis "
+                             f"dans ana explorer" + (f" ({res['source']})" if res.get("source") else "") + ". « — » : pas de résultat."), petit),
+            Spacer(1, 2 * mm)]
+    sortie = []
+    for k, (entetes, lignes) in enumerate(tableaux(res)):
+        nb = len(entetes) - 1
+        larg = [50 * mm] + [124 * mm / max(nb, 1)] * nb
+        rows = [[Paragraph(escape(h).replace("\n", "<br/><font size='6.5' color='#566360'>") + ("</font>" if "\n" in h else ""), cellb) for h in entetes]]
+        rows += [[Paragraph(escape(ln[0]), cellb if i == len(lignes) - 1 else cell)]
+                 + [Paragraph(escape(v), cell) for v in ln[1:]] for i, ln in enumerate(lignes)]
+        t = Table(rows, colWidths=larg, repeatRows=1)
+        t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
+                               ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), colors.HexColor("#F4F6F5")),
+                               ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                               ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
+        if k == 0:
+            sortie.append(KeepTogether(bloc + [t]) if len(rows) < 40 else bloc + [t])
+        else:
+            sortie.append(Spacer(1, 3 * mm))
+            sortie.append(t)
+    out = []
+    for x in sortie:
+        out += x if isinstance(x, list) else [x]
+    return out
+
+
 def ecrire_pdf(data: dict, chemin) -> None:
     s = styles()
     corps, petit, h1, h2, h3, cell = s["corps"], s["petit"], s["h1"], s["h2"], s["h3"], s["cell"]
@@ -688,6 +723,7 @@ def ecrire_pdf(data: dict, chemin) -> None:
     tab = table_echantillons(data, s)
     if tab is not None:
         story.append(KeepTogether([Paragraph("Échantillons", h2), tab]))
+    story += bloc_resultats(data, s)  # résultats lus dans ana explorer
 
     if lanc:
         story.append(Paragraph("Modifications après lancement", h2))  # keepWithNext : suit le tableau

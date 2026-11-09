@@ -15,6 +15,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table, TableStyle
 
+from mat_methode.analyses_ptt import resume_echantillon
 from mat_methode.domain.texte import fmt_vol
 from mat_methode.exports.pdf import (
     INK,
@@ -24,6 +25,7 @@ from mat_methode.exports.pdf import (
     _depart_commun,
     avec_reperes,
     bloc_a_faire,
+    bloc_resultats,
     bloc_statuts,
     cartouche,
     couleur_phase,
@@ -90,6 +92,10 @@ def phases_a_remplir(data: dict, s: dict) -> list:
                 if p.get("commentaire"):
                     fusions.append(len(lignes))
                     lignes.append([Paragraph(f"<b>Commentaire {escape(p['id'])} :</b> {escape(p['commentaire'])}", cell), "", "", "", ""])
+                res = resume_echantillon(data.get("resultats"), p["id"], limite=8)
+                if res:  # résultats déjà rendus par les labos (ana explorer)
+                    fusions.append(len(lignes))
+                    lignes.append([Paragraph(f"<b>Résultats {escape(p['id'])} :</b> {escape(res)}", cell), "", "", "", ""])
             t = Table(lignes, colWidths=[14 * mm, 38 * mm, 64 * mm, 29 * mm, 29 * mm], repeatRows=1)
             t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, trait), ("BACKGROUND", (0, 0), (-1, 0), fond),
                                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -174,9 +180,11 @@ def ecrire_protocole(data: dict, chemin) -> None:
         story.append(KeepTogether([Paragraph("Réactifs", h2), tab]))
     phases = phases_a_remplir(data, s)
     entete = [Paragraph("Détail du flux par phase", h2),
-              Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros Scirius / Aramis à noter à la main).", petit)]
+              Paragraph("Pour chaque phase : ses échantillons (cases vides : numéros Scirius / Aramis à noter à la main)"
+                        + (" et leurs résultats d’analyses déjà rendus." if data.get("resultats") else "."), petit)]
     story.append(KeepTogether(entete + phases[:1]))  # le titre reste avec la première phase
     story += phases[1:]
+    story += bloc_resultats(data, s)  # résultats lus dans ana explorer
     story += bloc_statuts(data, s)  # qui a changé le statut, et quand
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
 
