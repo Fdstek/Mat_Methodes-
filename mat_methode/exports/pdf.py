@@ -674,13 +674,14 @@ def bloc_resultats(data: dict, s: dict) -> list:
     sortie = []
     for k, (entetes, lignes) in enumerate(tableaux(res)):
         nb = len(entetes) - 1
-        larg = [50 * mm] + [124 * mm / max(nb, 1)] * nb
-        rows = [[Paragraph(escape(h).replace("\n", "<br/><font size='6.5' color='#566360'>") + ("</font>" if "\n" in h else ""), cellb) for h in entetes]]
-        rows += [[Paragraph(escape(ln[0]), cellb if i == len(lignes) - 1 else cell)]
-                 + [Paragraph(escape(v), cell) for v in ln[1:]] for i, ln in enumerate(lignes)]
+        larg = [34 * mm] + [140 * mm / max(nb, 1)] * nb
+        rows = [[Paragraph(escape(h), cellb) for h in entetes]]
+        for ln in lignes:  # échantillon en gras, n° Aramis et labos en petit dessous
+            ech, *reste = ln[0].split("\n")
+            rows.append([Paragraph(f"<b>{escape(ech)}</b>" + "".join(f"<br/><font size='6.5' color='#566360'>{escape(x)}</font>" for x in reste), cell)]
+                        + [Paragraph(escape(v), cell) for v in ln[1:]])
         t = Table(rows, colWidths=larg, repeatRows=1)
         t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, LINE), ("BACKGROUND", (0, 0), (-1, 0), TEAL_L),
-                               ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), colors.HexColor("#F4F6F5")),
                                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
                                ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]))
         if k == 0:

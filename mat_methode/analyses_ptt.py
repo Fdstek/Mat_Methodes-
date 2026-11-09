@@ -297,16 +297,16 @@ def resume_echantillon(res: dict | None, ident: str, limite: int = 0) -> str:
     return " · ".join(morceaux)
 
 
-def tableaux(res: dict, par_tableau: int = 6) -> list[tuple[list[str], list[list[str]]]]:
-    """Tableaux « une ligne par analyse, une colonne par échantillon » (en-têtes, lignes), coupés tous les `par_tableau` échantillons."""
+def tableaux(res: dict, par_tableau: int = 7) -> list[tuple[list[str], list[list[str]]]]:
+    """Tableaux « une ligne par échantillon, une colonne par analyse » (en-têtes, lignes), coupés toutes les `par_tableau` analyses.
+    1re colonne : « S2 », puis le n° Aramis et les labos sur les lignes suivantes (séparés par « \n »)."""
     out = []
-    echs = res.get("echantillons", [])
-    for k in range(0, len(echs), par_tableau):
-        part = echs[k:k + par_tableau]
-        entetes = ["Analyse"] + [f"{e['id']}" + (f"\n{e['aramis']}" if e.get("aramis") else "") for e in part]
-        lignes = [[libelle(a)] + [e["valeurs"].get(a["nom"], "—") for e in part]
-                  for a in res["analyses"] if any(a["nom"] in e["valeurs"] for e in part)]
-        lignes.append(["Laboratoires"] + [", ".join(e.get("labos", [])) or "—" for e in part])
+    echs, analyses = res.get("echantillons", []), res.get("analyses", [])
+    for k in range(0, max(len(analyses), 1), par_tableau):
+        part = analyses[k:k + par_tableau]
+        entetes = ["Échantillon"] + [libelle(a) for a in part]
+        lignes = [["\n".join(x for x in (e["id"], e.get("aramis") or "", ", ".join(e.get("labos", []))) if x)]
+                  + [e["valeurs"].get(a["nom"], "—") for a in part] for e in echs]
         out.append((entetes, lignes))
     return out
 

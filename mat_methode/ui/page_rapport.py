@@ -126,15 +126,17 @@ def carte_resultats(ctrl: Controleur, m, rafraichir, ouvert: bool = True) -> QWi
     x.changer_note(f"{n} / {total} échantillon{'s' if total > 1 else ''}")
     x.ajouter(ligne(etiquette(f"Retrouvés par le n° Aramis · {lu.origine}. Repris dans le PDF du rapport, le Word et le Protocole.",
                               secondaire=True, wrap=True), "stretch", bouton("Actualiser", actualiser, tip="Relire le classeur des analyses")))
-    echs = res["echantillons"]
-    entetes = ["Analyse"] + [f"{e['id']} · {e['aramis']}" if e.get("aramis") else e["id"] for e in echs]
-    lignes = [[libelle(a)] + [e["valeurs"].get(a["nom"], "—") for e in echs] for a in res["analyses"]]
-    lignes.append(["Laboratoires"] + [", ".join(e.get("labos", [])) or "—" for e in echs])
+    echs, analyses = res["echantillons"], res["analyses"]
+    entetes = ["Éch.", "N° Aramis", "Labos"] + [libelle(a) for a in analyses]
+    lignes = [[e["id"], e.get("aramis") or "", ", ".join(e.get("labos", [])) or "—"] + [e["valeurs"].get(a["nom"], "—") for a in analyses]
+              for e in echs]
     t = table(entetes, lignes)
     t.horizontalHeader().setSectionResizeMode(len(entetes) - 1, QHeaderView.ResizeMode.ResizeToContents)
+    t.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # beaucoup d'analyses : défilement horizontal
+    t.setFixedHeight(t.height() + t.horizontalScrollBar().sizeHint().height())
     for i, e in enumerate(echs):
-        for k, a in enumerate(res["analyses"]):
-            it = t.item(k, i + 1)
+        for k, a in enumerate(analyses):
+            it = t.item(i, k + 3)
             if it is not None and e["sources"].get(a["nom"]):
                 it.setToolTip(f"{a['nom']} : {e['valeurs'].get(a['nom'], '')} {a.get('unite', '')} — {e['sources'][a['nom']]}")
     x.ajouter(t)

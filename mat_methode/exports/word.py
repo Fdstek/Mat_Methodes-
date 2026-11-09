@@ -436,10 +436,10 @@ def ecrire_docx(data: dict, chemin) -> None:
     if res and res.get("echantillons"):  # résultats lus dans ana explorer
         from mat_methode.analyses_ptt import tableaux
         n = len(res["echantillons"])
-        for k, (entetes, lignes) in enumerate(tableaux(res, 5)):
+        for k, (entetes, lignes) in enumerate(tableaux(res, 6)):
             nb = len(entetes) - 1
-            tableau("Résultats d’analyses" if k == 0 else "Résultats d’analyses (suite)", [h.replace("\n", " · ") for h in entetes], lignes,
-                    [4.5] + [12.5 / max(nb, 1)] * nb)
+            tableau("Résultats d’analyses" if k == 0 else "Résultats d’analyses (suite)", entetes,
+                    [[ln[0].replace("\n", " · ")] + ln[1:] for ln in lignes], [3.5] + [13.5 / max(nb, 1)] * nb)
             if k == 0:
                 ecrire(doc.add_paragraph(), f"{n} échantillon{'s' if n > 1 else ''} avec des résultats, retrouvé{'s' if n > 1 else ''} par le n° Aramis dans ana explorer"
                        + (f" ({res['source']})" if res.get("source") else "") + ". « — » : pas de résultat.", 8, couleur=MUTED)

@@ -53,7 +53,9 @@ def test_lecture_et_consolidation(tmp_path):
     assert e2["valeurs"]["Azote"] == "<5" and "Phosphore2" not in e2["valeurs"]
     assert A.resume_echantillon(res, "S2").startswith("Phosphore 3,4 ppm · Azote <5")
     entetes, lignes = A.tableaux(res)[0]
-    assert entetes[1] == "S1\n2026001234" and lignes[0] == ["Phosphore (ppm)", "12,5", "3,4", "12,5"] and lignes[-1][0] == "Laboratoires"
+    assert entetes[:3] == ["Échantillon", "Phosphore (ppm)", "Azote (ppm)"]
+    assert lignes[0][:3] == ["S1\n2026001234\nCRES, ATCO", "12,5", "300"] and lignes[1][2] == "<5" and len(lignes) == 3
+    assert len(A.tableaux(res, 2)) == 3  # 5 analyses, 2 par tableau
 
 
 def test_source_et_cache(tmp_path):
@@ -113,8 +115,8 @@ def test_carte_resultats_rapport_et_protocole(qtbot, tmp_path, qapp):
     f.p_rapport.rafraichir()
     carte = next(x for x in f.p_rapport.findChildren(Expander) if x._titre == "Résultats d’analyses")
     t = carte.findChild(QTableWidget)
-    assert t.item(0, 0).text() == "Phosphore (ppm)" and t.item(0, 1).text() == "12,5"
-    assert "ATCO" in t.item(2, 1).toolTip()
+    assert t.horizontalHeaderItem(3).text() == "PHOSPHORE (PPM)" and t.item(0, 0).text() == "S0" and t.item(0, 3).text() == "12,5"
+    assert "ATCO" in t.item(0, 5).toolTip() and t.item(0, 2).text() == "CRES, ATCO"
     f.p_protocole.rafraichir()
     assert any(x._titre == "Résultats d’analyses" for x in f.p_protocole.findChildren(Expander))
     ctrl.fermer()
