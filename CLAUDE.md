@@ -142,8 +142,14 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   de vie récent (`instance.json`, < 15 s) avec le programme de la préférence `ana_explorer_exe` ou la clé `exe` de ses réglages. Retour : PNG + fiche .json
   dans `donnees\analyses\<id manip>\` (`lien_ana.figures / retirer` -> sous-dossier `retirees`) ; `Controleur.figures_ana`, signal `figures_changees`
   (vérification toutes les 3 s) ; `page_rapport.carte_figures` (Rapport et Protocole) ; clé JSON `figures_ana`, `pdf.bloc_figures` (rapport et protocole), images Word.
+- Lot du 10/11 (version 1.12.0, pas de changement de schéma) : photos SamplesTEK (dépôt `Fdstek/SamplesTEK-`, non modifié) : `mat_methode/photos_samplestek.py`
+  lit en lecture seule `<dossier SamplesTEK>\echantillons.db` (table `photos` : `sample_id` = n° lu sur le QR code, comparé au n° Aramis en majuscules sans espaces ;
+  photo retrouvée par son nom sous le dossier si elle a été déplacée) ; dossier = préférence `samplestek_dossier`, sinon `C:\PhotosEchantillons` ;
+  `Controleur.photos_samplestek`, `page_rapport.carte_photos / vignette` (Rapport et Protocole), clé JSON `photos` (avec `miniature` réduite dans
+  `donnees\temp\photos`), `pdf.bloc_photos` (rapport et protocole), tableau d'images Word ; carte Réglages « Photos SamplesTEK ». Tests : `MATMETHODE_SANS_PHOTOS`.
 - À vérifier par l'utilisateur sous Windows :
   - la lecture réelle du classeur des analyses (Réglages › Résultats d'analyses › « Tester la lecture ») ;
+  - les photos SamplesTEK (Réglages › Photos SamplesTEK › « Tester ») : le n° lu sur le QR code doit être le n° Aramis ;
   - l'icône dans la barre des tâches (voir `donnees\logs` : ligne « Icône : … ») ;
   - la lecture réelle de Scirius (Réglages › Fichier Scirius › « Tester la lecture ») ;
   - la police Segoe UI dans les PDF.

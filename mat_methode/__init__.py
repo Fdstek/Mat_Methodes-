@@ -1,9 +1,12 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 DATE_VERSION = "10/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.12.0", "10/11/2026", ["Photos SamplesTEK : les photos de chaque échantillon (retrouvées par son n° Aramis) s’affichent dans Rapport et Protocole ; un clic l’ouvre en grand",
+                              "Ces photos sont reprises dans le PDF du rapport, le Word et le PDF Protocole (3 par ligne, avec température, culot, incident, commentaire)",
+                              "Réglages › Photos SamplesTEK : dossier de stockage de SamplesTEK (C:\\PhotosEchantillons par défaut) et bouton « Tester »"]),
     ("1.11.0", "10/11/2026", ["Bouton « 🔎 ana explorer » à côté du n° d’expérience : ouvre ana explorer (version 48) et y lance la recherche de ce n°",
                               "Dans ana explorer, « → Mat & Méthode » renvoie le tableau et / ou les graphiques : ils s’affichent dans Rapport et Protocole",
                               "Ces tableaux et graphiques sont repris dans le PDF du rapport, le Word et le PDF Protocole ; « Retirer » les enlève"]),
