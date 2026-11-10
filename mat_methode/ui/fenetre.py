@@ -639,6 +639,8 @@ class Fenetre(QMainWindow):
             return
         try:
             data = exporter_json(m, self.ctrl.reglages)
+            if fmt in ("pdf", "protocole", "docx", "json"):  # résultats des échantillons lus dans ana explorer
+                self._ajouter_resultats(data, m)
             if fmt == "pdf":
                 from mat_methode.exports.pdf import ecrire_pdf
                 ecrire_pdf(data, f)
@@ -680,7 +682,25 @@ class Fenetre(QMainWindow):
             return markdown(m, self.ctrl.reglages)
         if fmt == "html":
             return rapport_html(m, self.ctrl.reglages)
-        return json.dumps(exporter_json(m, self.ctrl.reglages), ensure_ascii=False, indent=2)
+        data = exporter_json(m, self.ctrl.reglages)
+        self._ajouter_resultats(data, m)
+        return json.dumps(data, ensure_ascii=False, indent=2)
+
+    def _ajouter_resultats(self, data: dict, m=None) -> None:
+        """Ajoute au document les résultats d'analyses des échantillons disponibles dans ana explorer (clé « resultats ») et
+        les tableaux / graphiques envoyés depuis ana explorer (clé « figures_ana »)."""
+        if m is not None:
+            figs = self.ctrl.figures_ana(m)
+            if figs:
+                data["figures_ana"] = [{k: f[k] for k in ("chemin", "libelle", "titre", "sous_titre", "le")} for f in figs]
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            res = self.ctrl.resultats_manip(data.get("prelevements", []))
+        finally:
+            QApplication.restoreOverrideCursor()
+        if res:
+            data["resultats"] = res
 
     def autres_formats(self, ident: str | None = None):
         m = self.ctrl.manip(ident) if ident else self.ctrl.courante

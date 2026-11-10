@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import re
+from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
@@ -432,6 +433,27 @@ def ecrire_docx(data: dict, chemin) -> None:
                 [[p["id"], "entrée" if not p["apres_etape"] else f"{p['apres_etape']} · {etapes[p['apres_etape'] - 1]['operation']}", moment_texte(p),
                   f"{fmt_vol(p['volume_ml'] or 0)} mL", p.get("scirius"), p.get("aramis"), p.get("labo"), ", ".join(p.get("analyses", []))] for p in pre],
                 [1.2, 3.0, 2.4, 1.7, 1.9, 1.9, 2.0, 2.9])
+    res = data.get("resultats")
+    if res and res.get("echantillons"):  # résultats lus dans ana explorer
+        from mat_methode.analyses_ptt import tableaux
+        n = len(res["echantillons"])
+        for k, (entetes, lignes) in enumerate(tableaux(res, 6)):
+            nb = len(entetes) - 1
+            tableau("Résultats d’analyses" if k == 0 else "Résultats d’analyses (suite)", entetes,
+                    [[ln[0].replace("\n", " · ")] + ln[1:] for ln in lignes], [3.5] + [13.5 / max(nb, 1)] * nb)
+            if k == 0:
+                ecrire(doc.add_paragraph(), f"{n} échantillon{'s' if n > 1 else ''} avec des résultats, retrouvé{'s' if n > 1 else ''} par le n° Aramis dans ana explorer"
+                       + (f" ({res['source']})" if res.get("source") else "") + ". « — » : pas de résultat.", 8, couleur=MUTED)
+    figs = [f for f in data.get("figures_ana") or [] if Path(f.get("chemin", "")).exists()]
+    if figs:  # tableau / graphiques envoyés depuis ana explorer
+        doc.add_heading("Tableaux et graphiques (ana explorer)", level=2)
+        for f in figs:
+            try:
+                doc.add_picture(f["chemin"], width=Cm(17))
+            except Exception:  # image illisible : ignorée
+                continue
+            ecrire(doc.add_paragraph(), f"{f.get('libelle', '')}" + (f" · {f['titre']}" if f.get("titre") else "")
+                   + (f" — {f['sous_titre']}" if f.get("sous_titre") else "") + f" (ana explorer, {f.get('le', '')})", 8, couleur=MUTED)
     if lanc:
         if jr:
             tableau("Modifications après lancement", ["Date et heure", "Par", "Modification"],
