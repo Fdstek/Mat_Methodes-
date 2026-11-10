@@ -9,6 +9,7 @@ if hasattr(time, "tzset"):  # absent sous Windows : on y suppose un PC réglé s
     time.tzset()
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["MATMETHODE_SANS_SCIRIUS"] = "1"  # pas de lecture Scirius en arrière-plan (ni d'Excel) pendant les tests
+os.environ["MATMETHODE_SANS_PHOTOS"] = "1"  # pas de lecture de C:\\PhotosEchantillons (SamplesTEK) pendant les tests, sauf dossier choisi
 os.environ["MATMETHODE_SANS_ANALYSES"] = "1"  # pas de lecture du classeur des analyses (ana explorer) pendant les tests
 
 EXEMPLES = Path(__file__).resolve().parents[1] / "docs" / "cahier_des_charges" / "exemples"

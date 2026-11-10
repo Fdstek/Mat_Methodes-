@@ -689,7 +689,18 @@ class Fenetre(QMainWindow):
     def _ajouter_resultats(self, data: dict, m=None) -> None:
         """Ajoute au document les résultats d'analyses des échantillons disponibles dans ana explorer (clé « resultats ») et
         les tableaux / graphiques envoyés depuis ana explorer (clé « figures_ana »)."""
-        if m is not None:
+        if m is not None:  # photos SamplesTEK des échantillons (n° Aramis), réduites pour ne pas alourdir le document
+            from mat_methode.photos_samplestek import miniature
+            photos, _lu = self.ctrl.photos_samplestek(data.get("prelevements", []))
+            tmp = self.ctrl.st.donnees / "temp" / "photos"
+            for e in photos:
+                for ph in e["photos"]:
+                    try:
+                        ph["miniature"] = miniature(ph["fichier"], tmp)
+                    except Exception:  # photo illisible : la photo d'origine sera essayée
+                        ph["miniature"] = ph["fichier"]
+            if photos:
+                data["photos"] = photos
             figs = self.ctrl.figures_ana(m)
             if figs:
                 data["figures_ana"] = [{k: f[k] for k in ("chemin", "libelle", "titre", "sous_titre", "le")} for f in figs]

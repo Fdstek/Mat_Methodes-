@@ -366,6 +366,33 @@ class Controleur(QObject):
             self.figures_changees.emit()
         self._sig_figures = sig
 
+    # ------------------------------------------------------------ photos SamplesTEK
+    def dossier_samplestek(self) -> str:
+        """Dossier de stockage de SamplesTEK (préférence propre au poste ; vide = C:\\PhotosEchantillons)."""
+        return str(self.st.lire_preferences().get("samplestek_dossier") or "")
+
+    def choisir_dossier_samplestek(self, chemin: str) -> None:
+        p = self.st.lire_preferences()
+        p["samplestek_dossier"] = chemin
+        self.st.ecrire_preferences(p)
+
+    def photos_samplestek(self, prelevements: list[dict]):
+        """Photos SamplesTEK des échantillons (étiquette, n° Aramis) : (bloc « photos » des documents, lecture)."""
+        import os
+
+        from mat_methode.photos_samplestek import Lecture, dossier_effectif, lire, pour_export
+        if os.environ.get("MATMETHODE_SANS_PHOTOS") and not self.dossier_samplestek():
+            return [], Lecture()
+        aramis = [p["aramis"] for p in prelevements if p.get("aramis")]
+        if not aramis:
+            return [], Lecture()
+        try:
+            lu = lire(dossier_effectif(self.dossier_samplestek()), aramis)
+        except Exception as ex:  # jamais bloquant
+            log.info("Photos SamplesTEK : %s", ex)
+            return [], Lecture(erreur=str(ex))
+        return pour_export(lu, prelevements), lu
+
     def precharger_analyses(self) -> None:
         import os
         import threading

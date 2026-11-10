@@ -720,6 +720,39 @@ def bloc_figures(data: dict, s: dict) -> list:
     return out
 
 
+def bloc_photos(data: dict, s: dict) -> list:
+    """Photos des échantillons prises avec SamplesTEK (retrouvées par le n° Aramis), 3 par ligne, avec leur légende."""
+    from pathlib import Path
+
+    from reportlab.platypus import Image
+    blocs = data.get("photos") or []
+    out = []
+    larg_case = 174 * mm / 3
+    for e in blocs:
+        cases = []
+        for ph in e.get("photos", []):
+            f = ph.get("miniature") or ph.get("fichier") or ""
+            if not Path(f).exists():
+                continue
+            try:
+                img = Image(f)
+            except Exception:  # photo illisible : ignorée
+                continue
+            r = min((larg_case - 4 * mm) / img.imageWidth, 48 * mm / img.imageHeight)
+            img.drawWidth, img.drawHeight = img.imageWidth * r, img.imageHeight * r
+            leg = Paragraph(escape(ph.get("legende") or "") + (f"<br/><i>{escape(ph['commentaire'])}</i>" if ph.get("commentaire") else ""), s["petit"])
+            cases.append([img, leg])
+        if not cases:
+            continue
+        lignes = [cases[k:k + 3] + [""] * (3 - len(cases[k:k + 3])) for k in range(0, len(cases), 3)]
+        t = Table(lignes, colWidths=[larg_case] * 3)
+        t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                               ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        titre = Paragraph(f"<b>{escape(e['id'])}</b> · n° Aramis {escape(e.get('aramis') or '')}", s["corps"])
+        out.append(KeepTogether(([Paragraph("Photos des échantillons (SamplesTEK)", s["h2"])] if not out else []) + [titre, Spacer(1, 1 * mm), t]))
+    return out
+
+
 def ecrire_pdf(data: dict, chemin) -> None:
     s = styles()
     corps, petit, h1, h2, h3, cell = s["corps"], s["petit"], s["h1"], s["h2"], s["h3"], s["cell"]
@@ -751,6 +784,7 @@ def ecrire_pdf(data: dict, chemin) -> None:
         story.append(KeepTogether([Paragraph("Échantillons", h2), tab]))
     story += bloc_resultats(data, s)  # résultats lus dans ana explorer
     story += bloc_figures(data, s)  # tableau / graphiques envoyés depuis ana explorer
+    story += bloc_photos(data, s)  # photos SamplesTEK des échantillons
 
     if lanc:
         story.append(Paragraph("Modifications après lancement", h2))  # keepWithNext : suit le tableau

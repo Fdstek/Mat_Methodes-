@@ -179,6 +179,76 @@ def carte_figures(ctrl: Controleur, m, rafraichir, ouvrir_fichier, ouvert: bool 
     return x
 
 
+def vignette(fichier: str, cote: int = 170) -> QLabel:
+    """Miniature d'une photo (lecture réduite : rapide même pour une photo 4K)."""
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QImageReader, QPixmap
+    lab = QLabel()
+    r = QImageReader(fichier)
+    r.setAutoTransform(True)
+    t = r.size()
+    if t.isValid() and t.width() > 0:
+        k = cote / max(t.width(), t.height())
+        r.setScaledSize(QSize(max(1, int(t.width() * k)), max(1, int(t.height() * k))))
+    img = r.read()
+    if not img.isNull():
+        lab.setPixmap(QPixmap.fromImage(img))
+    else:
+        lab.setText("photo illisible")
+    lab.setFixedSize(cote, cote)
+    lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    lab.setStyleSheet(f"QLabel{{background:{theme.P.fond};border-radius:6px;}}")
+    return lab
+
+
+def carte_photos(ctrl: Controleur, m, ouvrir_fichier, ouvert: bool = True) -> QWidget | None:
+    """Carte « Photos des échantillons (SamplesTEK) » : photos prises avec SamplesTEK, retrouvées par le n° Aramis de chaque
+    échantillon. Un clic sur une photo l'ouvre en grand. Rien quand aucun échantillon n'a de n° Aramis."""
+    from mat_methode.ui.widgets import Expander, flux_widgets
+    pre = prelevements_manip(m)
+    if not any(p["aramis"] for p in pre):
+        return None
+    bloc, lu = ctrl.photos_samplestek(pre)
+    n = sum(len(e["photos"]) for e in bloc)
+    x = Expander("Photos des échantillons (SamplesTEK)", f"{n} photo{'s' if n > 1 else ''}" if n else "", ouvert=ouvert and bool(n))
+    if not bloc:
+        x.ajouter(etiquette("Aucune photo SamplesTEK pour les n° Aramis de cette manip." if not lu.erreur else
+                            f"{lu.erreur} (Réglages › Photos SamplesTEK).", secondaire=True, wrap=True))
+        return x
+    x.ajouter(etiquette(f"Retrouvées par le n° Aramis dans {lu.dossier}. Clique une photo pour l’ouvrir en grand. "
+                        "Reprises dans le PDF du rapport, le Word et le Protocole.", secondaire=True, wrap=True))
+    for e in bloc:
+        x.ajouter(etiquette(f"<b>{escape(e['id'])}</b> · n° Aramis {escape(e['aramis'])} · {len(e['photos'])} photo{'s' if len(e['photos']) > 1 else ''}",
+                            "titreCarte"))
+        cases = []
+        for ph in e["photos"]:
+            w = QWidget()
+            v = QVBoxLayout(w)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(2)
+            img = vignette(ph["fichier"])
+            img.setCursor(Qt.CursorShape.PointingHandCursor)
+            img.setToolTip(ph["fichier"] + (f"\n{ph['commentaire']}" if ph["commentaire"] else ""))
+            img.mousePressEvent = lambda _e, c=ph["fichier"]: ouvrir_fichier(c)
+            v.addWidget(img)
+            # légende sur des lignes courtes (température et culot / incident, date, commentaire) : jamais coupée
+            morceaux = ph["legende"].split(" · ")
+            quand = next((x for x in morceaux if "/" in x and ":" in x), "")
+            haut = " · ".join(x for x in morceaux if x != quand)
+            lignes_leg = [(t, i) for t, i in ((haut, False), (quand, False), (ph["commentaire"], True)) if t]
+            for txt, ital in lignes_leg:
+                lg = etiquette(f"<i>{escape(txt)}</i>" if ital else escape(txt), secondaire=True)
+                lg.setFixedWidth(170)
+                lg.setToolTip(txt)
+                v.addWidget(lg)
+            v.addStretch(1)
+            # taille explicite : la rangée de photos est mesurée avant que la police (feuille de style) soit appliquée
+            w.setFixedSize(170, 170 + 4 + len(lignes_leg) * (img.fontMetrics().height() + 6))
+            cases.append(w)
+        x.ajouter(flux_widgets(cases))
+    return x
+
+
 class PageRapport(QWidget):
     exporter_pdf = Signal()
     exporter_word = Signal()
@@ -304,6 +374,9 @@ class PageRapport(QWidget):
         figs = carte_figures(self.ctrl, m, self.rafraichir, self.ouvrir_fichier.emit)  # tableau / graphiques envoyés par ana explorer
         if figs is not None:
             self.lay.addWidget(figs)
+        photos = carte_photos(self.ctrl, m, self.ouvrir_fichier.emit)  # photos SamplesTEK (n° Aramis)
+        if photos is not None:
+            self.lay.addWidget(photos)
         if m.statuts:
             self.lay.addWidget(etiquette("Historique des statuts", "sousTitre"))
             self.lay.addWidget(table(["Date et heure", "Par", "Changement de statut"],

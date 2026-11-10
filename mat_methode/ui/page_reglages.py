@@ -84,6 +84,8 @@ class PageReglages(QWidget):
              "choisi" if r.scirius_fichier else "auto", self._scirius),
             ("analyses_ptt", "Résultats d’analyses", "Lien avec ana explorer : résultats des échantillons (n° Aramis) dans le Rapport et le Protocole",
              "choisi" if self.ctrl.fichier_analyses() else "auto", self._analyses_ptt),
+            ("samplestek", "Photos SamplesTEK", "Photos des échantillons prises avec SamplesTEK, retrouvées par le n° Aramis",
+             "choisi" if self.ctrl.dossier_samplestek() else "auto", self._samplestek),
         ]
 
     def ouvrir(self, cle: str | None):
@@ -398,6 +400,49 @@ class PageReglages(QWidget):
             self._actualiser()
 
         x.ajouter(ligne(champ("Programme ana explorer", prog), bouton("Parcourir…", parcourir_exe), bouton("Automatique", exe_automatique), "stretch"))
+
+    # ------------------------------------------------------------ photos SamplesTEK
+    def _samplestek(self):
+        from mat_methode import photos_samplestek as P
+        x = self._section("Photos SamplesTEK")
+        x.ajouter(etiquette("SamplesTEK (« Suivi Photos Échantillons ») enregistre chaque photo avec le n° d’échantillon lu sur le QR code "
+                            "de l’étiquette. Mat & Méthode retrouve les photos de chaque échantillon par son n° Aramis et les affiche dans "
+                            "Rapport et Protocole (et dans les PDF / Word). Indique le dossier de stockage de SamplesTEK (celui qui contient "
+                            f"« {P.BASE} », voir SamplesTEK › Stockage) ; sans choix : {P.DOSSIER_DEFAUT}. La base est lue sans jamais être "
+                            "modifiée ; ce choix ne vaut que pour toi.", secondaire=True, wrap=True))
+        chemin = ChampTexte(self.ctrl.dossier_samplestek(), f"automatique : {P.DOSSIER_DEFAUT}")
+        chemin.setReadOnly(True)
+        resultat = etiquette("", secondaire=True, wrap=True)
+
+        def parcourir():
+            from PySide6.QtWidgets import QFileDialog
+            d = QFileDialog.getExistingDirectory(self, "Dossier de stockage de SamplesTEK", self.ctrl.dossier_samplestek() or P.DOSSIER_DEFAUT)
+            if d:
+                self.ctrl.choisir_dossier_samplestek(d)
+                self._actualiser()
+
+        def auto():
+            self.ctrl.choisir_dossier_samplestek("")
+            self._actualiser()
+
+        def tester():
+            import sqlite3
+            from pathlib import Path
+            db = Path(P.dossier_effectif(self.ctrl.dossier_samplestek())) / P.BASE
+            if not db.exists():
+                resultat.setText(f"Base introuvable : {db}")
+                return
+            try:
+                con = sqlite3.connect(f"{db.as_uri()}?mode=ro", uri=True, timeout=5)
+                n, e = con.execute("SELECT COUNT(*), COUNT(DISTINCT sample_id) FROM photos").fetchone()
+                con.close()
+                resultat.setText(f"{n} photos de {e} échantillons dans {db}")
+            except sqlite3.Error as ex:
+                resultat.setText(f"Base illisible : {ex}")
+
+        x.ajouter(ligne(champ("Dossier de stockage SamplesTEK", chemin), bouton("Parcourir…", parcourir), bouton("Automatique", auto),
+                        bouton("Tester", tester, accent=True), "stretch"))
+        x.ajouter(resultat)
 
     # ------------------------------------------------------------ opérations (sous-étapes)
     def _operations(self):
