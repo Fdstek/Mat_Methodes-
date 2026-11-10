@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.page_flux import PageFlux
-from mat_methode.ui.page_rapport import carte_figures, carte_resultats, ligne_emis
+from mat_methode.ui.page_rapport import carte_figures, carte_photos, carte_resultats, ligne_emis
 from mat_methode.ui.widgets import InfoBar, bouton, etiquette, vider
 
 
@@ -76,4 +76,7 @@ class PageProtocole(QWidget):
             figs = carte_figures(self.ctrl, m, self.rafraichir, self.ouvrir_fichier.emit, ouvert=False)
             if figs is not None:
                 self.lay.addWidget(figs)
+            photos = carte_photos(self.ctrl, m, self.ouvrir_fichier.emit, ouvert=False)
+            if photos is not None:
+                self.lay.addWidget(photos)
         self.flux.rafraichir()

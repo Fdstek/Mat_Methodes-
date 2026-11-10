@@ -454,6 +454,21 @@ def ecrire_docx(data: dict, chemin) -> None:
                 continue
             ecrire(doc.add_paragraph(), f"{f.get('libelle', '')}" + (f" · {f['titre']}" if f.get("titre") else "")
                    + (f" — {f['sous_titre']}" if f.get("sous_titre") else "") + f" (ana explorer, {f.get('le', '')})", 8, couleur=MUTED)
+    if data.get("photos"):  # photos SamplesTEK des échantillons, 3 par ligne
+        doc.add_heading("Photos des échantillons (SamplesTEK)", level=2)
+        for e in data["photos"]:
+            ph = [x for x in e.get("photos", []) if Path(x.get("miniature") or x.get("fichier") or "").exists()]
+            if not ph:
+                continue
+            ecrire(doc.add_paragraph(), f"{e['id']} · n° Aramis {e.get('aramis', '')}", 9.5, gras=True)
+            tb = doc.add_table(rows=(len(ph) + 2) // 3, cols=3)
+            for k, x in enumerate(ph):
+                cell = tb.rows[k // 3].cells[k % 3]
+                try:
+                    cell.paragraphs[0].add_run().add_picture(x.get("miniature") or x["fichier"], width=Cm(5.3))
+                except Exception:  # photo illisible : ignorée
+                    continue
+                ecrire(cell.add_paragraph(), x.get("legende", "") + (f"\n{x['commentaire']}" if x.get("commentaire") else ""), 8, couleur=MUTED)
     if lanc:
         if jr:
             tableau("Modifications après lancement", ["Date et heure", "Par", "Modification"],
