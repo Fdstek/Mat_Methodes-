@@ -82,6 +82,8 @@ class PageReglages(QWidget):
             ("tags", "Tags", "Ajouter, renommer, retirer, ordre et couleur des tags", f"{len(tous_les_tags(self.ctrl.manips))}", self._tags),
             ("scirius", "Fichier Scirius", "Lien avec le suivi des enregistrements Scirius (SharePoint)",
              "choisi" if r.scirius_fichier else "auto", self._scirius),
+            ("analyses_ptt", "Résultats d’analyses", "Lien avec ana explorer : résultats des échantillons (n° Aramis) dans le Rapport et le Protocole",
+             "choisi" if self.ctrl.fichier_analyses() else "auto", self._analyses_ptt),
         ]
 
     def ouvrir(self, cle: str | None):
@@ -338,6 +340,64 @@ class PageReglages(QWidget):
 
         nom.returnPressed.connect(ajout_nom)
         x.ajouter(ligne(champ("Nouveau nom", nom), bouton("Ajouter", ajout_nom), "stretch"))
+
+    # ------------------------------------------------------------ résultats d'analyses (ana explorer)
+    def _analyses_ptt(self):
+        from mat_methode import analyses_ptt as A
+        x = self._section("Résultats d’analyses (ana explorer)")
+        x.ajouter(etiquette(f"Le classeur « {A.FICHIER} » (onglet « {A.FEUILLE} ») est celui d’ana explorer. Chaque échantillon "
+                            "est retrouvé par son n° Aramis (sinon son n° Scirius) : ses résultats s’affichent dans Rapport et Protocole, "
+                            "et sont repris dans les PDF et le Word. Le classeur est ouvert en lecture seule. Il est cherché "
+                            "automatiquement : le fichier ouvert par ana explorer sur ce poste, puis tes dossiers OneDrive / SharePoint. "
+                            "Tu peux aussi choisir un fichier ici (ce choix ne vaut que pour toi).", secondaire=True, wrap=True))
+        chemin = ChampTexte(self.ctrl.fichier_analyses(), "automatique")
+        chemin.setReadOnly(True)
+
+        def parcourir():
+            from PySide6.QtWidgets import QFileDialog
+            f, _ = QFileDialog.getOpenFileName(self, "Choisir le classeur des analyses", "", "Classeur Excel (*.xlsm *.xlsx)")
+            if f:
+                self.ctrl.choisir_fichier_analyses(f)
+                self._actualiser()
+
+        def auto():
+            self.ctrl.choisir_fichier_analyses("")
+            self._actualiser()
+
+        resultat = etiquette("", secondaire=True, wrap=True)
+
+        def tester():
+            from PySide6.QtWidgets import QApplication
+            resultat.setText("Lecture en cours (la première lecture peut prendre une minute)…")
+            QApplication.processEvents()
+            lu = self.ctrl.lire_analyses(True, lambda t: (resultat.setText(t), QApplication.processEvents()))
+            resultat.setText(f"{len(lu.par_aramis)} n° Aramis avec des résultats · {len(lu.analyses)} analyses · {lu.origine}" if not lu.vide else
+                             "Classeur introuvable ou illisible : " + (" | ".join(lu.ecartes[:3]) or "aucune source"))
+
+        x.ajouter(ligne(champ("Fichier choisi", chemin), bouton("Parcourir…", parcourir), bouton("Automatique", auto),
+                        bouton("Tester la lecture", tester, accent=True), "stretch"))
+        x.ajouter(resultat)
+        # programme ana explorer : lancé par le bouton « 🔎 ana explorer » à côté du n° d'expérience
+        from mat_methode.lien_ana import exe_auto
+        x.ajouter(etiquette("Programme ana explorer : ouvert par le bouton « 🔎 ana explorer » à côté du n° d’expérience. "
+                            "Il est retrouvé tout seul dès qu’ana explorer (version 48 ou plus) a été ouvert une fois sur ce poste ; "
+                            "sinon choisis le fichier PTT_Analysis_Explorer.exe (ce choix ne vaut que pour toi).", secondaire=True, wrap=True))
+        choisi = str(self.ctrl.st.lire_preferences().get("ana_explorer_exe") or "")
+        prog = ChampTexte(choisi, f"automatique : {exe_auto()}" if exe_auto() else "automatique (pas encore trouvé)")
+        prog.setReadOnly(True)
+
+        def parcourir_exe():
+            from PySide6.QtWidgets import QFileDialog
+            f, _ = QFileDialog.getOpenFileName(self, "Choisir le programme ana explorer", "", "Programme (*.exe *.py *.pyw)")
+            if f:
+                self.ctrl.choisir_exe_ana(f)
+                self._actualiser()
+
+        def exe_automatique():
+            self.ctrl.choisir_exe_ana("")
+            self._actualiser()
+
+        x.ajouter(ligne(champ("Programme ana explorer", prog), bouton("Parcourir…", parcourir_exe), bouton("Automatique", exe_automatique), "stretch"))
 
     # ------------------------------------------------------------ opérations (sous-étapes)
     def _operations(self):
