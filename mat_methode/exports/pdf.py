@@ -695,6 +695,31 @@ def bloc_resultats(data: dict, s: dict) -> list:
     return out
 
 
+def bloc_figures(data: dict, s: dict) -> list:
+    """Tableaux et graphiques envoyés depuis ana explorer (images PNG), chacun avec sa légende, pleine largeur."""
+    from pathlib import Path
+
+    from reportlab.platypus import Image
+    figs = [f for f in data.get("figures_ana") or [] if Path(f.get("chemin", "")).exists()]
+    if not figs:
+        return []
+    out = []
+    for k, f in enumerate(figs):
+        try:
+            img = Image(f["chemin"])
+        except Exception:  # image illisible : ignorée
+            continue
+        larg, haut = 174 * mm, 200 * mm
+        r = min(larg / img.imageWidth, haut / img.imageHeight)
+        img.drawWidth, img.drawHeight = img.imageWidth * r, img.imageHeight * r
+        legende = Paragraph(f"<b>{escape(f.get('libelle') or '')}</b>" + (f" · {escape(f['titre'])}" if f.get("titre") else "")
+                            + (f" — {escape(f['sous_titre'])}" if f.get("sous_titre") else "")
+                            + f" <font color='#566360'>(ana explorer, {escape(f.get('le') or '')})</font>", s["petit"])
+        bloc = ([Paragraph("Tableaux et graphiques (ana explorer)", s["h2"])] if not out else []) + [img, Spacer(1, 1 * mm), legende, Spacer(1, 4 * mm)]
+        out.append(KeepTogether(bloc))
+    return out
+
+
 def ecrire_pdf(data: dict, chemin) -> None:
     s = styles()
     corps, petit, h1, h2, h3, cell = s["corps"], s["petit"], s["h1"], s["h2"], s["h3"], s["cell"]
@@ -725,6 +750,7 @@ def ecrire_pdf(data: dict, chemin) -> None:
     if tab is not None:
         story.append(KeepTogether([Paragraph("Échantillons", h2), tab]))
     story += bloc_resultats(data, s)  # résultats lus dans ana explorer
+    story += bloc_figures(data, s)  # tableau / graphiques envoyés depuis ana explorer
 
     if lanc:
         story.append(Paragraph("Modifications après lancement", h2))  # keepWithNext : suit le tableau

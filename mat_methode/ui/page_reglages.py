@@ -377,6 +377,27 @@ class PageReglages(QWidget):
         x.ajouter(ligne(champ("Fichier choisi", chemin), bouton("Parcourir…", parcourir), bouton("Automatique", auto),
                         bouton("Tester la lecture", tester, accent=True), "stretch"))
         x.ajouter(resultat)
+        # programme ana explorer : lancé par le bouton « 🔎 ana explorer » à côté du n° d'expérience
+        from mat_methode.lien_ana import exe_auto
+        x.ajouter(etiquette("Programme ana explorer : ouvert par le bouton « 🔎 ana explorer » à côté du n° d’expérience. "
+                            "Il est retrouvé tout seul dès qu’ana explorer (version 48 ou plus) a été ouvert une fois sur ce poste ; "
+                            "sinon choisis le fichier PTT_Analysis_Explorer.exe (ce choix ne vaut que pour toi).", secondaire=True, wrap=True))
+        choisi = str(self.ctrl.st.lire_preferences().get("ana_explorer_exe") or "")
+        prog = ChampTexte(choisi, f"automatique : {exe_auto()}" if exe_auto() else "automatique (pas encore trouvé)")
+        prog.setReadOnly(True)
+
+        def parcourir_exe():
+            from PySide6.QtWidgets import QFileDialog
+            f, _ = QFileDialog.getOpenFileName(self, "Choisir le programme ana explorer", "", "Programme (*.exe *.py *.pyw)")
+            if f:
+                self.ctrl.choisir_exe_ana(f)
+                self._actualiser()
+
+        def exe_automatique():
+            self.ctrl.choisir_exe_ana("")
+            self._actualiser()
+
+        x.ajouter(ligne(champ("Programme ana explorer", prog), bouton("Parcourir…", parcourir_exe), bouton("Automatique", exe_automatique), "stretch"))
 
     # ------------------------------------------------------------ opérations (sous-étapes)
     def _operations(self):

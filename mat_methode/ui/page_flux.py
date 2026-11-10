@@ -178,6 +178,19 @@ class PageFlux(QWidget):
         self._colonne = None
         ctrl.analyses_pretes.connect(self._analyses_lues)  # résultats d'ana explorer lus en arrière-plan
 
+    def _ouvrir_ana(self, texte: str = ""):
+        """Bouton « ana explorer » : recherche du n° d'expérience (sinon de la référence) dans ana explorer."""
+        m = self.m
+        recherche = (texte or m.contexte.experience or m.contexte.ref).strip()
+        if not recherche:
+            self.ctrl.toast.emit("Saisis d’abord le n° d’expérience")
+            return
+        try:
+            self.ctrl.toast.emit(self.ctrl.ouvrir_ana(m, recherche))
+        except Exception as ex:
+            from mat_methode.ui import dialogues as D
+            D.informer(self, "ana explorer", f"Impossible d’ouvrir ana explorer : {ex}")
+
     def _analyses_lues(self, _lu=None):
         """Résultats d'analyses arrivés : seule la colonne du flux est redessinée (l'édition en cours n'est pas touchée)."""
         if self.isVisible() and self._colonne is not None and self.m is not None:
@@ -438,7 +451,10 @@ class PageFlux(QWidget):
         g.addWidget(champ("Opérateur (nom d’utilisateur Windows)", op), 2, 1, 1, 2)
         exp = ChampTexte(c.experience, "ex. EXP-2026-014")
         exp.modifie.connect(lambda v: (setattr(c, "experience", v.strip()), self._toucher()))
-        g.addWidget(champ("N° d’expérience", exp), 3, 0)
+        b_ana = bouton("🔎 ana explorer", lambda: self._ouvrir_ana(exp.text()),
+                       tip="Ouvrir ana explorer et y rechercher ce n° d’expérience (résultats, tableau, graphiques)")
+        b_ana.setProperty("garder", True)  # reste utilisable dans la vue en lecture (Protocole, manip validée)
+        g.addWidget(champ("N° d’expérience", ligne(exp, b_ana)), 3, 0)
         att = Liste(r.attributions, c.attribue, vide="Non attribuée")
         att.choisi.connect(lambda v: (setattr(c, "attribue", v), self._toucher()))
         g.addWidget(champ("Attribuée à (liste : Réglages › Personnes)", att), 3, 1, 1, 2)

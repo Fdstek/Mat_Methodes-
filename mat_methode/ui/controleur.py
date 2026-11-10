@@ -32,6 +32,7 @@ class Controleur(QObject):
     presence_changee = Signal()  # quelqu'un a ouvert / fermé l'application ou changé de manip
     scirius_pret = Signal(object)  # lecture du fichier Scirius terminée en arrière-plan
     analyses_pretes = Signal(object)  # lecture des résultats d'analyses (ana explorer) terminée en arrière-plan
+    figures_changees = Signal()  # ana explorer a envoyé (ou on a retiré) un tableau / des graphiques pour la manip courante
 
     def __init__(self, stockage: Stockage):
         super().__init__()
@@ -87,6 +88,11 @@ class Controleur(QObject):
         self.actualiser_presence()
         QTimer.singleShot(3000, self.precharger_scirius)  # après l'ouverture de la fenêtre, sans la ralentir
         QTimer.singleShot(6000, self.precharger_analyses)
+        self._sig_figures = None
+        self._t_figures = QTimer(self)
+        self._t_figures.setInterval(3000)  # envois d'ana explorer : vérifiés toutes les 3 s (contenu du dossier de la manip)
+        self._t_figures.timeout.connect(self._verifier_figures)
+        self._t_figures.start()
         self._t_actualiser.start()
         self._t_dossier.start()
         if st.lecture_seule:
@@ -325,6 +331,40 @@ class Controleur(QObject):
         if not any(p.get("aramis") or p.get("scirius") for p in prelevements):
             return None
         return self.lire_analyses().pour_export(prelevements)
+
+    def exe_ana(self) -> str:
+        """Programme d'ana explorer choisi sur ce poste (préférence), sinon celui qu'ana explorer a noté lui-même."""
+        from mat_methode.lien_ana import exe_auto
+        return str(self.st.lire_preferences().get("ana_explorer_exe") or "") or exe_auto()
+
+    def choisir_exe_ana(self, chemin: str) -> None:
+        p = self.st.lire_preferences()
+        p["ana_explorer_exe"] = chemin
+        self.st.ecrire_preferences(p)
+
+    def ouvrir_ana(self, m, recherche: str) -> str:
+        """Ouvre ana explorer sur cette recherche ; ses envois (tableau, graphiques) arriveront dans donnees\\analyses\\<id>."""
+        from mat_methode.lien_ana import dossier_retour, ouvrir_ana
+        return ouvrir_ana(recherche, m.id, m.nom, dossier_retour(self.st.donnees, m.id), self.exe_ana())
+
+    def figures_ana(self, m) -> list[dict]:
+        from mat_methode.lien_ana import figures
+        return figures(self.st.donnees, m.id)
+
+    def _verifier_figures(self) -> None:
+        m = self.courante
+        if m is None:
+            return
+        from mat_methode.lien_ana import dossier_retour
+        d = dossier_retour(self.st.donnees, m.id)
+        try:
+            sig = (m.id, tuple(sorted((p.name, p.stat().st_mtime) for p in d.glob("*.png")))) if d.is_dir() else (m.id, ())
+        except OSError:
+            return
+        if self._sig_figures is not None and sig != self._sig_figures and sig[0] == self._sig_figures[0]:
+            self._sig_figures = sig
+            self.figures_changees.emit()
+        self._sig_figures = sig
 
     def precharger_analyses(self) -> None:
         import os

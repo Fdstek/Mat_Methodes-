@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from mat_methode.ui.controleur import Controleur
 from mat_methode.ui.page_flux import PageFlux
-from mat_methode.ui.page_rapport import carte_resultats, ligne_emis
+from mat_methode.ui.page_rapport import carte_figures, carte_resultats, ligne_emis
 from mat_methode.ui.widgets import InfoBar, bouton, etiquette, vider
 
 
@@ -31,6 +31,7 @@ class PageProtocole(QWidget):
         self.flux.edition_changee.connect(self.rafraichir)
         racine.addWidget(self.flux)
         ctrl.analyses_pretes.connect(lambda _: self.isVisible() and not self.flux.edition and self.rafraichir())
+        ctrl.figures_changees.connect(lambda: self.isVisible() and not self.flux.edition and self.rafraichir())
 
     def _actions(self) -> list:
         return [bouton("Exporter le protocole (PDF)", self.exporter_pdf.emit, accent=True,
@@ -72,4 +73,7 @@ class PageProtocole(QWidget):
             res = carte_resultats(self.ctrl, m, self.rafraichir, ouvert=False)
             if res is not None:
                 self.lay.addWidget(res)
+            figs = carte_figures(self.ctrl, m, self.rafraichir, self.ouvrir_fichier.emit, ouvert=False)
+            if figs is not None:
+                self.lay.addWidget(figs)
         self.flux.rafraichir()

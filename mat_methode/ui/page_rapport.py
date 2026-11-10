@@ -143,6 +143,42 @@ def carte_resultats(ctrl: Controleur, m, rafraichir, ouvert: bool = True) -> QWi
     return x
 
 
+def carte_figures(ctrl: Controleur, m, rafraichir, ouvrir_fichier, ouvert: bool = True) -> QWidget | None:
+    """Carte « Tableaux et graphiques d'ana explorer » : images envoyées par le bouton « → Mat & Méthode » d'ana explorer,
+    reprises dans le PDF du rapport, le Word et le Protocole. Rien tant qu'aucune image n'a été envoyée."""
+    from PySide6.QtGui import QPixmap
+
+    from mat_methode import lien_ana
+    from mat_methode.ui import dialogues as D
+    from mat_methode.ui.widgets import Expander
+    figs = ctrl.figures_ana(m)
+    if not figs:
+        return None
+    x = Expander("Tableaux et graphiques d’ana explorer", f"{len(figs)}", ouvert=ouvert)
+    x.ajouter(etiquette("Envoyés depuis ana explorer (bouton « → Mat & Méthode »). Repris dans le PDF du rapport, le Word et le Protocole.",
+                        secondaire=True, wrap=True))
+
+    def retirer(f):
+        if D.confirmer(x, "Retirer cette image ?", f"« {f['libelle']} » du {f['le']} ne sera plus dans les documents "
+                       "(elle est rangée dans le dossier « retirees », pas effacée).", "Retirer"):
+            lien_ana.retirer(f["chemin"])
+            rafraichir()
+
+    for f in figs:
+        img = QLabel()
+        pm = QPixmap(f["chemin"])
+        if not pm.isNull():
+            img.setPixmap(pm.scaledToWidth(min(760, pm.width()), Qt.TransformationMode.SmoothTransformation))
+        img.setToolTip(f["chemin"])
+        titre = f"<b>{escape(f['libelle'])}</b>" + (f" · {escape(f['titre'])}" if f["titre"] else "")
+        info = etiquette(f"{titre}<br><span style='color:{theme.P.texte2}'>{escape(f['le'])}" + (f" · {escape(auteur(ctrl.reglages, f['par']))}" if f["par"] else "") + "</span>",
+                         wrap=True)
+        x.ajouter(ligne(info, "stretch", bouton("Ouvrir", lambda c=f["chemin"]: ouvrir_fichier(c), tip="Ouvrir l’image en grand"),
+                        bouton("Retirer", lambda f=f: retirer(f), tip="Ne plus mettre cette image dans les documents")))
+        x.ajouter(img)
+    return x
+
+
 class PageRapport(QWidget):
     exporter_pdf = Signal()
     exporter_word = Signal()
@@ -158,6 +194,7 @@ class PageRapport(QWidget):
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(14)
         ctrl.analyses_pretes.connect(lambda _: self.isVisible() and self.rafraichir())  # résultats lus en arrière-plan
+        ctrl.figures_changees.connect(lambda: self.isVisible() and self.rafraichir())  # envoi d'ana explorer
 
     def rafraichir(self, structure=True):
         m, r = self.ctrl.courante, self.ctrl.reglages
@@ -264,6 +301,9 @@ class PageRapport(QWidget):
         res = carte_resultats(self.ctrl, m, self.rafraichir)  # résultats des échantillons (ana explorer)
         if res is not None:
             self.lay.addWidget(res)
+        figs = carte_figures(self.ctrl, m, self.rafraichir, self.ouvrir_fichier.emit)  # tableau / graphiques envoyés par ana explorer
+        if figs is not None:
+            self.lay.addWidget(figs)
         if m.statuts:
             self.lay.addWidget(etiquette("Historique des statuts", "sousTitre"))
             self.lay.addWidget(table(["Date et heure", "Par", "Changement de statut"],

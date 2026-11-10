@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import re
+from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
@@ -443,6 +444,16 @@ def ecrire_docx(data: dict, chemin) -> None:
             if k == 0:
                 ecrire(doc.add_paragraph(), f"{n} échantillon{'s' if n > 1 else ''} avec des résultats, retrouvé{'s' if n > 1 else ''} par le n° Aramis dans ana explorer"
                        + (f" ({res['source']})" if res.get("source") else "") + ". « — » : pas de résultat.", 8, couleur=MUTED)
+    figs = [f for f in data.get("figures_ana") or [] if Path(f.get("chemin", "")).exists()]
+    if figs:  # tableau / graphiques envoyés depuis ana explorer
+        doc.add_heading("Tableaux et graphiques (ana explorer)", level=2)
+        for f in figs:
+            try:
+                doc.add_picture(f["chemin"], width=Cm(17))
+            except Exception:  # image illisible : ignorée
+                continue
+            ecrire(doc.add_paragraph(), f"{f.get('libelle', '')}" + (f" · {f['titre']}" if f.get("titre") else "")
+                   + (f" — {f['sous_titre']}" if f.get("sous_titre") else "") + f" (ana explorer, {f.get('le', '')})", 8, couleur=MUTED)
     if lanc:
         if jr:
             tableau("Modifications après lancement", ["Date et heure", "Par", "Modification"],

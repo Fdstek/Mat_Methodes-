@@ -25,6 +25,7 @@ from mat_methode.exports.pdf import (
     _depart_commun,
     avec_reperes,
     bloc_a_faire,
+    bloc_figures,
     bloc_resultats,
     bloc_statuts,
     cartouche,
@@ -185,6 +186,7 @@ def ecrire_protocole(data: dict, chemin) -> None:
     story.append(KeepTogether(entete + phases[:1]))  # le titre reste avec la première phase
     story += phases[1:]
     story += bloc_resultats(data, s)  # résultats lus dans ana explorer
+    story += bloc_figures(data, s)  # tableau / graphiques envoyés depuis ana explorer
     story += bloc_statuts(data, s)  # qui a changé le statut, et quand
     doc.build(story, onFirstPage=pied, onLaterPages=pied)
 
