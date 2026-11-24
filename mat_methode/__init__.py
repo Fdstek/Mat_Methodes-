@@ -1,9 +1,10 @@
 """Mat & Méthode : description d'une manip de prétraitement et génération du « Matériel et méthodes »."""
 
 NOM_APPLICATION = "Mat & Méthode"
-VERSION = "1.12.0"
-DATE_VERSION = "10/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
+VERSION = "1.12.1"
+DATE_VERSION = "24/11/2026"  # date de mise à jour, affichée à l'ouverture et dans le menu
 NOUVEAUTES = [
+    ("1.12.1", "24/11/2026", ["Dupliquer une manip garde maintenant sa liste « À faire » (elle disparaissait dans la copie)"]),
     ("1.12.0", "10/11/2026", ["Photos SamplesTEK : les photos de chaque échantillon (retrouvées par son n° Aramis) s’affichent dans Rapport et Protocole ; un clic l’ouvre en grand",
                               "Ces photos sont reprises dans le PDF du rapport, le Word et le PDF Protocole (3 par ligne, avec température, culot, incident, commentaire)",
                               "Réglages › Photos SamplesTEK : dossier de stockage de SamplesTEK (C:\\PhotosEchantillons par défaut) et bouton « Tester »"]),

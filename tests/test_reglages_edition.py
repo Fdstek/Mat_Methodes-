@@ -122,7 +122,8 @@ def test_a_faire():
     m = Manip()
     m.a_faire = [Tache(categorie="Réactif manquant", texte="Commander acide phosphorique")]
     assert Manip.model_validate(m.to_json()).a_faire[0].texte == "Commander acide phosphorique"
-    assert R.dupliquer(m, r).a_faire == []
+    c = R.dupliquer(m, r)  # la copie garde la liste « À faire » (nouveaux identifiants)
+    assert [t.texte for t in c.a_faire] == ["Commander acide phosphorique"] and c.a_faire[0].id != m.a_faire[0].id
 
 
 def test_materiel_dans_les_reglages(exemples):

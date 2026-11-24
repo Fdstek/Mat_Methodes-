@@ -221,3 +221,13 @@ def test_doublons_aramis_et_scirius(ethanol):
     m.prelevements[2].aramis = "A2"
     m.prelevements[1].scirius = "S1"  # même Scirius, même étape : toujours une erreur
     assert any("Scirius S1 en double" in x for x in R.avertissements(m))
+
+
+def test_dupliquer_garde_la_liste_a_faire(ethanol, reglages):
+    from mat_methode.domain.models import Tache
+    ethanol.a_faire = [Tache(categorie="Matériel manquant", texte="Ampoule 1 L"), Tache(categorie="Sécurité", texte="Lire la fiche", fait=True)]
+    c = R.dupliquer(ethanol, reglages)
+    assert [(t.categorie, t.texte, t.fait) for t in c.a_faire] == [("Matériel manquant", "Ampoule 1 L", False), ("Sécurité", "Lire la fiche", True)]
+    assert {t.id for t in c.a_faire}.isdisjoint({t.id for t in ethanol.a_faire})  # nouveaux identifiants
+    c.a_faire[0].fait = True
+    assert ethanol.a_faire[0].fait is False  # la copie est indépendante
