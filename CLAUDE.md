@@ -147,6 +147,7 @@ Le cahier des charges complet est dans `docs/cahier_des_charges/`.
   photo retrouvée par son nom sous le dossier si elle a été déplacée) ; dossier = préférence `samplestek_dossier`, sinon `C:\PhotosEchantillons` ;
   `Controleur.photos_samplestek`, `page_rapport.carte_photos / vignette` (Rapport et Protocole), clé JSON `photos` (avec `miniature` réduite dans
   `donnees\temp\photos`), `pdf.bloc_photos` (rapport et protocole), tableau d'images Word ; carte Réglages « Photos SamplesTEK ». Tests : `MATMETHODE_SANS_PHOTOS`.
+- Lot du 24/11 (version 1.12.1) : `regles.dupliquer` garde la liste « À faire » (nouveaux identifiants des points).
 - À vérifier par l'utilisateur sous Windows :
   - la lecture réelle du classeur des analyses (Réglages › Résultats d'analyses › « Tester la lecture ») ;
   - les photos SamplesTEK (Réglages › Photos SamplesTEK › « Tester ») : le n° lu sur le QR code doit être le n° Aramis ;

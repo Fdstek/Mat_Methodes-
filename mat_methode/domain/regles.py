@@ -692,13 +692,14 @@ def reference_auto(m: Manip, reglages: Reglages, manips: list[Manip], jour: str 
 
 # ------------------------------------------------------------------ duplication (§6.1)
 def dupliquer(m: Manip, reglages: Reglages, nom: str | None = None) -> Manip:
-    """Copie sans lancement ni journal (version 1), sans référence, lot ni numéros Scirius/Aramis."""
+    """Copie sans lancement ni journal (version 1), sans référence, lot ni numéros Scirius/Aramis ; la liste « À faire » est conservée."""
     c = m.copie()
     c.id = nouvel_id()
     c.nom = nom or f"{m.nom} (copie)"
     c.etat = reglages.etat_initial()
     c.rev, c.lancee, c.journal, c.base = 1, None, [], None
-    c.a_faire = []  # la liste « à faire » est propre à chaque manip
+    for t in c.a_faire:  # la liste « À faire » est reprise telle quelle (chaque point a un nouvel identifiant)
+        t.id = nouvel_id()
     c.rapports = []
     c.statuts = []  # nouvel historique des statuts
     c.maj = maintenant_iso()
